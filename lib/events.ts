@@ -30,6 +30,28 @@ export const STRUCTURES: Record<Structure, { label: string; short: string }> = {
   mixed: { label: "Swiss + Top Cut", short: "Swiss + cut" },
 };
 
+export type FeaturedEvent = {
+  name: string;
+  winner: string;
+  community: string;
+  players: number;
+  format: string;
+  winningDeck: string;
+  /** Date-only ISO, so it reads the same regardless of viewer timezone. */
+  date: string;
+};
+
+/** Historical highlight, pinned as the first card on the events page. */
+export const FEATURED_EVENT: FeaturedEvent = {
+  name: "YCS Providence 2012",
+  winner: "Chris LeBlanc",
+  community: "Konami",
+  players: 1154,
+  format: "Wind-Up",
+  winningDeck: "Karakuri Geargia",
+  date: "2012-10-22",
+};
+
 export const events: readonly TournamentEvent[] = [
   {
     slug: "redu-weekly-52",

@@ -45,6 +45,7 @@
   --z-base: 0;
   --z-raise: 10;
   --z-nav: 100;
+  --z-pattern: 800;
   --z-grain: 900;
 
   color-scheme: dark;
@@ -73,6 +74,29 @@ body {
   font-size: 17px;
   line-height: 1.65;
   -webkit-font-smoothing: antialiased;
+}
+
+/* geometric lattice: same chamfer angle as the panels, echoed faintly across
+   the whole page so large empty stretches don't read as flat fill */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-pattern);
+  pointer-events: none;
+  opacity: 0.05;
+  mix-blend-mode: overlay;
+  background-image:
+    repeating-linear-gradient(
+      45deg,
+      var(--c-accent) 0 1px,
+      transparent 1px 64px
+    ),
+    repeating-linear-gradient(
+      -45deg,
+      var(--c-accent) 0 1px,
+      transparent 1px 64px
+    );
 }
 
 /* grain overlay: breaks the flatness of large dark fields */
@@ -744,6 +768,66 @@ a {
   letter-spacing: 0.18em;
   text-transform: uppercase;
   color: var(--c-muted);
+}
+
+/* --- featured event: pinned hall-of-fame card --- */
+
+.featured {
+  margin: 0 0 24px;
+  padding: clamp(20px, 3vw, 30px);
+}
+
+.featured__badge {
+  display: inline-block;
+  margin-bottom: 18px;
+  padding: 5px 14px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--c-accent) 16%, transparent);
+  font-family: var(--f-mono);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--c-accent);
+}
+
+.featured__body {
+  display: grid;
+  gap: clamp(16px, 3vw, 32px);
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+.featured__name {
+  font-size: clamp(20px, 2.4vw, 28px);
+}
+
+.featured__date {
+  margin-top: 6px;
+  font-family: var(--f-mono);
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  color: var(--c-muted);
+}
+
+.featured__stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px 32px;
+  margin: 0;
+}
+
+.featured__stats dt {
+  font-family: var(--f-mono);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--c-muted);
+}
+
+.featured__stats dd {
+  margin: 4px 0 0;
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
 }
 
 .btn--quiet {
@@ -1595,6 +1679,10 @@ a {
 
   .event__signup {
     justify-items: start;
+  }
+
+  .featured__body {
+    grid-template-columns: 1fr;
   }
 
   .filters__actions {

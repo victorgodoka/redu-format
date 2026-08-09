@@ -4,6 +4,7 @@ import { getSession } from "@/lib/auth";
 import {
   ALMOST_FULL,
   allEvents,
+  FEATURED_EVENT,
   fillRatio,
   formatDate,
   formatTime,
@@ -91,10 +92,40 @@ export default async function EventsPage({
         <div className="wrap">
           <p className="tab">Tournaments</p>
           <h1 className="section__title">Events</h1>
-          <p className="lede">
-            Swiss, Single Elimination and Swiss into Top Cut. All times are UTC.
-            Side decking is allowed after game one in every Bo3 event.
-          </p>
+
+          {/* Pinned outside the filtered/paginated list, so it is always the
+              first thing on the page regardless of query params. */}
+          <div className="featured panel">
+            <span className="featured__badge">Hall of Fame</span>
+            <div className="featured__body">
+              <div className="featured__main">
+                <h2 className="featured__name">{FEATURED_EVENT.name}</h2>
+                <p className="featured__date">{formatDate(FEATURED_EVENT.date)}</p>
+              </div>
+              <dl className="featured__stats">
+                <div>
+                  <dt>Winner</dt>
+                  <dd>{FEATURED_EVENT.winner}</dd>
+                </div>
+                <div>
+                  <dt>Community</dt>
+                  <dd>{FEATURED_EVENT.community}</dd>
+                </div>
+                <div>
+                  <dt>Players</dt>
+                  <dd>{FEATURED_EVENT.players.toLocaleString("en-GB")}</dd>
+                </div>
+                <div>
+                  <dt>Format</dt>
+                  <dd>{FEATURED_EVENT.format}</dd>
+                </div>
+                <div>
+                  <dt>Winning deck</dt>
+                  <dd>{FEATURED_EVENT.winningDeck}</dd>
+                </div>
+              </dl>
+            </div>
+          </div>
 
           {/* GET form: filters live in the URL, so results are shareable and
               the page works with JavaScript disabled. */}
