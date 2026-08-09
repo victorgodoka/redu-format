@@ -280,16 +280,89 @@ a {
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--c-muted);
-  transition: color 200ms ease;
+  transition: all 200ms ease;
+}
+
+/* dark ink on gold: light text here measured 1.86:1, well under the 4.5:1 floor */
+.topbar__link-sign-in {
+  padding: 9px 14px;
+  border-radius: 999px;
+  background-color: var(--c-accent);
+  color: #16130c;
+  white-space: nowrap;
+}
+
+.topbar__link-sign-in:hover {
+  background-color: var(--c-accent-hi);
 }
 
 .topbar__link:hover {
   color: var(--c-text);
 }
 
-.topbar__link::before {
+.topbar__link-sign-in:hover {
+  background-color: var(--c-accent-hi);
+  color: #16130c;
+}
+
+.topbar__auth {
+  display: flex;
+  align-items: center;
+}
+
+.topbar__link[data-n]::before {
   content: attr(data-n);
   color: var(--c-accent);
+}
+
+/* --- account chip --- */
+
+.account {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 14px 6px 6px;
+  border: 1px solid var(--c-line);
+  border-radius: 999px;
+  transition: border-color 200ms ease, background 200ms ease;
+}
+
+.account:hover {
+  border-color: var(--c-accent);
+  background: color-mix(in srgb, var(--c-accent) 10%, transparent);
+}
+
+.account__avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  object-fit: cover;
+}
+
+.account__avatar--empty {
+  display: grid;
+  place-items: center;
+  background: var(--c-line);
+  font-family: var(--f-display);
+  font-size: 14px;
+  text-transform: uppercase;
+}
+
+.account__name {
+  font-family: var(--f-mono);
+  font-size: 12px;
+  letter-spacing: 0.1em;
+}
+
+.account__badge {
+  padding: 3px 8px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--c-accent) 18%, transparent);
+  color: var(--c-accent);
+  font-family: var(--f-mono);
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
 }
 
 /* --- hero --- */
@@ -483,6 +556,215 @@ a {
   margin-top: 36px;
 }
 
+/* --- banlist --- */
+
+.section__count {
+  color: var(--c-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.banjump {
+  display: grid;
+  padding: 8px 0;
+}
+
+.banjump__item {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 24px;
+  border-bottom: 1px solid var(--c-line-soft);
+  font-family: var(--f-mono);
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--c-muted);
+  transition: color 200ms ease, background 200ms ease;
+}
+
+.banjump__item:last-child {
+  border-bottom: 0;
+}
+
+.banjump__item:hover {
+  background: color-mix(in srgb, var(--c-accent) 8%, transparent);
+  color: var(--c-text);
+}
+
+.banjump__item b {
+  color: var(--c-accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.cards {
+  display: grid;
+  gap: clamp(14px, 1.6vw, 22px);
+  grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
+  margin: 40px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.card a {
+  width: 100%;
+  position: relative;
+}
+
+/* real card scans are 421x614, so the frame matches instead of cropping */
+.card__art {
+  position: relative;
+  display: block;
+  aspect-ratio: 421 / 614;
+  overflow: hidden;
+  border-radius: 3px;
+  background: var(--c-raise);
+}
+
+.card__art img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.card__name {
+  font-size: 13px;
+  line-height: 1.35;
+  color: #c6c4d2;
+  text-wrap: pretty;
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  display: inline-block;
+  width: 100%;
+}
+
+/* forbidden reads hotter than the rest of the list */
+#forbidden .card__art::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 3px;
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--c-danger) 60%, transparent);
+}
+
+/* --- dashboard --- */
+
+.profile {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 20px;
+  padding-bottom: 36px;
+  border-bottom: 1px solid var(--c-line-soft);
+}
+
+.profile__avatar {
+  width: 72px;
+  height: 72px;
+  border-radius: 999px;
+  object-fit: cover;
+}
+
+.profile__name {
+  font-size: clamp(30px, 4.4vw, 56px);
+}
+
+.profile__meta {
+  margin-top: 8px;
+  font-family: var(--f-mono);
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--c-muted);
+}
+
+.profile__out {
+  margin-left: auto;
+}
+
+.decklist {
+  display: grid;
+  gap: clamp(16px, 2vw, 24px);
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
+  margin: 40px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.deck {
+  transition: transform 220ms ease;
+}
+
+.deck:hover {
+  transform: translateY(-3px);
+}
+
+.deck__link {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 16px;
+}
+
+.deck__cover {
+  position: relative;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 76px;
+  height: 76px;
+  overflow: hidden;
+  border-radius: 4px;
+  background: var(--c-raise);
+}
+
+.deck__cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.deck__body {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.deck__name {
+  font-family: var(--f-display);
+  font-size: 20px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: -0.01em;
+  overflow-wrap: anywhere;
+}
+
+.deck__counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  font-family: var(--f-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--c-muted);
+}
+
+.deck__counts b {
+  color: var(--c-accent);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.empty {
+  display: grid;
+  justify-items: start;
+  gap: 24px;
+  margin-top: 40px;
+  padding: clamp(28px, 4vw, 48px);
+}
+
 /* --- login --- */
 
 .auth {
@@ -584,9 +866,44 @@ a {
   .rows__item[class] {
     padding-inline-start: 0;
   }
+}
 
+/* Below tablet the five numbered links cannot fit on one line, so the brand and
+   the account sit on the first row and the nav becomes a swipeable strip. Every
+   link stays in the DOM and reachable, unlike a collapsed menu. */
+@media (max-width: 719px) {
   .topbar {
     flex-wrap: wrap;
+    gap: 14px;
+    padding-block: 18px;
+  }
+
+  .topbar__auth {
+    margin-inline-start: auto;
+  }
+
+  .topbar__nav {
+    order: 3;
+    flex: 1 0 100%;
+    gap: 20px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    overscroll-behavior-inline: contain;
+    /* bleed to the viewport edge so the strip reads as scrollable */
+    margin-inline: calc(var(--gutter) * -1);
+    padding-inline: var(--gutter);
+    scroll-padding-inline: var(--gutter);
+    /* fade the trailing edge as the affordance for "there is more" */
+    mask-image: linear-gradient(to right, #000 88%, transparent 100%);
+  }
+
+  .topbar__nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .topbar__link {
+    flex: 0 0 auto;
+    white-space: nowrap;
   }
 }
 

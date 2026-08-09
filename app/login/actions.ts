@@ -2,7 +2,7 @@
 
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { exchangeToken, getSession, rateLimit } from "@/lib/auth";
+import { fetchProfile, getSession, rateLimit } from "@/lib/auth";
 
 export type LoginState = { error?: string };
 
@@ -18,20 +18,22 @@ export async function login(
     return { error: "Too many attempts. Wait a minute and try again." };
   }
 
-  const user = await exchangeToken(token);
-  if (!user) return { error: "That token was rejected by Dueling Nexus." };
+  const profile = await fetchProfile(token);
+  if (!profile) return { error: "That token was rejected by Dueling Nexus." };
 
   const session = await getSession();
-  session.name = user.name;
-  session.avatar = user.avatar;
-  session.contributor = user.contributor;
+  session.token = token;
+  session.name = profile.name;
+  session.avatar = profile.avatar;
+  session.contributor = profile.contributor;
+  session.contributorTime = profile.contributorTime;
   await session.save();
 
-  redirect("/login");
+  redirect("/dashboard");
 }
 
 export async function logout() {
   const session = await getSession();
   session.destroy();
-  redirect("/login");
+  redirect("/");
 }

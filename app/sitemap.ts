@@ -1,5 +1,9 @@
 import type { MetadataRoute } from "next";
+import { SITE_URL } from "@/lib/site";
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  return [{ url: "https://reduformat.com", changeFrequency: "weekly" }];
+  return [
+    { url: SITE_URL, changeFrequency: "weekly", priority: 1 },
+    { url: `${SITE_URL}/banlist`, changeFrequency: "yearly", priority: 0.8 },
+  ];
 }

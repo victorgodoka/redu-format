@@ -1,14 +1,8 @@
 import Link from "next/link";
+import SiteHeader from "./site-header";
 
 const DISCORD = "https://discord.gg/reduformat";
 const EVENT_SIGNUP = DISCORD; // TODO: point at the actual signup page
-
-const nav = [
-  { n: "01", label: "Format", href: "#format" },
-  { n: "02", label: "Decks", href: "#why" },
-  { n: "03", label: "Community", href: "#community" },
-  { n: "04", label: "Sign in", href: "/login" },
-];
 
 const facts = [
   { k: "Banlist", v: "September 2012" },
@@ -65,18 +59,9 @@ export default function Home() {
         Skip to content
       </a>
 
-      <div className="wrap">
-        <header className="topbar">
-          <span className="topbar__mark">REDU</span>
-          <nav className="topbar__nav" aria-label="Main">
-            {nav.map(({ n, label, href }) => (
-              <Link key={href} className="topbar__link" data-n={n} href={href}>
-                {label}
-              </Link>
-            ))}
-          </nav>
-        </header>
+      <SiteHeader />
 
+      <div className="wrap">
         <section className="hero panel">
           <p className="hero__kicker">
             <span>September 2012 banlist</span>
@@ -198,6 +183,7 @@ export default function Home() {
             <p>REDU Format</p>
             <div className="site-footer__links">
               <Link href="/login">Sign in</Link>
+              <Link href="/banlist">Banlist</Link>
               <a href={DISCORD} target="_blank" rel="noopener noreferrer">
                 Discord
               </a>

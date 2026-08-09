@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Chakra_Petch, Geist, Geist_Mono } from "next/font/google";
+import { SITE_URL } from "@/lib/site";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -20,7 +21,7 @@ const display = Chakra_Petch({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://reduformat.com"),
+  metadataBase: new URL(SITE_URL),
   title: "REDU Format | Retro Yu-Gi-Oh! Wind-Up Format",
   description:
     "REDU Format is retro Yu-Gi-Oh! on the September 2012 banlist and the Return of the Duelist card pool. Wind-Up, Dark World, Chaos Dragon and more.",
@@ -49,7 +50,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} ${display.variable}`}
     >
-      <body>{children}</body>
+      {/* Extensions mutate <body> before hydration (e.g. adding a "vc-init"
+          class). This only relaxes the check on body's own attributes; real
+          mismatches inside the tree still surface. */}
+      <body suppressHydrationWarning>{children}</body>
     </html>
   );
 }

@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --experimental-strip-types --test app/draw.test.ts lib/rate-limit.test.ts"
+    "test": "node --experimental-strip-types --test app/draw.test.ts lib/rate-limit.test.ts lib/nexus-parse.test.ts"
   },
   "dependencies": {
     "iron-session": "^8.0.4",
