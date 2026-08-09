@@ -160,3 +160,32 @@ test("validateDecks keeps the deck id alongside the verdict", () => {
 test("an empty deck raises nothing here: size is checked elsewhere", () => {
   assert.deepEqual(validateDeck(deck([])).errors, []);
 });
+
+test("the passcode of an errata'd card is never accepted, in any zone", () => {
+  for (const zone of ["main", "extra", "side"] as const) {
+    const lists = { main: pad([]), extra: [], side: [] };
+    lists[zone] = [...lists[zone], SANGAN.id];
+    const result = validateDeck({ id: "z", ...lists });
+    assert.ok(
+      result.errors.some((e) => e.type === "errata"),
+      `passcode slipped through the ${zone} deck`,
+    );
+  }
+});
+
+test("no errata'd card can be spelled with its passcode", () => {
+  // Guards the whole table, not just the one card the cases above use.
+  for (const errata of ERRATAS.slice(0, 25)) {
+    const viaPasscode = validateDeck(deck(pad([errata.id])));
+    assert.ok(
+      viaPasscode.errors.some((e) => e.type === "errata"),
+      `${errata.name} accepted its passcode`,
+    );
+
+    const viaErrata = validateDeck(deck(pad([errata.errataId])));
+    assert.ok(
+      !viaErrata.errors.some((e) => e.type === "errata"),
+      `${errata.name} rejected its own errata id`,
+    );
+  }
+});

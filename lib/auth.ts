@@ -133,6 +133,8 @@ export async function fetchProfile(token: string): Promise<NexusProfile | null> 
 
   const profile: NexusProfile = {
     name,
+    // Empty is fine: the UI falls back to the initial. Rejecting the whole
+    // profile here would lock out any account without an avatar.
     avatar: cleanAvatar(avatar),
     ...parseContributor(contributor),
     decks: (Array.isArray(deck) ? deck : [])

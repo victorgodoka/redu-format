@@ -44,10 +44,10 @@ const BAN_COPIES: Record<string, number> = {
 const DEFAULT_COPIES = 3;
 
 /**
- * When true, a deck must use the pre-errata printing of an errata'd card, since
- * that is the wording this format plays. Flip to false to accept either id.
+ * A deck may never carry the passcode of a card that has an errata: this format
+ * plays the original wording, so the errata id is the only accepted spelling.
+ * Both ids still count as the same card when copies are tallied.
  */
-const REQUIRE_PRE_ERRATA_PRINTING = true;
 
 // ---------------------------------------------------------------------------
 // Indexes, built once per process rather than rebuilt per deck.
@@ -143,18 +143,15 @@ export function validateDeck(deck: NexusDeckLists): DeckValidationResult {
       });
     }
 
-    // 3. Errata. This format plays the original wording, so the original
-    //    printing is the one that belongs in the list.
+    // 3. Errata. The passcode of an errata'd card is never acceptable.
     const errataId = PRINT_BY_PASSCODE.get(passcode);
-    if (REQUIRE_PRE_ERRATA_PRINTING && errataId !== undefined) {
-      if (prints.has(passcode)) {
-        errors.push({
-          type: "errata",
-          cardId: passcode,
-          cardName: nameOf(passcode),
-          errataId,
-        });
-      }
+    if (errataId !== undefined && prints.has(passcode)) {
+      errors.push({
+        type: "errata",
+        cardId: passcode,
+        cardName: nameOf(passcode),
+        errataId,
+      });
     }
   }
 
@@ -177,6 +174,6 @@ export function describeError(error: DeckValidationError): string {
         ? `${error.cardName} is Forbidden, deck has ${error.actualCopies}`
         : `${error.cardName} is limited to ${error.allowedCopies}, deck has ${error.actualCopies}`;
     case "errata":
-      return `${error.cardName} must use the pre-errata printing (${error.errataId})`;
+      return `${error.cardName} has an errata: use card ${error.errataId}, not ${error.cardId}`;
   }
 }

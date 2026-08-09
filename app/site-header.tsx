@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { getSession } from "@/lib/auth";
+import { fetchProfile, getSession } from "@/lib/auth";
 
 const nav = [
   { n: "01", label: "Home", href: "/" },
@@ -12,6 +12,22 @@ const nav = [
 
 export default async function SiteHeader() {
   const session = await getSession();
+
+  /**
+   * Nexus rotates the avatar URL whenever the picture changes, so the copy
+   * saved at login goes stale and 404s. Read the live profile instead; it is
+   * cached for a minute per token, and the session values stay as a fallback
+   * for when the upstream call fails.
+   */
+  const profile = session.token ? await fetchProfile(session.token) : null;
+
+  const account = session.name
+    ? {
+        name: profile?.name ?? session.name,
+        avatar: profile?.avatar ?? session.avatar ?? "",
+        contributor: profile?.contributor ?? session.contributor ?? false,
+      }
+    : null;
 
   return (
     <div className="wrap">
@@ -29,12 +45,12 @@ export default async function SiteHeader() {
         </nav>
 
         <div className="topbar__auth">
-          {session.name ? (
+          {account ? (
             <Link className="account" href="/dashboard">
-              {session.avatar ? (
+              {account.avatar ? (
                 <Image
                   className="account__avatar"
-                  src={session.avatar}
+                  src={account.avatar}
                   alt=""
                   width={32}
                   height={32}
@@ -44,11 +60,11 @@ export default async function SiteHeader() {
                   className="account__avatar account__avatar--empty"
                   aria-hidden="true"
                 >
-                  {session.name.slice(0, 1)}
+                  {account.name.slice(0, 1)}
                 </span>
               )}
-              <span className="account__name">{session.name}</span>
-              {session.contributor ? (
+              <span className="account__name">{account.name}</span>
+              {account.contributor ? (
                 <span className="account__badge">Contributor</span>
               ) : null}
             </Link>
