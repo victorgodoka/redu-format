@@ -61,7 +61,7 @@ test("counts a real deck and picks the first main deck card as cover", () => {
     main: 40,
     extra: 15,
     side: 15,
-    coverId: "64881644",
+    coverId: 64881644,
   });
 });
 
@@ -76,7 +76,7 @@ test("ignores non-numeric ids so the cover url cannot be steered", () => {
     ...MELODIOUS,
     main_deck: "../../etc/passwd,64881644",
   });
-  assert.equal(deck?.coverId, "64881644");
+  assert.equal(deck?.coverId, 64881644);
   assert.equal(deck?.main, 1);
 });
 
@@ -88,7 +88,7 @@ test("survives a deck with no main deck or no name", () => {
     main: 0,
     extra: 0,
     side: 0,
-    coverId: "",
+    coverId: null,
   });
 });
 

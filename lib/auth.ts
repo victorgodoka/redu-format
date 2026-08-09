@@ -5,8 +5,10 @@ import { getIronSession, type SessionOptions } from "iron-session";
 import { cookies } from "next/headers";
 import {
   cleanAvatar,
+  NexusDeckLists,
   parseContributor,
   parseDeck,
+  parseDeckList,
   type NexusDeck,
 } from "./nexus-parse";
 
@@ -21,6 +23,7 @@ export type NexusProfile = {
   /** Unit unconfirmed, never rendered. See parseContributor. */
   contributorTime: number;
   decks: NexusDeck[];
+  deckLists: NexusDeckLists[];
 };
 
 /**
@@ -36,9 +39,22 @@ export type Session = {
   avatar?: string;
   contributor?: boolean;
   contributorTime?: number;
+  /**
+   * Mock registrations: event slug -> deck id. Lives in the cookie because
+   * there is no backend yet, so it is capped to keep the cookie under the 4KB
+   * browser limit. ponytail: move to the events API once it exists.
+   */
+  signups?: { e: string; d: string }[];
 };
 
-export { cleanAvatar, parseContributor, parseDeck } from "./nexus-parse";
+export const MAX_SIGNUPS = 25;
+
+export {
+  cleanAvatar,
+  deckLegality,
+  parseContributor,
+  parseDeck,
+} from "./nexus-parse";
 export type { NexusDeck } from "./nexus-parse";
 
 // Read at call time, not import time, so a missing secret fails the request
@@ -122,6 +138,9 @@ export async function fetchProfile(token: string): Promise<NexusProfile | null> 
     decks: (Array.isArray(deck) ? deck : [])
       .map(parseDeck)
       .filter((d): d is NexusDeck => d !== null),
+    deckLists: (Array.isArray(deck) ? deck : [])
+      .map(parseDeckList)
+      .filter((d): d is NexusDeckLists => d !== null),
   };
 
   if (profiles.size >= CACHE_MAX) profiles.clear();

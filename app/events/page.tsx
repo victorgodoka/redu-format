@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { getSession } from "@/lib/auth";
 import {
   ALMOST_FULL,
   allEvents,
@@ -74,6 +75,9 @@ export default async function EventsPage({
   // One clock for filtering and for labelling, so the two cannot disagree.
   const now = new Date();
   const { items, page, pages, total } = queryEvents(allEvents, query, now);
+
+  const session = await getSession();
+  const registered = new Set((session.signups ?? []).map((s) => s.e));
 
   return (
     <>
@@ -225,13 +229,20 @@ export default async function EventsPage({
                         <a className="btn btn--quiet" href={event.signupUrl}>
                           Results
                         </a>
+                      ) : registered.has(event.slug) ? (
+                        <Link
+                          className="btn btn--in"
+                          href={`/events/${event.slug}/signup`}
+                        >
+                          You are in
+                        </Link>
                       ) : (
-                        <a
+                        <Link
                           className={`btn${full ? "" : " btn--solid"}`}
-                          href={event.signupUrl}
+                          href={`/events/${event.slug}/signup`}
                         >
                           {full ? "Waitlist" : "Sign up"}
-                        </a>
+                        </Link>
                       )}
                     </div>
                   </li>

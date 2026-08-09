@@ -3,7 +3,6 @@ import SiteHeader from "./site-header";
 
 const DISCORD = "https://discord.gg/reduformat";
 const NEXUS = "https://duelingnexus.com";
-const EVENT_SIGNUP = DISCORD; // TODO: point at the actual events page
 
 const facts = [
   { k: "Card pool", v: "Up to Return of the Duelist" },

@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
-import Image from "next/image";
-import { banlist, CARD_IMAGE } from "@/lib/banlist";
+import { BANLIST_IDS } from "@/lib/banlist";
+import { Card } from "@/lib/cards";
 import SiteHeader from "../site-header";
+import CardBrowser, { type BrowserSection } from "./card-browser";
 
 export const metadata: Metadata = {
   title: "REDU Format banlist | September 2012 Forbidden & Limited List",
@@ -18,7 +19,25 @@ export const metadata: Metadata = {
   },
 };
 
-const total = banlist.reduce((sum, section) => sum + section.cards.length, 0);
+/** Wording shown in the preview panel for each section. */
+const LEGALITY: Record<string, string> = {
+  forbidden: "Forbidden",
+  limited: "Limited to 1",
+  "semi-limited": "Semi-Limited to 2",
+  unrestricted: "Unlimited",
+};
+
+// Resolved on the server: CARD_LIB is 1.4MB and must never reach the browser.
+const sections: BrowserSection[] = BANLIST_IDS.map((section) => ({
+  slug: section.slug,
+  label: section.label,
+  copies: section.copies,
+  note: section.note,
+  legality: LEGALITY[section.slug] ?? section.label,
+  cards: section.cards.map(([id]) => new Card(id).toJSON()),
+}));
+
+const total = sections.reduce((sum, section) => sum + section.cards.length, 0);
 
 export default function BanlistPage() {
   return (
@@ -43,11 +62,13 @@ export default function BanlistPage() {
                 </p>
                 <p>
                   Counts are per deck total: your main deck, extra deck and side
-                  deck share the same allowance.
+                  deck share the same allowance. Errata&rsquo;d cards are shown
+                  with their original printing and wording, which is what this
+                  format plays.
                 </p>
               </div>
               <nav className="banjump panel" aria-label="Banlist sections">
-                {banlist.map((section) => (
+                {sections.map((section) => (
                   <a
                     className="banjump__item"
                     key={section.slug}
@@ -62,34 +83,9 @@ export default function BanlistPage() {
           </div>
         </section>
 
-        {banlist.map((section) => (
-          <section className="section" id={section.slug} key={section.slug}>
-            <div className="wrap">
-              <p className="tab">{section.copies}</p>
-              <h2 className="section__title">
-                {section.label}{" "}
-                <span className="section__count">({section.cards.length})</span>
-              </h2>
-              <p className="lede">{section.note}</p>
-
-              <ul className="cards">
-                {section.cards.map(([id, name]) => (
-                  <li className="card" key={id}>
-                    <a target="_blank" className="card__art" href={`https://duelingnexus.com/wiki/${name}`}>
-                      <Image
-                        src={`${CARD_IMAGE}/${id}.jpg`}
-                        alt={name}
-                        width={421}
-                        height={614}
-                        sizes="(max-width: 640px) 40vw, 180px"
-                      />
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </section>
-        ))}
+        <div className="wrap">
+          <CardBrowser sections={sections} />
+        </div>
       </main>
     </>
   );

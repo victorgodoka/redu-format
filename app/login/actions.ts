@@ -3,6 +3,7 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { fetchProfile, getSession, rateLimit } from "@/lib/auth";
+import { safeNext } from "@/lib/safe-next";
 
 export type LoginState = { error?: string };
 
@@ -11,6 +12,7 @@ export async function login(
   form: FormData,
 ): Promise<LoginState> {
   const token = String(form.get("token") ?? "").trim();
+  const next = safeNext(form.get("next"));
   if (!token) return { error: "Paste your Dueling Nexus token." };
 
   const ip = (await headers()).get("x-forwarded-for")?.split(",")[0] ?? "local";
@@ -29,7 +31,7 @@ export async function login(
   session.contributorTime = profile.contributorTime;
   await session.save();
 
-  redirect("/dashboard");
+  redirect(next);
 }
 
 export async function logout() {

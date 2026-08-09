@@ -6,8 +6,15 @@ export type NexusDeck = {
   main: number;
   extra: number;
   side: number;
-  /** Card id for the cover art, "" when the main deck is empty. */
-  coverId: string;
+  /** Card id for the cover art, null when the main deck is empty. */
+  coverId: number | null;
+};
+
+export type NexusDeckLists = {
+  id: string;
+  main: number[];
+  extra: number[];
+  side: number[];
 };
 
 /**
@@ -15,12 +22,25 @@ export type NexusDeck = {
  * than an absent key. Splitting that naively yields [""] and counts as 1, so
  * the blanks are filtered before anything is measured.
  */
-function cardIds(value: unknown): string[] {
+function cardIds(value: unknown): number[] {
   if (typeof value !== "string") return [];
   return value
     .split(",")
     .map((id) => id.trim())
-    .filter((id) => /^\d+$/.test(id));
+    .filter((id) => /^\d+$/.test(id))
+    .map((id) => Number(id))
+}
+
+/**
+ * Standard construction limits: 40 to 60 in the main deck, at most 15 in the
+ * extra and side. A deck outside these cannot be registered for an event.
+ */
+export function deckLegality(deck: NexusDeck): string | null {
+  if (deck.main < 40) return `Main deck has ${deck.main} cards, needs 40`;
+  if (deck.main > 60) return `Main deck has ${deck.main} cards, limit is 60`;
+  if (deck.extra > 15) return `Extra deck has ${deck.extra} cards, limit is 15`;
+  if (deck.side > 15) return `Side deck has ${deck.side} cards, limit is 15`;
+  return null;
 }
 
 export function parseDeck(raw: unknown): NexusDeck | null {
@@ -36,7 +56,20 @@ export function parseDeck(raw: unknown): NexusDeck | null {
     main: main.length,
     extra: cardIds(deck.extra_deck).length,
     side: cardIds(deck.side_deck).length,
-    coverId: main[0] ?? "",
+    coverId: main[0] ?? null,
+  };
+}
+
+export function parseDeckList(raw: unknown): NexusDeckLists | null {
+  if (typeof raw !== "object" || raw === null) return null;
+  const deck = raw as Record<string, unknown>;
+  if (typeof deck.id !== "string" || deck.id.length === 0) return null;
+
+  return {
+    id: deck.id,
+    main: cardIds(deck.main_deck),
+    extra: cardIds(deck.extra_deck),
+    side: cardIds(deck.side_deck),
   };
 }
 

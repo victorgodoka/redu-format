@@ -5,11 +5,12 @@ import { login, type LoginState } from "./actions";
 
 const initial: LoginState = {};
 
-export default function LoginForm() {
+export default function LoginForm({ next }: { next: string }) {
   const [state, action, pending] = useActionState(login, initial);
 
   return (
     <form action={action} className="form">
+      <input type="hidden" name="next" value={next} />
       <label htmlFor="token">Dueling Nexus token</label>
       <input
         id="token"

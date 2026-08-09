@@ -23,6 +23,7 @@ export default async function DashboardPage() {
   const profile = await fetchProfile(session.token);
   if (!profile) redirect("/api/auth/logout");
 
+
   return (
     <>
       <a className="skip-link" href="#main">
