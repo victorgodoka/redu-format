@@ -550,10 +550,275 @@ a {
   margin: 24px auto 0;
 }
 
+.cta .lede + .lede {
+  margin-top: 18px;
+}
+
 .cta__actions {
   display: flex;
   justify-content: center;
   margin-top: 36px;
+}
+
+/* --- events --- */
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 18px;
+  margin-top: 36px;
+  padding: 22px 26px;
+}
+
+.filters__field {
+  display: grid;
+  gap: 7px;
+  min-width: 180px;
+}
+
+.filters__field label {
+  font-family: var(--f-mono);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--c-muted);
+}
+
+.filters__field select {
+  padding: 12px 14px;
+  border: 1px solid var(--c-line);
+  border-radius: 2px;
+  background: var(--c-raise);
+  color: var(--c-text);
+  font-family: var(--f-mono);
+  font-size: 13px;
+}
+
+.filters__actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-inline-start: auto;
+}
+
+.filters__actions .btn {
+  min-width: 130px;
+  padding-block: 12px;
+}
+
+.filters__reset {
+  font-family: var(--f-mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--c-muted);
+  transition: color 200ms ease;
+}
+
+.filters__reset:hover {
+  color: var(--c-accent);
+}
+
+.filters__count {
+  margin-top: 24px;
+  font-family: var(--f-mono);
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--c-muted);
+}
+
+.events {
+  display: grid;
+  gap: 14px;
+  margin: 20px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.event {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr) auto;
+  gap: 26px;
+  align-items: center;
+  padding: 22px 26px;
+}
+
+.event__when {
+  display: grid;
+  gap: 4px;
+  font-family: var(--f-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.event__date {
+  font-size: 13px;
+  color: var(--c-text);
+}
+
+.event__time {
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  color: var(--c-muted);
+}
+
+.event__name {
+  font-size: clamp(19px, 2.2vw, 26px);
+}
+
+.event__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin-top: 10px;
+  font-family: var(--f-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--c-muted);
+}
+
+.event__tag {
+  padding: 3px 9px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--c-accent) 16%, transparent);
+  color: var(--c-accent);
+}
+
+.event__host {
+  margin-top: 10px;
+  font-size: 13px;
+  color: #a9a7b8;
+}
+
+.event__signup {
+  display: grid;
+  justify-items: end;
+  gap: 12px;
+}
+
+.event__seats {
+  font-family: var(--f-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--c-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.event__seats--full {
+  color: var(--c-danger);
+}
+
+.event__seats--almost {
+  color: var(--c-accent);
+}
+
+/* --- finished events --- */
+
+/* Muted rather than hidden: the archive is still worth reading, it just must
+   not compete with what you can still sign up for. */
+.event--past .event__name,
+.event--past .event__date {
+  color: var(--c-muted);
+}
+
+.event--past .event__tag {
+  background: var(--c-line);
+  color: var(--c-muted);
+}
+
+.event--past::before {
+  background: color-mix(in srgb, var(--c-panel) 85%, var(--c-bg));
+}
+
+.event__done {
+  justify-self: start;
+  margin-top: 6px;
+  padding: 3px 9px;
+  border: 1px solid var(--c-line);
+  border-radius: 3px;
+  font-family: var(--f-mono);
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--c-muted);
+}
+
+.btn--quiet {
+  border-color: var(--c-line-soft);
+  color: var(--c-muted);
+}
+
+.btn--quiet:hover {
+  border-color: var(--c-line);
+  background: transparent;
+  color: var(--c-text);
+}
+
+.event__signup .btn {
+  min-width: 150px;
+  padding-block: 12px;
+}
+
+/* --- pager --- */
+
+.pager {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 10px 20px;
+  margin-top: 44px;
+}
+
+.pager__step,
+.pager__num {
+  font-family: var(--f-mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--c-muted);
+  transition: color 200ms ease, background 200ms ease;
+}
+
+.pager__step:hover,
+.pager__num:hover {
+  color: var(--c-accent);
+}
+
+.pager__step--off {
+  opacity: 0.35;
+}
+
+.pager__step--off:hover {
+  color: var(--c-muted);
+}
+
+.pager__pages {
+  display: flex;
+  gap: 6px;
+}
+
+.pager__num {
+  display: grid;
+  place-items: center;
+  min-width: 34px;
+  height: 34px;
+  border: 1px solid var(--c-line);
+  border-radius: 999px;
+  font-variant-numeric: tabular-nums;
+}
+
+.pager__num--on {
+  border-color: var(--c-accent);
+  background: var(--c-accent);
+  color: #16130c;
+}
+
+.pager__num--on:hover {
+  color: #16130c;
 }
 
 /* --- banlist --- */
@@ -904,6 +1169,26 @@ a {
   .topbar__link {
     flex: 0 0 auto;
     white-space: nowrap;
+  }
+}
+
+@media (max-width: 760px) {
+  .event {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .event__signup {
+    justify-items: start;
+  }
+
+  .filters__actions {
+    margin-inline-start: 0;
+    width: 100%;
+  }
+
+  .filters__field {
+    min-width: 100%;
   }
 }
 

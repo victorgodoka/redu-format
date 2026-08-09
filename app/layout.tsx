@@ -24,7 +24,7 @@ export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: "REDU Format | Retro Yu-Gi-Oh! Wind-Up Format",
   description:
-    "REDU Format is retro Yu-Gi-Oh! on the September 2012 banlist and the Return of the Duelist card pool. Wind-Up, Dark World, Chaos Dragon and more.",
+    "The Zexal-era retro Yu-Gi-Oh! format set in October 2012, on the September 2012 banlist with a card pool up to Return of the Duelist. Play it on Dueling Nexus.",
   keywords: [
     "REDU format",
     "Wind-Up format",

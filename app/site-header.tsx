@@ -4,9 +4,9 @@ import { getSession } from "@/lib/auth";
 
 const nav = [
   { n: "01", label: "Home", href: "/" },
-  { n: "02", label: "Banlist", href: "/banlist" },
-  { n: "03", label: "Format", href: "/#format" },
-  { n: "04", label: "Decks", href: "/#why" },
+  { n: "02", label: "Events", href: "/events" },
+  { n: "03", label: "Banlist", href: "/banlist" },
+  { n: "04", label: "Format", href: "/#format" },
   { n: "05", label: "Community", href: "/#community" },
 ];
 

@@ -1,0 +1,288 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+import {
+  ALMOST_FULL,
+  allEvents,
+  fillRatio,
+  formatDate,
+  formatTime,
+  isPast,
+  queryEvents,
+  seatsLeft,
+  STRUCTURES,
+  type EventQuery,
+} from "@/lib/events";
+import SiteHeader from "../site-header";
+
+export const metadata: Metadata = {
+  title: "REDU Format events | Tournaments and schedule",
+  description:
+    "Upcoming REDU Format tournaments: Swiss, Single Elimination and Swiss into Top Cut, with dates, seat counts and signups.",
+  alternates: { canonical: "/events" },
+};
+
+const structureOptions = [
+  { value: "all", label: "All structures" },
+  { value: "swiss", label: "Swiss" },
+  { value: "single-elim", label: "Single Elimination" },
+  { value: "mixed", label: "Swiss + Top Cut" },
+];
+
+const whenOptions = [
+  { value: "upcoming", label: "Upcoming" },
+  { value: "past", label: "Past" },
+  { value: "all", label: "Any date" },
+];
+
+const seatOptions = [
+  { value: "all", label: "Any capacity" },
+  { value: "open", label: "Seats left" },
+  { value: "almost", label: "Almost full (80%+)" },
+  { value: "full", label: "Sold out" },
+];
+
+/** Rebuilds the query string for a page link, keeping the active filters. */
+function pageHref(query: EventQuery, page: number) {
+  const params = new URLSearchParams();
+  if (query.structure && query.structure !== "all") {
+    params.set("structure", query.structure);
+  }
+  if (query.when && query.when !== "upcoming") params.set("when", query.when);
+  if (query.seats && query.seats !== "all") params.set("seats", query.seats);
+  if (page > 1) params.set("page", String(page));
+
+  const qs = params.toString();
+  return qs ? `/events?${qs}` : "/events";
+}
+
+export default async function EventsPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const raw = await searchParams;
+  const pick = (key: string) =>
+    Array.isArray(raw[key]) ? raw[key][0] : raw[key];
+
+  const query: EventQuery = {
+    structure: pick("structure") ?? "all",
+    when: pick("when") ?? "upcoming",
+    seats: pick("seats") ?? "all",
+    page: pick("page"),
+  };
+
+  // One clock for filtering and for labelling, so the two cannot disagree.
+  const now = new Date();
+  const { items, page, pages, total } = queryEvents(allEvents, query, now);
+
+  return (
+    <>
+      <a className="skip-link" href="#main">
+        Skip to content
+      </a>
+
+      <SiteHeader />
+
+      <main className="section" id="main">
+        <div className="wrap">
+          <p className="tab">Tournaments</p>
+          <h1 className="section__title">Events</h1>
+          <p className="lede">
+            Swiss, Single Elimination and Swiss into Top Cut. All times are UTC.
+            Side decking is allowed after game one in every Bo3 event.
+          </p>
+
+          {/* GET form: filters live in the URL, so results are shareable and
+              the page works with JavaScript disabled. */}
+          <form className="filters panel" method="get">
+            <div className="filters__field">
+              <label htmlFor="structure">Structure</label>
+              <select
+                id="structure"
+                name="structure"
+                defaultValue={query.structure}
+              >
+                {structureOptions.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="filters__field">
+              <label htmlFor="when">Date</label>
+              <select id="when" name="when" defaultValue={query.when}>
+                {whenOptions.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="filters__field">
+              <label htmlFor="seats">Seats</label>
+              <select id="seats" name="seats" defaultValue={query.seats}>
+                {seatOptions.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="filters__actions">
+              <button className="btn btn--solid" type="submit">
+                Apply
+              </button>
+              <Link className="filters__reset" href="/events">
+                Reset
+              </Link>
+            </div>
+          </form>
+
+          <p className="filters__count" role="status">
+            {total === 0
+              ? "No events match these filters."
+              : `${total} ${total === 1 ? "event" : "events"} · page ${page} of ${pages}`}
+          </p>
+
+          {items.length === 0 ? (
+            <div className="empty panel">
+              <p className="lede">
+                Nothing scheduled under those filters. Try Any date, or clear
+                the structure filter.
+              </p>
+              <Link className="btn" href="/events">
+                Clear filters
+              </Link>
+            </div>
+          ) : (
+            <ul className="events">
+              {items.map((event) => {
+                const left = seatsLeft(event);
+                const full = left === 0;
+                const past = isPast(event, now);
+                const almost = !full && fillRatio(event) >= ALMOST_FULL;
+
+                return (
+                  <li
+                    className={`event panel${past ? " event--past" : ""}`}
+                    key={event.slug}
+                  >
+                    <div className="event__when">
+                      <span className="event__date">
+                        {formatDate(event.startsAt)}
+                      </span>
+                      <span className="event__time">
+                        {formatTime(event.startsAt)}
+                      </span>
+                      {past ? (
+                        <span className="event__done">Finished</span>
+                      ) : null}
+                    </div>
+
+                    <div className="event__body">
+                      <h2 className="event__name">{event.name}</h2>
+                      <p className="event__meta">
+                        <span className="event__tag">
+                          {STRUCTURES[event.structure].label}
+                        </span>
+                        <span>{event.rounds} rounds</span>
+                        {event.topCut ? <span>Top {event.topCut}</span> : null}
+                        <span>{event.matchFormat}</span>
+                        <span>{event.timeLimit} min + 3 turns</span>
+                      </p>
+                      <p className="event__host">
+                        {event.host} · {event.entry}
+                      </p>
+                    </div>
+
+                    <div className="event__signup">
+                      {/* A finished event has an attendance, not seats left. */}
+                      {past ? (
+                        <span className="event__seats">
+                          {event.taken} of {event.seats} duelists
+                        </span>
+                      ) : (
+                        <span
+                          className={`event__seats${
+                            full
+                              ? " event__seats--full"
+                              : almost
+                                ? " event__seats--almost"
+                                : ""
+                          }`}
+                        >
+                          {full
+                            ? "Sold out"
+                            : `${left} of ${event.seats} seats left`}
+                        </span>
+                      )}
+
+                      {past ? (
+                        <a className="btn btn--quiet" href={event.signupUrl}>
+                          Results
+                        </a>
+                      ) : (
+                        <a
+                          className={`btn${full ? "" : " btn--solid"}`}
+                          href={event.signupUrl}
+                        >
+                          {full ? "Waitlist" : "Sign up"}
+                        </a>
+                      )}
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+
+          {pages > 1 ? (
+            <nav className="pager" aria-label="Pagination">
+              {page > 1 ? (
+                <Link className="pager__step" href={pageHref(query, page - 1)}>
+                  Previous
+                </Link>
+              ) : (
+                <span className="pager__step pager__step--off">Previous</span>
+              )}
+
+              <span className="pager__pages">
+                {Array.from({ length: pages }, (_, i) => i + 1).map((n) =>
+                  n === page ? (
+                    <span
+                      className="pager__num pager__num--on"
+                      key={n}
+                      aria-current="page"
+                    >
+                      {n}
+                    </span>
+                  ) : (
+                    <Link
+                      className="pager__num"
+                      key={n}
+                      href={pageHref(query, n)}
+                    >
+                      {n}
+                    </Link>
+                  ),
+                )}
+              </span>
+
+              {page < pages ? (
+                <Link className="pager__step" href={pageHref(query, page + 1)}>
+                  Next
+                </Link>
+              ) : (
+                <span className="pager__step pager__step--off">Next</span>
+              )}
+            </nav>
+          ) : null}
+        </div>
+      </main>
+    </>
+  );
+}

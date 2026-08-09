@@ -2,38 +2,43 @@ import Link from "next/link";
 import SiteHeader from "./site-header";
 
 const DISCORD = "https://discord.gg/reduformat";
-const EVENT_SIGNUP = DISCORD; // TODO: point at the actual signup page
+const NEXUS = "https://duelingnexus.com";
+const EVENT_SIGNUP = DISCORD; // TODO: point at the actual events page
 
 const facts = [
-  { k: "Banlist", v: "September 2012" },
-  { k: "Newest legal set", v: "Return of the Duelist, 28 Aug 2012" },
-  { k: "Reference event", v: "YCS Providence, October 2012" },
-  { k: "New archetype", v: "Geargia" },
+  { k: "Card pool", v: "Up to Return of the Duelist" },
+  { k: "Banlist", v: "September 2012 TCG" },
+  { k: "Reference event", v: "YCS Providence, October 20, 2012" },
+  { k: "Decks in that top 8", v: "6 different strategies" },
   { k: "Era", v: "Zexal" },
 ];
 
 const decks = [
-  { name: "Wind-Up", note: "Deck to beat" },
-  { name: "Chaos Dragon", note: "Grind" },
-  { name: "Dark World", note: "Punishes discard" },
-  { name: "Dino Rabbit", note: "Laggia / Dolkka" },
-  { name: "Hero Beat", note: "Toolbox" },
+  { name: "Wind-Up", note: "Namesake" },
   { name: "Agent", note: "Swarm" },
   { name: "Geargia", note: "Gear Gigant X" },
+  { name: "Chaos Dragon", note: "Grind" },
+  { name: "Dino Rabbit", note: "Laggia / Dolkka" },
+  { name: "Dark World", note: "Punishes discard" },
+  { name: "Hero Beat", note: "Toolbox" },
 ];
 
 const faq = [
   {
     q: "What is REDU Format?",
-    a: "REDU Format is a retro Yu-Gi-Oh! format played on the September 2012 Forbidden & Limited List, with Return of the Duelist as the newest legal core set. Players also call it Wind-Up Format after the deck that came out of that banlist.",
+    a: "REDU Format is a retro Yu-Gi-Oh! format that revisits YCS Providence of October 20, 2012. It runs the September 2012 TCG banlist with a card pool extending up to the Return of the Duelist core set.",
   },
   {
-    q: "What banlist does REDU Format use?",
-    a: "The September 2012 Forbidden & Limited List, the same one duelists played at YCS Providence in October 2012.",
+    q: "Why is it called REDU Format?",
+    a: "It is named after Return of the Duelist, the newest legal core set, which introduced the Heroic Challenger, Madolche, Prophecy and Elemental Lord archetypes. It is also called Wind-Up Format because of how strongly that archetype shows up.",
   },
   {
     q: "Which decks are competitive in REDU Format?",
-    a: "Wind-Up, Chaos Dragon, Dark World, Dino Rabbit, Hero Beat, Agent and Geargia all put up results.",
+    a: "Wind-Up, Agent, Geargia, Chaos Dragon, Dino Rabbit, Dark World and Hero Beat all compete. YCS Providence saw six different decks in its top 8.",
+  },
+  {
+    q: "Where can I play REDU Format?",
+    a: "On Dueling Nexus, with both automatic and manual duelling. REDU is also a Konami-supported Time Wizard format, so sanctioned events run in OTS stores and at YCS events.",
   },
 ];
 
@@ -64,8 +69,8 @@ export default function Home() {
       <div className="wrap">
         <section className="hero panel">
           <p className="hero__kicker">
+            <span>Welcome to</span>
             <span>September 2012 banlist</span>
-            <span>YCS Providence</span>
             <span>Zexal era</span>
           </p>
           <h1 className="hero__title">
@@ -73,16 +78,22 @@ export default function Home() {
             <span>Format</span>
           </h1>
           <p className="lede">
-            Retro Yu-Gi-Oh! frozen at Return of the Duelist. Wind-Up is the deck
-            to beat. Six other decks beat it on a given weekend.
+            Explore the Zexal-era retro format set in October 2012, with a card
+            pool that extends up to the Return of the Duelist set, exclusively
+            on Dueling Nexus.
           </p>
           <div className="hero__actions">
-            <a className="btn btn--solid" href={EVENT_SIGNUP}>
-              Latest event
+            <a
+              className="btn btn--solid"
+              href={NEXUS}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Start duelling today
             </a>
-            <a className="btn" href="#community">
-              Join the Discord
-            </a>
+            <Link className="btn" href="/events">
+              View the latest events
+            </Link>
           </div>
         </section>
       </div>
@@ -95,22 +106,32 @@ export default function Home() {
             <div className="section__split">
               <div className="prose">
                 <p>
-                  Players call it REDU Format because Return of the Duelist is
-                  the newest core set you can play. Konami put out REDU on
-                  August 28, 2012 with 100 cards, and it handed the format
-                  Geargia: Geargiarmor, Geargiaccelerator, Geargiarsenal,
-                  Geargiano Mk-II and Gear Gigant X.
+                  REDU Format is a retro format that revisits the gameplay of
+                  YCS Providence on October 20, 2012. The format features an
+                  expansive card pool and a diverse meta, with decks such as
+                  Wind-Up, Agent, Geargia, Chaos Dragon and Dino Rabbit all
+                  competing for dominance.
                 </p>
                 <p>
-                  The format runs the September 2012 banlist and rebuilds the
-                  card pool duelists brought to YCS Providence that October.
-                  Wind-Up came out of that list without the hand loop and kept
-                  the consistency, which is where the other name comes from.
+                  It takes its name from the Return of the Duelist core set,
+                  which introduced the Heroic Challenger, Madolche, Prophecy and
+                  Elemental Lord archetypes. Players also call it Wind-Up Format
+                  because of how strongly that archetype shows up.
                 </p>
                 <p>
-                  You get a Zexal-era board with Xyz monsters on top of a card
-                  pool that still runs Heavy Storm, Dark Hole and Monster
-                  Reborn.
+                  The September 2012 TCG banlist restricted the Wind-Up loop and
+                  the Inzektor loop, and hit powerful cards such as Brionac,
+                  Dragon of the Ice Barrier, Future Fusion, Chaos Sorcerer and
+                  Red-Eyes Darkness Metal Dragon, all of which proved too
+                  oppressive in the previous format. Those changes and the new
+                  releases made the format flexible: YCS Providence put six
+                  different decks in its top 8, and none of them was the
+                  previously all-encompassing Wind-Up.
+                </p>
+                <p>
+                  The format&rsquo;s diversity, its resilience and its community
+                  make it a pillar of the Yu-Gi-Oh! retro format scene. We hope
+                  you will be part of it.
                 </p>
               </div>
               <dl className="facts panel">
@@ -128,17 +149,18 @@ export default function Home() {
         <section className="section" id="why">
           <div className="wrap">
             <p className="tab">Why play REDU</p>
-            <h2 className="section__title">
-              A wide metagame and cards that answer things.
-            </h2>
+            <h2 className="section__title">Why play REDU Format?</h2>
             <div className="prose">
               <p>
-                Heavy Storm, Dark Hole and Monster Reborn are all legal, so a
-                bad opening hand does not end the duel on turn two. You draw out
-                of it and punish the board your opponent built.
+                With the October 2012 card pool and the September 2012 banlist,
+                you get a variety of Synchro and Xyz toolbox cards, strong
+                engines, and legal power cards such as Dark Hole, Heavy Storm
+                and Maxx &ldquo;C&rdquo;.
               </p>
               <p>
-                No single deck folds the room. Pick one and learn the mirror.
+                REDU is also a Konami-supported Time Wizard format, so
+                officially sanctioned REDU events take place in OTS stores and
+                at YCS events.
               </p>
             </div>
             <ul className="rows">
@@ -156,11 +178,19 @@ export default function Home() {
           <div className="wrap">
             <div className="cta panel">
               <p className="tab">Join REDU community</p>
-              <h2 className="cta__title">Duelists run this format on Discord.</h2>
+              <h2 className="cta__title">Ready to play REDU Format?</h2>
               <p className="lede">
-                Our Discord runs frequent tournaments, deck talk and rulings
-                threads. If you have never played the format, say so when you
-                join and someone will hand you a starting list.
+                Our platform hosts the biggest REDU Format tournaments and
+                events, and our community of over 85,000 Discord members is as
+                enthusiastic about REDU as it is about the TCG, Edison, Genesys
+                and other formats. New and returning players are welcome, and
+                you can choose between an automatic and a manual experience,
+                all within Dueling Nexus.
+              </p>
+              <p className="lede">
+                Discuss your favourite decks, strategies and tricks in our
+                Discord, and join to catch the latest on events, tournaments,
+                giveaways and collaborations.
               </p>
               <div className="cta__actions">
                 <a
@@ -169,7 +199,7 @@ export default function Home() {
                   target="_blank"
                   rel="noopener noreferrer"
                 >
-                  discord.gg/reduformat
+                  Join our Discord
                 </a>
               </div>
             </div>
@@ -182,12 +212,13 @@ export default function Home() {
           <div className="site-footer__inner panel">
             <p>REDU Format</p>
             <div className="site-footer__links">
-              <Link href="/login">Sign in</Link>
               <Link href="/banlist">Banlist</Link>
+              <a href={NEXUS} target="_blank" rel="noopener noreferrer">
+                Dueling Nexus
+              </a>
               <a href={DISCORD} target="_blank" rel="noopener noreferrer">
                 Discord
               </a>
-              <a href="#format">Format</a>
             </div>
           </div>
         </div>
