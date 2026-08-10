@@ -3,14 +3,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { fetchProfile, getSession } from "@/lib/auth";
-import {
-  allEvents,
-  formatDate,
-  formatTime,
-  isPast,
-  seatsLeft,
-  STRUCTURES,
-} from "@/lib/events";
+import { formatDate, formatTime, isPast, pastEvents, seatsLeft, STRUCTURES } from "@/lib/events";
+import { getTournament } from "@/lib/tournaments";
 import SiteHeader from "../../../site-header";
 import { cancel } from "./actions";
 import DeckPicker from "./deck-picker";
@@ -27,7 +21,7 @@ export default async function SignupPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const event = allEvents.find((e) => e.slug === slug);
+  const event = (await getTournament(slug)) ?? pastEvents.find((e) => e.slug === slug);
   if (!event) notFound();
 
   const session = await getSession();

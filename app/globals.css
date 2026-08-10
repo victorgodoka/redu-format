@@ -2046,6 +2046,119 @@ a {
   margin-top: 10px;
 }
 
+/* --- admin --- */
+
+.admin-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 32px;
+}
+
+.admin-list {
+  display: grid;
+  gap: 12px;
+  margin: 24px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.admin-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 24px;
+}
+
+.admin-row__main {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.admin-row__title {
+  font-size: 17px;
+}
+
+.admin-row__meta {
+  font-family: var(--f-mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--c-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.admin-row__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.admin-row__actions .btn {
+  min-width: 0;
+  padding: 10px 20px;
+}
+
+.btn--danger {
+  border-color: var(--c-danger);
+  color: var(--c-danger);
+}
+
+.btn--danger:hover {
+  background: color-mix(in srgb, var(--c-danger) 14%, transparent);
+}
+
+.form--grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px 20px;
+  margin-top: 28px;
+}
+
+.form__field {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+}
+
+.form__field--full {
+  grid-column: 1 / -1;
+}
+
+.form__field label {
+  font-family: var(--f-mono);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--c-muted);
+}
+
+.form__field input,
+.form__field select {
+  width: 100%;
+  padding: 13px 16px;
+  border: 1px solid var(--c-line);
+  border-radius: 2px;
+  background: var(--c-raise);
+  color: var(--c-text);
+  font-family: var(--f-mono);
+  font-size: 14px;
+}
+
+.form--grid .form__error {
+  grid-column: 1 / -1;
+}
+
+.form--grid > .btn {
+  grid-column: 1 / -1;
+  justify-self: start;
+}
+
 /* --- footer --- */
 
 .site-footer {
@@ -2168,6 +2281,14 @@ a {
 
   .filters__field {
     min-width: 100%;
+  }
+
+  .form--grid {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-row {
+    align-items: stretch;
   }
 }
 
