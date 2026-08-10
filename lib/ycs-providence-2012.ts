@@ -127,7 +127,7 @@ export type YcsDeck = {
 
 export const YCS_PROVIDENCE_2012_DECKS: readonly YcsDeck[] = [
   {
-    id: "941d692274f48771b473277032690344",
+    id: "bba47bea767583cb689a7b58b6617573",
     archetype: "Karakuri Geargia",
     place: "1st Place",
     player: "Chris Leblanc",
@@ -137,7 +137,7 @@ export const YCS_PROVIDENCE_2012_DECKS: readonly YcsDeck[] = [
     side: [42009836,42009836,67688478,67688478,91133740,91133740,18895832,30241314,30241314,90846359,90846359,99735427,99735427,59616123,59616123],
   },
   {
-    id: "8be49319c09af35abf9c7d4333d58e67",
+    id: "f3feaa7901707ca3e4416cd57043eed2",
     archetype: "Chaos Dragon",
     place: "2nd Place",
     player: "Chris Tuttobene",
@@ -147,7 +147,7 @@ export const YCS_PROVIDENCE_2012_DECKS: readonly YcsDeck[] = [
     side: [71564252,71564252,67688478,67688478,67688478,24725825,24725825,51119924,51119924,23434538,5318639,60082869,60082869,94192409,94192409],
   },
   {
-    id: "f076a2edff4d8f6999c03c539d1d9501",
+    id: "3896c1052be7530df221775dcf09254c",
     archetype: "Chaos Zombie",
     place: "3rd Place",
     player: "Nareg Torossian",
@@ -157,7 +157,7 @@ export const YCS_PROVIDENCE_2012_DECKS: readonly YcsDeck[] = [
     side: [70095154,70095154,70095154,24317029,24317029,24317029,34853266,37520316,81510157,81510157,60082869,60082869,60082869,94192409,94192409],
   },
   {
-    id: "1d2f33c93a991ecfabecc544b4f03c08",
+    id: "ac34b43ed640a5d20fcc4ae5d580f299",
     archetype: "Karakuri Geargia",
     place: "4th Place",
     player: "Andres Torres",
@@ -167,7 +167,7 @@ export const YCS_PROVIDENCE_2012_DECKS: readonly YcsDeck[] = [
     side: [79853073,23434538,81674782,81674782,44656491,44656491,81510157,18895832,18895832,53334471,53334471,38411870,51452091,99735427,99735427],
   },
   {
-    id: "69cd4a4b02a93e6bc84524ffc4d5d0bb",
+    id: "852518d7a5dfca35d07a9f2e9c24f36a",
     archetype: "Dino Rabbit",
     place: "6th Place",
     player: "Bo Tang",
@@ -177,7 +177,7 @@ export const YCS_PROVIDENCE_2012_DECKS: readonly YcsDeck[] = [
     side: [70095154,88240808,88240808,42009836,42009836,23434538,23434538,18895832,81510157,3136426,3136426,60082869,60082869,30241314,30241314],
   },
   {
-    id: "1df83f4d58d8efcb790266f917ca5054",
+    id: "561e1f898b1fae4173d532cbf4198b2e",
     archetype: "Agent",
     place: "6th Place",
     player: "Evolution",
@@ -187,7 +187,7 @@ export const YCS_PROVIDENCE_2012_DECKS: readonly YcsDeck[] = [
     side: [91133740,23434538,23434538,71044499,71044499,81510157,81510157,60082869,60082869,70342110,70342110,53334471,53334471,99735427,99735427],
   },
   {
-    id: "acb6afaaa06b5ce639d715e9a8656d15",
+    id: "db88d2d33b13f1d043c722438fee79d4",
     archetype: "Gravekeeper",
     place: "8th Place",
     player: "Justin Ashe",
@@ -197,7 +197,7 @@ export const YCS_PROVIDENCE_2012_DECKS: readonly YcsDeck[] = [
     side: [70095154,70095154,71564252,71564252,71044499,71044499,5318639,5318639,5318639,53334471,53334471,73599290,73599290,82732705,82732705],
   },
   {
-    id: "867cf3bbec42b51904c743ea6c6ebfce",
+    id: "8e0e28f1d50d0b0d967a0507a57af8dd",
     archetype: "Agent",
     place: "8th Place",
     player: "Simon He",
