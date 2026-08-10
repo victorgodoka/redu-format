@@ -99,7 +99,11 @@ export default async function EventsPage({
             <span className="featured__badge">Hall of Fame</span>
             <div className="featured__body">
               <div className="featured__main">
-                <h2 className="featured__name">{FEATURED_EVENT.name}</h2>
+                <h2 className="featured__name">
+                  <Link href={`/events/${FEATURED_EVENT.slug}`}>
+                    {FEATURED_EVENT.name}
+                  </Link>
+                </h2>
                 <p className="featured__date">{formatDate(FEATURED_EVENT.date)}</p>
               </div>
               <dl className="featured__stats">

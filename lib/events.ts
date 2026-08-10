@@ -31,6 +31,7 @@ export const STRUCTURES: Record<Structure, { label: string; short: string }> = {
 };
 
 export type FeaturedEvent = {
+  slug: string;
   name: string;
   winner: string;
   community: string;
@@ -43,6 +44,7 @@ export type FeaturedEvent = {
 
 /** Historical highlight, pinned as the first card on the events page. */
 export const FEATURED_EVENT: FeaturedEvent = {
+  slug: "ycs-providence-2012",
   name: "YCS Providence 2012",
   winner: "Chris LeBlanc",
   community: "Konami",

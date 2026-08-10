@@ -86,7 +86,7 @@ export default async function DashboardPage() {
                     target="_blank"
                     rel="noopener noreferrer"
                   >
-                    <span className="deck__cover">
+                    {/* <span className="deck__cover">
                       {deck.coverId ? (
                         <Image
                           src={`${CARD_ART}/${deck.coverId}.jpg`}
@@ -96,7 +96,7 @@ export default async function DashboardPage() {
                           sizes="200px"
                         />
                       ) : null}
-                    </span>
+                    </span> */}
                     <span className="deck__body">
                       <span className="deck__name">{deck.name}</span>
                       <span className="deck__counts">
