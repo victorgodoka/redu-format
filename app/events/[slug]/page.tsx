@@ -115,7 +115,7 @@ function DeckCard({ deck }: { deck: YcsDeck }) {
             target="_blank"
             rel="noopener noreferrer"
           >
-            Save to Nexus
+            Save Deck
           </a>
         </div>
       </div>
@@ -214,7 +214,9 @@ export default async function EventDetailPage({
           <h2 className="section__subtitle">Bracket</h2>
           <Bracket rounds={YCS_PROVIDENCE_2012_BRACKET} />
 
-          <h2 className="section__subtitle">Top decks</h2>
+          <h2 className="section__subtitle" id="decklists">
+            Top decks
+          </h2>
           <ul className="decklist decklist--wide">
             {YCS_PROVIDENCE_2012_DECKS.map((deck) => (
               <DeckCard deck={deck} key={deck.id} />

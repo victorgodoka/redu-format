@@ -7,8 +7,9 @@ const nav = [
   { n: "02", label: "Events", href: "/events" },
   { n: "03", label: "Banlist", href: "/banlist" },
   { n: "04", label: "Rulings", href: "/rulings" },
-  { n: "05", label: "Format", href: "/#format" },
-  { n: "06", label: "Community", href: "/#community" },
+  { n: "05", label: "Decklists", href: "/events/ycs-providence-2012#decklists" },
+  { n: "06", label: "Format", href: "/#format" },
+  { n: "07", label: "Community", href: "/#community" },
 ];
 
 export default async function SiteHeader() {
