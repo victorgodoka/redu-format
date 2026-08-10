@@ -1499,10 +1499,10 @@ a {
 .deck__cover {
   position: absolute;
   inset: 0 0 0 auto;
-  z-index: 0;
   height: auto;
   border-radius: 0;
   background: none;
+  z-index: -1;
 }
 
 /* the mask does the blending, so no scrim layer is needed on top */

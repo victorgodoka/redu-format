@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { BANLIST_IDS } from "./banlist.ts";
 import { parseCardText } from "./card-text.ts";
+import { CARD_LIB } from "./cardLib.ts";
 import { Card, cardsByIds, findCardByName } from "./cards.ts";
 import { ERRATAS } from "./erratas.ts";
 
@@ -48,12 +49,18 @@ test("the errata table wins over the card library", () => {
   assert.equal(card.name, "Elemental HERO Stratos");
 });
 
-test("cards outside the library still resolve from the errata table", () => {
-  // Firewall Dragon postdates this format's library but is in the CSV.
-  const card = new Card(5043010);
+test("cards outside the library still resolve from the errata table", (t) => {
+  // Picked from the data rather than hard-coded: which cards sit outside
+  // CARD_LIB changes whenever the errata table is trimmed.
+  const inLib = new Set(CARD_LIB.map((c) => c.id));
+  const outside = ERRATAS.find((e) => !inLib.has(e.id));
+  if (!outside) return t.skip("no errata card sits outside the library");
+
+  const card = new Card(outside.id);
   assert.equal(card.found, true);
-  assert.equal(card.name, "Firewall Dragon");
-  assert.equal(card.koid, 13082);
+  assert.equal(card.name, outside.name);
+  assert.equal(card.koid, outside.koid);
+  assert.equal(card.desc, outside.desc);
 });
 
 test("an unknown id is reported rather than silently blank", () => {
