@@ -36,6 +36,10 @@ export const MASTER_RULES: readonly MasterRule[] = [
     date: "March 19, 2011",
     current: true,
     newTerms: ["Xyz Monster", "Xyz Summon", "Rank"],
+    renamed: [
+      { from: "Advance Summon", to: "Tribute Summon" },
+      { from: "Release", to: "Tribute" },
+    ],
     changes: ["Removed Ignition Effect Priority."],
   },
 ];
