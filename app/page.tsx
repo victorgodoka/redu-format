@@ -1,26 +1,25 @@
 import Link from "next/link";
 import SiteHeader from "./site-header";
 
-const DISCORD = "https://discord.gg/reduformat";
-const NEXUS = "https://duelingnexus.com";
+const DISCORD = "https://discord.gg/duelingnexus";
 
 const facts = [
   { k: "Card pool", v: "Up to Return of the Duelist" },
-  { k: "Banlist", v: "September 2012 TCG" },
-  { k: "Reference event", v: "YCS Providence, October 20, 2012" },
-  { k: "Decks in that top 8", v: "6 different strategies" },
+  { k: "Banlist", v: "Sep. 2012 TCG" },
+  { k: "Reference event", v: "YCS Providence Oct 2012" },
   { k: "Era", v: "Zexal" },
+  { k: "Diverse meta", v: "Lot of different strategies to play" },
 ];
 
-const decks = [
-  { name: "Wind-Up", note: "Namesake" },
-  { name: "Agent", note: "Swarm" },
-  { name: "Geargia", note: "Gear Gigant X" },
-  { name: "Chaos Dragon", note: "Grind" },
-  { name: "Dino Rabbit", note: "Laggia / Dolkka" },
-  { name: "Dark World", note: "Punishes discard" },
-  { name: "Hero Beat", note: "Toolbox" },
-];
+  // const decks = [
+  //   { name: "Wind-Up", note: "Namesake" },
+  //   { name: "Agent", note: "Swarm" },
+  //   { name: "Geargia", note: "Gear Gigant X" },
+  //   { name: "Chaos Dragon", note: "Grind" },
+  //   { name: "Dino Rabbit", note: "Laggia / Dolkka" },
+  //   { name: "Dark World", note: "Punishes discard" },
+  //   { name: "Hero Beat", note: "Toolbox" },
+  // ];
 
 const faq = [
   {
@@ -67,11 +66,11 @@ export default function Home() {
 
       <div className="wrap">
         <section className="hero panel">
-          <p className="hero__kicker">
+          {/* <p className="hero__kicker">
             <span>Welcome to</span>
             <span>September 2012 banlist</span>
             <span>Zexal era</span>
-          </p>
+          </p> */}
           <h1 className="hero__title">
             REDU
             <span>Format</span>
@@ -84,7 +83,7 @@ export default function Home() {
           <div className="hero__actions">
             <a
               className="btn btn--solid"
-              href={NEXUS}
+              href={DISCORD}
               target="_blank"
               rel="noopener noreferrer"
             >
@@ -162,14 +161,14 @@ export default function Home() {
                 at YCS events.
               </p>
             </div>
-            <ul className="rows">
+            {/* <ul className="rows">
               {decks.map(({ name, note }) => (
                 <li className="rows__item" key={name}>
                   <span className="rows__name">{name}</span>
                   <span className="rows__note">{note}</span>
                 </li>
               ))}
-            </ul>
+            </ul> */}
           </div>
         </section>
 
@@ -212,7 +211,7 @@ export default function Home() {
             <p>REDU Format</p>
             <div className="site-footer__links">
               <Link href="/banlist">Banlist</Link>
-              <a href={NEXUS} target="_blank" rel="noopener noreferrer">
+              <a href={'https://duelingnexus.com/home'} target="_blank" rel="noopener noreferrer">
                 Dueling Nexus
               </a>
               <a href={DISCORD} target="_blank" rel="noopener noreferrer">

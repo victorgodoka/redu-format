@@ -471,7 +471,7 @@ a {
   margin: 0;
   padding: clamp(20px, 3vw, 32px);
   display: grid;
-  grid-template-columns: auto auto auto;
+  grid-template-columns: auto auto;
 }
 
 .facts__row {
@@ -1842,6 +1842,151 @@ a {
   color: #16130c;
 }
 
+/* --- rulings: master rule history --- */
+
+.mrules {
+  display: grid;
+  gap: clamp(16px, 2vw, 24px);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+  margin: 32px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.mrule {
+  padding: clamp(22px, 3vw, 32px);
+}
+
+/* the rule set this format actually plays gets the accent edge */
+.mrule--current {
+  background: var(--c-accent);
+}
+
+.mrule__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.mrule__name {
+  font-size: clamp(20px, 2.4vw, 26px);
+}
+
+.mrule__badge {
+  padding: 3px 10px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--c-accent) 18%, transparent);
+  font-family: var(--f-mono);
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--c-accent);
+}
+
+.mrule__when {
+  margin-top: 8px;
+  font-family: var(--f-mono);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  color: var(--c-muted);
+}
+
+.mrule__group {
+  margin-top: 22px;
+}
+
+.mrule__group-title {
+  margin-bottom: 8px;
+  font-family: var(--f-mono);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--c-muted);
+}
+
+.mrule__items {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 15px;
+  color: #c6c4d2;
+}
+
+.mrule__items li {
+  padding-left: 14px;
+  border-left: 2px solid var(--c-line);
+}
+
+.mrule__arrow {
+  color: var(--c-accent);
+}
+
+/* --- rulings: format-only rules --- */
+
+.rulings {
+  display: grid;
+  gap: clamp(16px, 2vw, 24px);
+  margin: 32px 0 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: none;
+}
+
+.ruling {
+  padding: clamp(22px, 3vw, 32px);
+}
+
+.ruling__n {
+  font-family: var(--f-mono);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--c-accent);
+}
+
+.ruling__title {
+  margin-top: 10px;
+  font-size: clamp(19px, 2.2vw, 24px);
+}
+
+.ruling__body {
+  margin-top: 14px;
+  max-width: 68ch;
+  color: #c6c4d2;
+  text-wrap: pretty;
+}
+
+.ruling__note {
+  margin-top: 12px;
+  max-width: 68ch;
+  font-size: 14px;
+  color: var(--c-muted);
+}
+
+/* worked examples: monospaced and rules-off, so they read as transcripts
+   rather than as more prose */
+.ruling__example {
+  margin-top: 16px;
+  padding: 14px 18px;
+  border-left: 2px solid var(--c-accent);
+  background: var(--c-raise);
+  font-family: var(--f-mono);
+  font-size: 13px;
+  line-height: 1.6;
+  color: #c6c4d2;
+}
+
+.ruling__example-label {
+  margin-bottom: 6px;
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--c-accent);
+}
+
 .empty {
   display: grid;
   justify-items: start;
@@ -2003,10 +2148,6 @@ a {
 }
 
 @media (max-width: 760px) {
-  .facts {
-    grid-template-columns: auto auto;
-  }
-
   .event {
     grid-template-columns: 1fr;
     gap: 16px;

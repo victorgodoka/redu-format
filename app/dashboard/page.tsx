@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import { redirect } from "next/navigation";
 import { fetchProfile, getSession } from "@/lib/auth";
-import { CARD_ART } from "@/lib/banlist";
 import { logout } from "../login/actions";
 import SiteHeader from "../site-header";
 
