@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { fetchProfile, getSession, MAX_SIGNUPS } from "@/lib/auth";
 import { deckLegality } from "@/lib/nexus-parse";
-import { allEvents, seatsLeft } from "@/lib/events";
+import { seatsLeft } from "@/lib/events";
+import { getTournament } from "@/lib/tournaments";
 import { describeError, validateDeck } from "@/lib/validateDecks";
 
 export type SignupState = { error?: string };
@@ -18,7 +19,7 @@ export async function register(
   const session = await getSession();
   if (!session.token) return { error: "Your session expired. Sign in again." };
 
-  const event = allEvents.find((e) => e.slug === slug);
+  const event = await getTournament(slug);
   if (!event) return { error: "That event no longer exists." };
   if (new Date(event.startsAt) < new Date()) {
     return { error: "That event has already finished." };

@@ -3,17 +3,18 @@ import Link from "next/link";
 import { getSession } from "@/lib/auth";
 import {
   ALMOST_FULL,
-  allEvents,
   FEATURED_EVENT,
   fillRatio,
   formatDate,
   formatTime,
   isPast,
+  pastEvents,
   queryEvents,
   seatsLeft,
   STRUCTURES,
   type EventQuery,
 } from "@/lib/events";
+import { listTournaments } from "@/lib/tournaments";
 import SiteHeader from "../site-header";
 
 export const metadata: Metadata = {
@@ -75,6 +76,7 @@ export default async function EventsPage({
 
   // One clock for filtering and for labelling, so the two cannot disagree.
   const now = new Date();
+  const allEvents = [...(await listTournaments()), ...pastEvents];
   const { items, page, pages, total } = queryEvents(allEvents, query, now);
 
   const session = await getSession();
