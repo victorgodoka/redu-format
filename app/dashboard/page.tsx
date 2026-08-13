@@ -2,8 +2,10 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import CardImage from "../card-image";
 import { deckLegality, fetchProfile, getSession } from "@/lib/auth";
 import { CARD_ART } from "@/lib/banlist";
+import { Card } from "@/lib/cards";
 import {
   formatDate,
   formatTime,
@@ -40,7 +42,10 @@ export default async function DashboardPage() {
     .map((deck) => {
       const list = validatedLists.find((d) => d.id === deck.id);
       const legal = !deckLegality(deck) && (list?.valid ?? false);
-      return { deck, legal };
+      // The cover can be an errata id; its original passcode is the fallback
+      // art if the CDN never mirrored that specific print.
+      const coverFallbackId = deck.coverId !== null ? new Card(deck.coverId).id : null;
+      return { deck, legal, coverFallbackId };
     })
     .sort((a, b) => Number(b.legal) - Number(a.legal));
 
@@ -179,7 +184,7 @@ export default async function DashboardPage() {
             </div>
           ) : (
             <ul className="decklist">
-              {deckRows.map(({ deck, legal }) => (
+              {deckRows.map(({ deck, legal, coverFallbackId }) => (
                 <li
                   className={`deck panel${legal ? " deck--legal" : " deck--illegal"}`}
                   key={deck.id}
@@ -192,8 +197,10 @@ export default async function DashboardPage() {
                   >
                     <span className="deck__cover">
                       {deck.coverId ? (
-                        <Image
+                        <CardImage
+                          key={deck.coverId}
                           src={`${CARD_ART}/${deck.coverId}.jpg`}
+                          fallbackSrc={`${CARD_ART}/${coverFallbackId}.jpg`}
                           alt=""
                           width={72}
                           height={72}

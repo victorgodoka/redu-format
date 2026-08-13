@@ -3,6 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { fetchProfile, getSession } from "@/lib/auth";
+import { Card } from "@/lib/cards";
 import { formatDate, formatTime, isPast, pastEvents, seatsLeft, STRUCTURES } from "@/lib/events";
 import { getTournament } from "@/lib/tournaments";
 import SiteHeader from "../../../site-header";
@@ -34,6 +35,13 @@ export default async function SignupPage({
   if (!profile) redirect("/api/auth/logout");
 
   const validDecklists = validateDecks(profile.deckLists);
+  // Cover art can point at an errata id; the original passcode is what the
+  // fallback image retries if that specific print was never mirrored.
+  const coverFallbackIds = Object.fromEntries(
+    profile.decks
+      .filter((deck) => deck.coverId !== null)
+      .map((deck) => [deck.id, new Card(deck.coverId!).id]),
+  );
 
   const now = new Date();
   const past = isPast(event, now);
@@ -115,7 +123,12 @@ export default async function SignupPage({
                   </a>
                 </div>
               ) : (
-                <DeckPicker slug={slug} decks={profile.decks} deckLists={validDecklists} />
+                <DeckPicker
+                  slug={slug}
+                  decks={profile.decks}
+                  deckLists={validDecklists}
+                  coverFallbackIds={coverFallbackIds}
+                />
               )}
             </div>
 

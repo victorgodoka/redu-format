@@ -1,7 +1,7 @@
 "use client";
 
-import Image from "next/image";
 import { useActionState } from "react";
+import CardImage from "@/app/card-image";
 import { CARD_ART } from "@/lib/banlist";
 import { deckLegality, type NexusDeck } from "@/lib/nexus-parse";
 import { describeError, type ValidatedDeck } from "@/lib/validateDecks";
@@ -29,10 +29,13 @@ export default function DeckPicker({
   slug,
   decks,
   deckLists,
+  coverFallbackIds,
 }: {
   slug: string;
   decks: NexusDeck[];
   deckLists: ValidatedDeck[];
+  /** Original passcode per deck id, in case the cover's own print has no art. */
+  coverFallbackIds: Record<string, number>;
 }) {
   const [state, action, pending] = useActionState(register, initial);
 
@@ -69,8 +72,10 @@ export default function DeckPicker({
                 />
                 <span className="pick__cover">
                   {deck.coverId ? (
-                    <Image
+                    <CardImage
+                      key={deck.coverId}
                       src={`${CARD_ART}/${deck.coverId}.jpg`}
+                      fallbackSrc={`${CARD_ART}/${coverFallbackIds[deck.id] ?? deck.coverId}.jpg`}
                       alt=""
                       width={120}
                       height={120}

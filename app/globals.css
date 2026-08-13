@@ -1530,18 +1530,12 @@ a {
 /* the mask does the blending, so no scrim layer is needed on top; sized to
    match the 340x340 intrinsic box the Image components render at */
 .decklist--wide .deck__cover img {
-  width: 340px;
-  height: 340px;
-  object-fit: initial;
-  object-position: center;
+  width: 680px;
+  height: 680px;
+  object-fit: fill;
+  object-position: center center;
   mask-image: linear-gradient(to right, transparent 0%, #000 100%);
   -webkit-mask-image: linear-gradient(to right, transparent 0%, #000 100%);
-}
-
-.decklist--wide .deck__cover img:first-child {
-  margin-right: -4rem;
-  mask-image: linear-gradient(to left, transparent 0%, #000 80%, transparent 100%);
-  -webkit-mask-image: linear-gradient(to left, transparent 0%, #000 80%, transparent 100%);
 }
 
 .decklist--wide .deck__body {
@@ -1722,6 +1716,17 @@ a {
   overflow: hidden;
   border-radius: 2px;
   background: var(--c-raise);
+}
+
+.deck__art-card a,
+.deck__cards a {
+  transition: all 800ms ease-out;
+}
+
+.deck__art-card a:hover,
+.deck__cards a:hover {
+  color: var(--c-accent);
+  transition: all 800ms ease;
 }
 
 .deck__art-card img {

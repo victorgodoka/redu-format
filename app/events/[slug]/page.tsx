@@ -3,9 +3,10 @@ import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Bracket } from "@/app/bracket";
+import CardImage from "@/app/card-image";
 import { fetchProfile, getSession } from "@/lib/auth";
 import { CARD_ART, CARD_IMAGE } from "@/lib/banlist";
-import { cardsByIds } from "@/lib/cards";
+import { Card, cardsByIds } from "@/lib/cards";
 import {
   FEATURED_EVENT,
   formatDate,
@@ -23,6 +24,7 @@ import {
   type YcsDeck,
 } from "@/lib/ycs-providence-2012";
 import SiteHeader from "../../site-header";
+import { WikiLink } from "@/app/wiki-link";
 
 const EDITOR = "https://duelingnexus.com/editor";
 
@@ -88,7 +90,9 @@ function DeckSection({ title, ids }: { title: string; ids: readonly number[] }) 
       <ul className="deck__cards">
         {rows.map(({ card, count }) => (
           <li key={card.id}>
-            <b>×{count}</b> {card.name}
+            <WikiLink cardName={card.name}>
+              <b>×{count}</b> {card.name}
+            </WikiLink>
           </li>
         ))}
       </ul>
@@ -108,14 +112,16 @@ function DeckArt({ title, ids }: { title: string; ids: readonly number[] }) {
       <ul className="deck__art-grid">
         {rows.map(({ card, count }) => (
           <li className="deck__art-card" key={card.id} title={card.name}>
-            <Image
-              src={`${CARD_IMAGE}/${card.id}.jpg`}
-              alt={card.name}
-              width={421}
-              height={614}
-              sizes="128px"
-            />
-            <span className="deck__art-count">×{count}</span>
+            <WikiLink cardName={card.name}>
+              <Image
+                src={`${CARD_IMAGE}/${card.id}.jpg`}
+                alt={card.name}
+                width={421}
+                height={614}
+                sizes="128px"
+              />
+              <span className="deck__art-count">×{count}</span>
+            </WikiLink>
           </li>
         ))}
       </ul>
@@ -124,20 +130,20 @@ function DeckArt({ title, ids }: { title: string; ids: readonly number[] }) {
 }
 
 function DeckCard({ deck }: { deck: YcsDeck }) {
+  const coverId = deck.cover ?? deck.main[0];
   return (
     <li className="deck panel">
       <div className="deck__link">
         <div className="deck__cover">
-          {(deck.covers ?? [deck.main[0], deck.main[3]]).map((card) => (
-            <Image
-              src={`${CARD_ART}/${card}.jpg`}
-              key={card}
-              alt=""
-              width={340}
-              height={340}
-              sizes="416px"
-            />
-          ))}
+          <CardImage
+            key={coverId}
+            src={`${CARD_ART}/${coverId}.jpg`}
+            fallbackSrc={`${CARD_ART}/${new Card(coverId).id}.jpg`}
+            alt=""
+            width={680}
+            height={680}
+            sizes="416px"
+          />
         </div>
         <div className="deck__body">
           <span className="deck__place">{deck.place}</span>

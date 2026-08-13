@@ -1,7 +1,7 @@
 "use client";
 
-import Image from "next/image";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import CardImage from "@/app/card-image";
 import { CARD_IMAGE } from "@/lib/banlist";
 import { parseCardText, type CardJson } from "@/lib/card-text";
 
@@ -44,9 +44,11 @@ function useCompact() {
 function CardDetail({ card, legality }: Selection) {
   return (
     <>
-      <Image
+      <CardImage
+        key={card.printId}
         className="preview__art"
         src={`${CARD_IMAGE}/${card.printId}.jpg`}
+        fallbackSrc={`${CARD_IMAGE}/${card.id}.jpg`}
         alt={card.name}
         width={421}
         height={614}
@@ -184,8 +186,9 @@ export default function CardBrowser({
                           : `${card.name}, ${section.legality}`
                       }
                     >
-                      <Image
+                      <CardImage
                         src={`${CARD_IMAGE}/${card.printId}.jpg`}
+                        fallbackSrc={`${CARD_IMAGE}/${card.id}.jpg`}
                         alt=""
                         width={421}
                         height={614}
