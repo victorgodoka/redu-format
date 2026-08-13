@@ -1,10 +1,22 @@
 import type { Metadata } from "next";
 import Image from "next/image";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Bracket } from "@/app/bracket";
+import { fetchProfile, getSession } from "@/lib/auth";
 import { CARD_ART, CARD_IMAGE } from "@/lib/banlist";
 import { cardsByIds } from "@/lib/cards";
-import { FEATURED_EVENT, formatDate } from "@/lib/events";
+import {
+  FEATURED_EVENT,
+  formatDate,
+  formatTime,
+  isPast,
+  mockPlacement,
+  pastEvents,
+  seatsLeft,
+  STRUCTURES,
+} from "@/lib/events";
+import { getTournament } from "@/lib/tournaments";
 import {
   YCS_PROVIDENCE_2012_BRACKET,
   YCS_PROVIDENCE_2012_DECKS,
@@ -12,13 +24,47 @@ import {
 } from "@/lib/ycs-providence-2012";
 import SiteHeader from "../../site-header";
 
-export const metadata: Metadata = {
-  title: `${FEATURED_EVENT.name} | REDU Format`,
-  description: `Results, bracket and Top 8 decklists from ${FEATURED_EVENT.name}.`,
-  alternates: { canonical: `/events/${FEATURED_EVENT.slug}` },
-};
-
 const EDITOR = "https://duelingnexus.com/editor";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
+  const { slug } = await params;
+
+  if (slug === FEATURED_EVENT.slug) {
+    return {
+      title: `${FEATURED_EVENT.name} | REDU Format`,
+      description: `Results, bracket and Top 8 decklists from ${FEATURED_EVENT.name}.`,
+      alternates: { canonical: `/events/${FEATURED_EVENT.slug}` },
+      openGraph: {
+        type: "website",
+        url: `/events/${FEATURED_EVENT.slug}`,
+        siteName: "REDU Format",
+        title: `${FEATURED_EVENT.name} | REDU Format`,
+        description: `Results, bracket and Top 8 decklists from ${FEATURED_EVENT.name}.`,
+      },
+    };
+  }
+
+  const event = (await getTournament(slug)) ?? pastEvents.find((e) => e.slug === slug);
+  if (!event) return {};
+
+  const description = `${STRUCTURES[event.structure].label} tournament on ${formatDate(event.startsAt)}, ${event.seats} seats.`;
+  return {
+    title: `${event.name} | REDU Format`,
+    description,
+    alternates: { canonical: `/events/${slug}` },
+    openGraph: {
+      type: "website",
+      url: `/events/${slug}`,
+      siteName: "REDU Format",
+      title: `${event.name} | REDU Format`,
+      description,
+    },
+  };
+}
 
 /** Ids repeat in the source list once per copy; this collapses them to counts. */
 function groupCards(ids: readonly number[]) {
@@ -82,14 +128,16 @@ function DeckCard({ deck }: { deck: YcsDeck }) {
     <li className="deck panel">
       <div className="deck__link">
         <div className="deck__cover">
-          {(deck.covers ?? [deck.main[0], deck.main[3]]).map((card) => <Image
-            src={`${CARD_ART}/${card}.jpg`}
-            key={card}
-            alt={""}
-            width={340}
-            height={340}
-            sizes="416px"
-          />)}
+          {(deck.covers ?? [deck.main[0], deck.main[3]]).map((card) => (
+            <Image
+              src={`${CARD_ART}/${card}.jpg`}
+              key={card}
+              alt=""
+              width={340}
+              height={340}
+              sizes="416px"
+            />
+          ))}
         </div>
         <div className="deck__body">
           <span className="deck__place">{deck.place}</span>
@@ -160,16 +208,168 @@ function DeckCard({ deck }: { deck: YcsDeck }) {
   );
 }
 
-// Only the featured YCS survives today; every other slug is still a signup-only
-// mock. The bracket and deck data will grow real per-slug lookups once REDU's
-// own events have results to show here.
+function FeaturedEventPage() {
+  return (
+    <main className="section" id="main">
+      <div className="wrap">
+        <p className="tab">Hall of Fame</p>
+        <h1 className="section__title">{FEATURED_EVENT.name}</h1>
+
+        <dl className="facts panel">
+          <div className="facts__row">
+            <dt>Date</dt>
+            <dd>{formatDate(FEATURED_EVENT.date)}</dd>
+          </div>
+          <div className="facts__row">
+            <dt>Winner</dt>
+            <dd>{FEATURED_EVENT.winner}</dd>
+          </div>
+          <div className="facts__row">
+            <dt>Community</dt>
+            <dd>{FEATURED_EVENT.community}</dd>
+          </div>
+          <div className="facts__row">
+            <dt>Players</dt>
+            <dd>{FEATURED_EVENT.players.toLocaleString("en-GB")}</dd>
+          </div>
+          <div className="facts__row">
+            <dt>Format</dt>
+            <dd>{FEATURED_EVENT.format}</dd>
+          </div>
+          <div className="facts__row">
+            <dt>Winning deck</dt>
+            <dd>{FEATURED_EVENT.winningDeck}</dd>
+          </div>
+        </dl>
+
+        <h2 className="section__subtitle">Bracket</h2>
+        <Bracket rounds={YCS_PROVIDENCE_2012_BRACKET} />
+
+        <h2 className="section__subtitle" id="decklists">
+          Top decks
+        </h2>
+        <ul className="decklist decklist--wide">
+          {YCS_PROVIDENCE_2012_DECKS.map((deck) => (
+            <DeckCard deck={deck} key={deck.id} />
+          ))}
+        </ul>
+      </div>
+    </main>
+  );
+}
+
+async function GenericEventPage({ slug }: { slug: string }) {
+  const event = (await getTournament(slug)) ?? pastEvents.find((e) => e.slug === slug);
+  if (!event) notFound();
+
+  const session = await getSession();
+  const profile = session.token ? await fetchProfile(session.token) : null;
+  const registeredId = session.signups?.find((s) => s.e === slug)?.d;
+  const registeredDeck = profile?.decks.find((d) => d.id === registeredId);
+
+  const now = new Date();
+  const past = isPast(event, now);
+  const left = seatsLeft(event);
+
+  return (
+    <main className="section" id="main">
+      <div className="wrap">
+        <p className="tab">{past ? "Results" : "Tournament"}</p>
+        <h1 className="section__title">{event.name}</h1>
+
+        <div className="signup">
+          <div className="signup__main">
+            {registeredDeck ? (
+              <div className="notice notice--done panel">
+                <p className="tab">{past ? "You played" : "Registered"}</p>
+                <h2 className="notice__title">
+                  {registeredDeck.name}
+                </h2>
+                {past ? (
+                  <p className="lede">
+                    Mock standing: {mockPlacement(`${slug}:${profile?.name ?? ""}`, event.taken)} of{" "}
+                    {event.taken}. Real results land here once the backend
+                    tracks match outcomes.
+                  </p>
+                ) : (
+                  <p className="lede">
+                    {registeredDeck.main} main · {registeredDeck.extra} extra ·{" "}
+                    {registeredDeck.side} side. Bring it to{" "}
+                    {formatDate(event.startsAt)} at {formatTime(event.startsAt)}.
+                  </p>
+                )}
+                {past ? null : (
+                  <Link className="btn" href={`/events/${slug}/signup`}>
+                    Manage registration
+                  </Link>
+                )}
+              </div>
+            ) : (
+              <div className="notice panel">
+                <p className="lede">
+                  {past
+                    ? "This event has finished."
+                    : left === 0
+                      ? "Every seat is taken."
+                      : "You are not registered for this event yet."}
+                </p>
+                {past ? null : (
+                  <Link className="btn btn--solid" href={`/events/${slug}/signup`}>
+                    {left === 0 ? "Join the waitlist" : "Sign up"}
+                  </Link>
+                )}
+              </div>
+            )}
+          </div>
+
+          <aside className="signup__side">
+            <dl className="facts panel">
+              <div className="facts__row">
+                <dt>Starts</dt>
+                <dd>
+                  {formatDate(event.startsAt)}, {formatTime(event.startsAt)}
+                </dd>
+              </div>
+              <div className="facts__row">
+                <dt>Structure</dt>
+                <dd>{STRUCTURES[event.structure].label}</dd>
+              </div>
+              <div className="facts__row">
+                <dt>Rounds</dt>
+                <dd>
+                  {event.rounds} · {event.matchFormat} · {event.timeLimit} min +
+                  3 turns
+                  {event.topCut ? ` · Top ${event.topCut}` : ""}
+                </dd>
+              </div>
+              <div className="facts__row">
+                <dt>Seats</dt>
+                <dd>
+                  {past
+                    ? `${event.taken} of ${event.seats} duelists`
+                    : `${left} of ${event.seats} left`}
+                </dd>
+              </div>
+              <div className="facts__row">
+                <dt>Host</dt>
+                <dd>
+                  {event.host} · {event.entry}
+                </dd>
+              </div>
+            </dl>
+          </aside>
+        </div>
+      </div>
+    </main>
+  );
+}
+
 export default async function EventDetailPage({
   params,
 }: {
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  if (slug !== FEATURED_EVENT.slug) notFound();
 
   return (
     <>
@@ -179,51 +379,11 @@ export default async function EventDetailPage({
 
       <SiteHeader />
 
-      <main className="section" id="main">
-        <div className="wrap">
-          <p className="tab">Hall of Fame</p>
-          <h1 className="section__title">{FEATURED_EVENT.name}</h1>
-
-          <dl className="facts panel">
-            <div className="facts__row">
-              <dt>Date</dt>
-              <dd>{formatDate(FEATURED_EVENT.date)}</dd>
-            </div>
-            <div className="facts__row">
-              <dt>Winner</dt>
-              <dd>{FEATURED_EVENT.winner}</dd>
-            </div>
-            <div className="facts__row">
-              <dt>Community</dt>
-              <dd>{FEATURED_EVENT.community}</dd>
-            </div>
-            <div className="facts__row">
-              <dt>Players</dt>
-              <dd>{FEATURED_EVENT.players.toLocaleString("en-GB")}</dd>
-            </div>
-            <div className="facts__row">
-              <dt>Format</dt>
-              <dd>{FEATURED_EVENT.format}</dd>
-            </div>
-            <div className="facts__row">
-              <dt>Winning deck</dt>
-              <dd>{FEATURED_EVENT.winningDeck}</dd>
-            </div>
-          </dl>
-
-          <h2 className="section__subtitle">Bracket</h2>
-          <Bracket rounds={YCS_PROVIDENCE_2012_BRACKET} />
-
-          <h2 className="section__subtitle" id="decklists">
-            Top decks
-          </h2>
-          <ul className="decklist decklist--wide">
-            {YCS_PROVIDENCE_2012_DECKS.map((deck) => (
-              <DeckCard deck={deck} key={deck.id} />
-            ))}
-          </ul>
-        </div>
-      </main>
+      {slug === FEATURED_EVENT.slug ? (
+        <FeaturedEventPage />
+      ) : (
+        <GenericEventPage slug={slug} />
+      )}
     </>
   );
 }

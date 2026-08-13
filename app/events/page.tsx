@@ -22,6 +22,14 @@ export const metadata: Metadata = {
   description:
     "Upcoming REDU Format tournaments: Swiss, Single Elimination and Swiss into Top Cut, with dates, seat counts and signups.",
   alternates: { canonical: "/events" },
+  openGraph: {
+    type: "website",
+    url: "/events",
+    siteName: "REDU Format",
+    title: "REDU Format events | Tournaments and schedule",
+    description:
+      "Upcoming REDU Format tournaments: Swiss, Single Elimination and Swiss into Top Cut.",
+  },
 };
 
 const structureOptions = [
@@ -76,10 +84,13 @@ export default async function EventsPage({
 
   // One clock for filtering and for labelling, so the two cannot disagree.
   const now = new Date();
-  const allEvents = [...(await listTournaments()), ...pastEvents];
+  const [tournaments, session] = await Promise.all([
+    listTournaments(),
+    getSession(),
+  ]);
+  const allEvents = [...tournaments, ...pastEvents];
   const { items, page, pages, total } = queryEvents(allEvents, query, now);
 
-  const session = await getSession();
   const registered = new Set((session.signups ?? []).map((s) => s.e));
 
   return (
@@ -225,7 +236,9 @@ export default async function EventsPage({
                     </div>
 
                     <div className="event__body">
-                      <h2 className="event__name">{event.name}</h2>
+                      <h2 className="event__name">
+                        <Link href={`/events/${event.slug}`}>{event.name}</Link>
+                      </h2>
                       <p className="event__meta">
                         <span className="event__tag">
                           {STRUCTURES[event.structure].label}
@@ -263,9 +276,12 @@ export default async function EventsPage({
                       )}
 
                       {past ? (
-                        <a className="btn btn--quiet" href={event.signupUrl}>
+                        <Link
+                          className="btn btn--quiet"
+                          href={`/events/${event.slug}`}
+                        >
                           Results
-                        </a>
+                        </Link>
                       ) : registered.has(event.slug) ? (
                         <Link
                           className="btn btn--in"

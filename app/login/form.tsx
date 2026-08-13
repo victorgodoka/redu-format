@@ -23,8 +23,23 @@ export default function LoginForm({ next }: { next: string }) {
         aria-invalid={state.error ? true : undefined}
       />
       <p className="form__hint">
-        We exchange the token once for your public profile, then discard it. It
-        is never stored and never sent to your browser.
+        You can view your token by going to your{" "}
+        <a
+          href="https://duelingnexus.com/profile"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Dueling Nexus profile
+        </a>
+        , selecting the options menu on the top right of the screen with the
+        gear icon, clicking Token, and then copying and pasting it into this
+        field.
+      </p>
+      <p className="form__hint">
+        The token is kept in an encrypted cookie so we can re-read your decks
+        later. It is refreshed automatically, and you can force it from your
+        dashboard. If Dueling Nexus ever rejects it, we drop it and ask you for
+        a new one.
       </p>
       {state.error ? (
         <p id="token-error" role="alert" className="form__error">

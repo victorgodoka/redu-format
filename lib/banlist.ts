@@ -3,15 +3,19 @@
  *
  * Ids are card passcodes, unpadded: yugi.wiki serves /3078576.jpg and 404s on
  * /03078576.jpg, so leading zeros must not be added.
+ *
+ * Each card is a group of ids: the canonical passcode, any alt-art reprint
+ * (alias) passcodes, and, when the card received an errata, the pre-errata
+ * printing id. This format plays the original wording, so that last id is
+ * the only spelling a deck may legally contain; the others still share this
+ * card's restriction.
  */
-export type BanCard = readonly [id: number, name: string];
-
 export type BanSection = {
   slug: string;
   label: string;
   copies: string;
   note: string;
-  cards: readonly BanCard[];
+  cards: readonly number[][];
 };
 
 export const BANLIST_IDS: readonly BanSection[] = [
@@ -21,226 +25,61 @@ export const BANLIST_IDS: readonly BanSection[] = [
     copies: "0 copies",
     note: "Cannot be used in your main deck, extra deck or side deck.",
     cards: [
-      [
-        87910978,
-        "Brain Control"
-      ],
-      [
-        50321796,
-        "Brionac, Dragon of the Ice Barrier"
-      ],
-      [
-        69243953,
-        "Butterfly Dagger - Elma"
-      ],
-      [
-        57953380,
-        "Card of Safe Return"
-      ],
-      [
-        4031928,
-        "Change of Heart"
-      ],
-      [
-        82301904,
-        "Chaos Emperor Dragon - Envoy of the End"
-      ],
-      [
-        60682203,
-        "Cold Wave"
-      ],
-      [
-        17375316,
-        "Confiscation"
-      ],
-      [
-        57728570,
-        "Crush Card Virus"
-      ],
-      [
-        34124316,
-        "Cyber Jar"
-      ],
-      [
-        69015963,
-        "Cyber-Stein"
-      ],
-      [
-        40737112,
-        "Dark Magician of Chaos"
-      ],
-      [
-        32646477,
-        "Dark Strike Fighter"
-      ],
-      [
-        44763025,
-        "Delinquent Duo"
-      ],
-      [
-        56570271,
-        "Destiny HERO - Disk Commander"
-      ],
-      [
-        23557835,
-        "Dimension Fusion"
-      ],
-      [
-        17484499,
-        "Exchange of the Spirit"
-      ],
-      [
-        78706415,
-        "Fiber Jar"
-      ],
-      [
-        93369354,
-        "Fishborg Blaster"
-      ],
-      [
-        77565204,
-        "Future Fusion"
-      ],
-      [
-        42703248,
-        "Giant Trunade"
-      ],
-      [
-        67441435,
-        "Glow-Up Bulb"
-      ],
-      [
-        7391448,
-        "Goyo Guardian"
-      ],
-      [
-        79571449,
-        "Graceful Charity"
-      ],
-      [
-        18144507,
-        "Harpie's Feather Duster"
-      ],
-      [
-        61740673,
-        "Imperial Order"
-      ],
-      [
-        28566710,
-        "Last Turn"
-      ],
-      [
-        85602018,
-        "Last Will"
-      ],
-      [
-        34206604,
-        "Magical Scientist"
-      ],
-      [
-        31560081,
-        "Magician of Faith"
-      ],
-      [
-        21593977,
-        "Makyura the Destructor"
-      ],
-      [
-        34906152,
-        "Mass Driver"
-      ],
-      [
-        46411259,
-        "Metamorphosis"
-      ],
-      [
-        96782886,
-        "Mind Master"
-      ],
-      [
-        41482598,
-        "Mirage of Nightmare"
-      ],
-      [
-        74191942,
-        "Painful Choice"
-      ],
-      [
-        55144522,
-        "Pot of Greed"
-      ],
-      [
-        70828912,
-        "Premature Burial"
-      ],
-      [
-        12580477,
-        "Raigeki"
-      ],
-      [
-        14878871,
-        "Rescue Cat"
-      ],
-      [
-        83555666,
-        "Ring of Destruction"
-      ],
-      [
-        93016201,
-        "Royal Oppression"
-      ],
-      [
-        8131171,
-        "Sinister Serpent"
-      ],
-      [
-        45986603,
-        "Snatch Steal"
-      ],
-      [
-        20663556,
-        "Substitoad"
-      ],
-      [
-        29762407,
-        "Temple of the Kings"
-      ],
-      [
-        42829885,
-        "The Forceful Sentry"
-      ],
-      [
-        63519819,
-        "Thousand-Eyes Restrict"
-      ],
-      [
-        35316708,
-        "Time Seal"
-      ],
-      [
-        64697231,
-        "Trap Dustshoot"
-      ],
-      [
-        33184167,
-        "Tribe-Infecting Virus"
-      ],
-      [
-        52687916,
-        "Trishula, Dragon of the Ice Barrier"
-      ],
-      [
-        44910027,
-        "Victory Dragon"
-      ],
-      [
-        78010363,
-        "Witch of the Black Forest"
-      ],
-      [
-        3078576,
-        "Yata-Garasu"
-      ]
+      [87910978, 87910998],
+      [50321796, 50321816],
+      [69243953],
+      [57953380],
+      [4031928],
+      [82301904, 82301924],
+      [60682203],
+      [17375316],
+      [57728570, 57728590],
+      [34124316],
+      [69015963],
+      [40737112, 40737132],
+      [32646477, 32646497],
+      [44763025],
+      [56570271, 56570291],
+      [23557835],
+      [17484499, 17484519],
+      [78706415, 78706435],
+      [93369354],
+      [77565204, 77565224],
+      [42703248],
+      [67441435],
+      [7391448, 7391468],
+      [79571449],
+      [18144506, 18144507, 18144508],
+      [61740673, 61740693],
+      [28566710],
+      [85602018],
+      [34206604],
+      [31560081],
+      [21593977],
+      [34906152],
+      [46411259],
+      [96782886],
+      [41482598],
+      [74191942],
+      [55144522],
+      [70828912],
+      [12580477],
+      [14878871, 14878891],
+      [83555666],
+      [93016201],
+      [8131171, 8131191],
+      [45986603],
+      [20663556],
+      [29762407, 29762427],
+      [42829885],
+      [63519819],
+      [35316708],
+      [64697231],
+      [33184167],
+      [52687916],
+      [44910027],
+      [78010363, 78010383],
+      [3078576],
     ],
   },
   {
@@ -249,67 +88,67 @@ export const BANLIST_IDS: readonly BanSection[] = [
     copies: "1 copy",
     note: "One copy total across your main deck, extra deck and side deck.",
     cards: [
-      [46052429, "Advanced Ritual Art"],
-      [1475311, "Allure of Darkness"],
-      [72989439, "Black Luster Soldier - Envoy of the Beginning"],
-      [91351370, "Black Whirlwind"],
-      [2009101, "Blackwing - Gale the Whirlwind"],
-      [14087893, "Book of Moon"],
-      [48976825, "Burial from a Different Dimension"],
-      [72892473, "Card Destruction"],
-      [36468556, "Ceasefire"],
-      [9596126, "Chaos Sorcerer"],
-      [94886282, "Charge of the Light Brigade"],
-      [15341821, "Dandylion"],
-      [65192027, "Dark Armed Dragon"],
-      [53129443, "Dark Hole"],
-      [40044918, "Elemental HERO Stratos"],
-      [45222299, "Evigishki Gustkraken"],
-      [33396948, "Exodia the Forbidden One"],
-      [81439173, "Foolish Burial"],
-      [50091196, "Formula Synchron"],
-      [27970830, "Gateway of the Six"],
-      [41470137, "Gladiator Beast Bestiari"],
-      [44330098, "Gorz the Emissary of Darkness"],
-      [19613556, "Heavy Storm"],
-      [37742478, "Honest"],
-      [66957584, "Infernity Launcher"],
-      [68184115, "Inzektor Dragonfly"],
-      [69207766, "Inzektor Hornet"],
-      [7902349, "Left Arm of the Forbidden One"],
-      [44519536, "Left Leg of the Forbidden One"],
-      [29981921, "Legendary Six Samurai - Shi En"],
-      [23171610, "Limiter Removal"],
-      [48686504, "Lonefire Blossom"],
-      [32723153, "Magical Explosion"],
-      [92826944, "Mezuki"],
-      [37520316, "Mind Control"],
-      [43040603, "Monster Gate"],
-      [83764719, "Monster Reborn"],
-      [33508719, "Morphing Jar"],
-      [28297833, "Necroface"],
-      [80344569, "Neo-Spacian Grand Mole"],
-      [16226786, "Night Assailant"],
-      [2295440, "One for One"],
-      [33420078, "Plaguespreader Zombie"],
-      [67169062, "Pot of Avarice"],
-      [23701465, "Primal Seed"],
-      [88264978, "Red-Eyes Darkness Metal Dragon"],
-      [32807846, "Reinforcement of the Army"],
-      [27174286, "Return from the Different Dimension"],
-      [70903634, "Right Arm of the Forbidden One"],
-      [8124921, "Right Leg of the Forbidden One"],
-      [26202165, "Sangan"],
-      [73915051, "Scapegoat"],
-      [41420027, "Solemn Judgment"],
-      [11747708, "Spore"],
-      [90953320, "T.G. Hyper Librarian"],
-      [1315120, "T.G. Striker"],
-      [46652477, "The Transmigration Prophecy"],
-      [34853266, "Tsukuyomi"],
-      [80604092, "Ultimate Offering"],
-      [17078030, "Wall of Revealing Light"],
-      [81122844, "Wind-Up Carrier Zenmaity"],
+      [46052429],
+      [1475311],
+      [72989439, 72989459],
+      [91351370],
+      [2009101],
+      [14087893],
+      [48976825],
+      [72892473],
+      [36468556],
+      [9596126, 9596146],
+      [94886282],
+      [15341821],
+      [65192027],
+      [53129443],
+      [40044918, 40044938],
+      [45222299],
+      [33396948],
+      [81439173],
+      [50091196],
+      [27970830],
+      [41470137],
+      [44330098],
+      [19613556],
+      [37742478],
+      [66957584],
+      [68184115],
+      [69207766],
+      [7902349],
+      [44519536],
+      [29981921],
+      [23171610],
+      [48686504],
+      [32723153],
+      [92826944],
+      [37520316],
+      [43040603],
+      [83764718, 83764719, 83764720],
+      [33508719],
+      [28297833],
+      [80344569],
+      [16226786, 16226806],
+      [2295440],
+      [33420078],
+      [67169062],
+      [23701465],
+      [88264978, 88264998],
+      [32807846],
+      [27174286],
+      [70903634],
+      [8124921],
+      [26202165, 26202185],
+      [73915051],
+      [41420027],
+      [11747708],
+      [90953320],
+      [1315120],
+      [46652477],
+      [34853266],
+      [80604091, 80604092, 80604111],
+      [17078030],
+      [81122844],
     ],
   },
   {
@@ -318,34 +157,34 @@ export const BANLIST_IDS: readonly BanSection[] = [
     copies: "2 copies",
     note: "Two copies total across your main deck, extra deck and side deck.",
     cards: [
-      [8949584, "A Hero Lives"],
-      [59509952, "Archlord Kristya"],
-      [85215458, "Blackwing - Kalut the Moon Shadow"],
-      [29401950, "Bottomless Trap Hole"],
-      [85087012, "Card Trooper"],
-      [91623717, "Chain Strike"],
-      [14943837, "Debris Dragon"],
-      [9411399, "Destiny HERO - Malicious"],
-      [70583986, "Dewloren, Tiger King of the Ice Barrier"],
-      [213326, "E - Emergency Call"],
-      [25377819, "Hieratic Seal of Convocation"],
-      [95503687, "Lumina, Lightsworn Summoner"],
-      [98494543, "Magical Stone Excavation"],
-      [15800838, "Mind Crush"],
-      [44095762, "Mirror Force"],
-      [29843091, "Ojama Trio"],
-      [98645731, "Pot of Duality"],
-      [58577036, "Reasoning"],
-      [10028593, "Reborn Tengu"],
-      [85138716, "Rescue Rabbit"],
-      [72405967, "Royal Tribute"],
-      [54031490, "Shien's Smoke Signal"],
-      [84749824, "Solemn Warning"],
-      [423585, "Summoner Monk"],
-      [91188343, "The Agent of Mystery - Earth"],
-      [53582587, "Torrential Tribute"],
-      [10802915, "Tour Guide From the Underworld"],
-      [98777036, "Tragoedia"],
+      [8949584],
+      [59509952],
+      [85215458],
+      [29401950],
+      [85087012],
+      [91623717],
+      [14943837],
+      [9411399],
+      [70583986, 70584006],
+      [213326],
+      [25377819],
+      [95503687, 95503707],
+      [98494543],
+      [15800838, 15800858],
+      [44095762],
+      [29843091],
+      [98645731],
+      [58577036],
+      [10028593],
+      [85138716],
+      [72405967],
+      [54031490],
+      [84749824],
+      [423585],
+      [91188343],
+      [53582587],
+      [10802915],
+      [98777036],
     ],
   },
   {
@@ -354,13 +193,13 @@ export const BANLIST_IDS: readonly BanSection[] = [
     copies: "3 copies",
     note: "Restricted on earlier lists, free to play at three in this format.",
     cards: [
-      [45809008, "Destiny Draw"],
-      [67723438, "Emergency Teleport"],
-      [3136426, "Level Limit - Area B"],
-      [62279055, "Magic Cylinder"],
-      [31305911, "Marshmallon"],
-      [4906301, "Necro Gardna"],
-      [72302403, "Swords of Revealing Light"],
+      [45809008],
+      [67723438],
+      [3136426],
+      [62279055],
+      [31305911],
+      [4906301],
+      [72302403],
     ],
   },
 ];

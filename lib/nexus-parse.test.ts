@@ -10,10 +10,17 @@ test("keeps a real Nexus avatar url, query string intact", () => {
   assert.equal(cleanAvatar(REAL_AVATAR), REAL_AVATAR);
 });
 
-test("drops avatars that are not https on the Nexus host", () => {
+test("keeps a default ygopro.online avatar url", () => {
+  const url = "https://ygopro.online/assets/profile/Avatars/0.jpg";
+  assert.equal(cleanAvatar(url), url);
+});
+
+test("drops avatars that are not https on an expected host", () => {
   assert.equal(cleanAvatar("http://duelingnexus.com/uploads/avatars/a.png"), "");
+  assert.equal(cleanAvatar("http://ygopro.online/assets/profile/Avatars/0.jpg"), "");
   assert.equal(cleanAvatar("https://evil.example/uploads/avatars/a.png"), "");
   assert.equal(cleanAvatar("https://duelingnexus.com.evil.test/a.png"), "");
+  assert.equal(cleanAvatar("https://ygopro.online.evil.test/a.png"), "");
   assert.equal(cleanAvatar("javascript:alert(1)"), "");
   assert.equal(cleanAvatar("/uploads/avatars/a.png"), "");
   assert.equal(cleanAvatar(""), "");
@@ -63,6 +70,16 @@ test("counts a real deck and picks the first main deck card as cover", () => {
     side: 15,
     coverId: 64881644,
   });
+});
+
+test("cover is a main_deck index, not a card id", () => {
+  const deck = parseDeck({ ...MELODIOUS, cover: 3 });
+  assert.equal(deck?.coverId, 90276649);
+});
+
+test("an out-of-range cover index falls back to the first card", () => {
+  const deck = parseDeck({ ...MELODIOUS, cover: 999 });
+  assert.equal(deck?.coverId, 64881644);
 });
 
 test("an empty side deck counts as zero, not one", () => {

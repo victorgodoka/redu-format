@@ -41,6 +41,9 @@ export const metadata: Metadata = {
     title: "REDU Format | Retro Yu-Gi-Oh! Wind-Up Format",
     description:
       "Retro Yu-Gi-Oh! on the September 2012 banlist and the Return of the Duelist card pool.",
+    // Shallow-merges into every page's own openGraph block as the fallback
+    // preview image, unless that page sets its own `images`.
+    images: ["/android-chrome-512x512.png"],
   },
 };
 

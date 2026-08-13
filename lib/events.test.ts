@@ -5,6 +5,7 @@ import {
   allEvents as events,
   fillRatio,
   isPast,
+  mockPlacement,
   PAGE_SIZE,
   queryEvents,
   seatsLeft,
@@ -153,4 +154,12 @@ test("open, almost and sold out never double count", () => {
   // almost is a subset of open, so open already covers it.
   assert.equal(q("open") + q("full"), events.length);
   assert.ok(q("almost") <= q("open"));
+});
+
+test("mockPlacement is stable and stays within the field", () => {
+  const seed = "wind-up-cup-x:Godoka";
+  const first = mockPlacement(seed, 64);
+  assert.equal(mockPlacement(seed, 64), first, "same seed, same result");
+  assert.ok(first >= 1 && first <= 64, "placement must be within the field");
+  assert.equal(mockPlacement(seed, 0), 1, "an empty field never divides by zero");
 });

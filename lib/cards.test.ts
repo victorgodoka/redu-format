@@ -4,7 +4,9 @@ import { BANLIST_IDS } from "./banlist.ts";
 import { parseCardText } from "./card-text.ts";
 import { CARD_LIB } from "./cardLib.ts";
 import { Card, cardsByIds, findCardByName } from "./cards.ts";
-import { ERRATAS } from "./erratas.ts";
+
+/** The errata'd row for a passcode: same id, but errataId/errataText set. */
+const ERRATA_ROWS = CARD_LIB.filter((c) => c.errataId !== null);
 
 test("resolves a card that never received an errata", () => {
   // 53129443 is Dark Hole, a passcode stable enough to hard-code.
@@ -28,39 +30,25 @@ test("an errata'd card keeps its passcode and gains the internal ids", () => {
 });
 
 test("errataId is always the passcode plus twenty", () => {
-  for (const errata of ERRATAS) {
-    assert.equal(errata.errataId, errata.id + 20, `${errata.name}`);
+  for (const row of ERRATA_ROWS) {
+    assert.equal(row.errataId, row.id + 20, row.name);
   }
 });
 
 test("koid is never confused with the passcode", () => {
-  for (const errata of ERRATAS) {
-    assert.notEqual(errata.koid, errata.id, `${errata.name}`);
-    assert.ok(errata.koid > 0);
+  for (const row of ERRATA_ROWS) {
+    assert.notEqual(row.koid, row.id, row.name);
+    assert.ok((row.koid ?? 0) > 0);
   }
 });
 
-test("the errata table wins over the card library", () => {
-  // Stratos is in both sources; the errata text is the one that must show.
+test("the errata'd row wins over the plain one for the same passcode", () => {
+  // Stratos has two rows sharing an id; the errata'd row's text must show.
   const card = new Card(40044918);
-  const errata = ERRATAS.find((e) => e.id === 40044918);
-  assert.ok(errata);
-  assert.equal(card.desc, errata.desc);
+  const row = ERRATA_ROWS.find((c) => c.id === 40044918);
+  assert.ok(row);
+  assert.equal(card.desc, row.errataText);
   assert.equal(card.name, "Elemental HERO Stratos");
-});
-
-test("cards outside the library still resolve from the errata table", (t) => {
-  // Picked from the data rather than hard-coded: which cards sit outside
-  // CARD_LIB changes whenever the errata table is trimmed.
-  const inLib = new Set(CARD_LIB.map((c) => c.id));
-  const outside = ERRATAS.find((e) => !inLib.has(e.id));
-  if (!outside) return t.skip("no errata card sits outside the library");
-
-  const card = new Card(outside.id);
-  assert.equal(card.found, true);
-  assert.equal(card.name, outside.name);
-  assert.equal(card.koid, outside.koid);
-  assert.equal(card.desc, outside.desc);
 });
 
 test("an unknown id is reported rather than silently blank", () => {
@@ -140,11 +128,11 @@ test("card text with no markup passes through whole", () => {
 });
 
 test("no [b] markup survives into rendered runs", () => {
-  for (const errata of ERRATAS) {
-    const joined = parseCardText(errata.desc)
+  for (const row of ERRATA_ROWS) {
+    const joined = parseCardText(row.errataText ?? "")
       .map((p) => p.text)
       .join("");
-    assert.ok(!joined.includes("[b]"), `${errata.name} kept an open tag`);
-    assert.ok(!joined.includes("[/b]"), `${errata.name} kept a close tag`);
+    assert.ok(!joined.includes("[b]"), `${row.name} kept an open tag`);
+    assert.ok(!joined.includes("[/b]"), `${row.name} kept a close tag`);
   }
 });

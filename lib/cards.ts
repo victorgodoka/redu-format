@@ -1,18 +1,30 @@
 import { CARD_LIB } from "./cardLib.ts";
-import { ERRATAS } from "./erratas.ts";
 import type { CardJson } from "./card-text.ts";
 
 /**
- * CARD_LIB holds 5145 entries and ERRATAS 113. Scanning both with `find` on
- * every lookup made a 151-card page do roughly 800k comparisons; these indexes
- * are built once per process and turn each lookup into a hash hit.
+ * An errata'd passcode appears twice in CARD_LIB: once with its current text
+ * and null errata fields, then again with errataId/errataText set. A Map set
+ * in iteration order makes the second (errata'd) row win, which is exactly
+ * the "errata wins" precedence the old two-source merge used to need.
+ * Built once per process; O(1) lookups after, instead of scanning ~5700 rows.
  */
-const byId = new Map(CARD_LIB.map((c) => [c.id, c]));
-const errataById = new Map(ERRATAS.map((e) => [e.id, e]));
+const BY_ID = new Map<number, (typeof CARD_LIB)[number]>();
+for (const card of CARD_LIB) BY_ID.set(card.id, card);
+// Alt-art aliases and errata ids resolve to their owning row, but never
+// shadow a real passcode already claimed above.
+for (const card of CARD_LIB) {
+  for (const alias of card.aliases) {
+    if (!BY_ID.has(alias)) BY_ID.set(alias, card);
+  }
+  if (card.errataId !== null && !BY_ID.has(card.errataId)) {
+    BY_ID.set(card.errataId, card);
+  }
+}
+const byId = (id: number) => BY_ID.get(id);
 
 /** Card page on the rulings database, keyed by Konami id, not by passcode. */
 const RULINGS = "https://db.ygoresources.com/card#";
-/** Only reached if a card is missing a koid in both sources. */
+/** Only reached if a card has no koid on file. */
 const RULINGS_SEARCH = "https://db.ygoresources.com/search#quick:";
 
 export class Card {
@@ -32,20 +44,20 @@ export class Card {
   readonly errataId: number | null;
   /** Konami id, used for rulings links. Not the passcode. */
   readonly koid: number | null;
-  /** False when neither source knows the id. */
+  /** False when the id is not in the card library. */
   readonly found: boolean;
 
-  constructor(id: number) {
-    // The errata table is the source of truth; the library fills in the rest.
-    const errata = errataById.get(id);
-    const card = byId.get(id);
+  constructor(cId: number) {
+    const card = byId(cId);
 
-    this.id = id;
-    this.found = errata !== undefined || card !== undefined;
-    this.name = errata?.name ?? card?.name ?? `Unknown card ${id}`;
-    this.desc = errata?.desc ?? card?.desc ?? "";
-    this.errataId = errata?.errataId ?? null;
-    this.koid = errata?.koid ?? card?.koid ?? null;
+    this.id = card?.id ?? cId;
+    this.found = card !== undefined;
+    this.name = card?.name ?? `Unknown card ${cId}`;
+    // errataText is the pre-errata wording, which is what this frozen format
+    // actually reads off the card; desc is always the current, post-errata text.
+    this.desc = card?.errataText ?? card?.desc ?? "";
+    this.errataId = card?.errataId ?? null;
+    this.koid = card?.koid ?? null;
   }
 
   get hasErrata(): boolean {
@@ -86,9 +98,6 @@ export function cardsByIds(ids: readonly number[]): Card[] {
 
 export function findCardByName(name: string): Card | null {
   const wanted = name.trim().toLowerCase();
-  const errata = ERRATAS.find((e) => e.name.toLowerCase() === wanted);
-  if (errata) return new Card(errata.id);
-
   const match = CARD_LIB.find((c) => c.name.toLowerCase() === wanted);
   return match ? new Card(match.id) : null;
 }

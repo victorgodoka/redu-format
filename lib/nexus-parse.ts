@@ -1,4 +1,5 @@
-const AVATAR_HOST = "duelingnexus.com";
+/** Nexus serves avatars from its own uploads, or from ygopro.online for default ones. */
+const AVATAR_HOSTS = new Set(["duelingnexus.com", "ygopro.online"]);
 
 export type NexusDeck = {
   id: string;
@@ -49,6 +50,9 @@ export function parseDeck(raw: unknown): NexusDeck | null {
   if (typeof deck.id !== "string" || deck.id.length === 0) return null;
 
   const main = cardIds(deck.main_deck);
+  // `cover` is the 0-based index of the chosen cover card within main_deck,
+  // not a card id: Nexus sends 0 by default, and 0 is not a valid passcode.
+  const cover = typeof deck.cover === "number" ? deck.cover : 0;
 
   return {
     id: deck.id,
@@ -56,7 +60,7 @@ export function parseDeck(raw: unknown): NexusDeck | null {
     main: main.length,
     extra: cardIds(deck.extra_deck).length,
     side: cardIds(deck.side_deck).length,
-    coverId: main[0] ?? null,
+    coverId: main[cover] ?? main[0] ?? null,
   };
 }
 
@@ -74,15 +78,15 @@ export function parseDeckList(raw: unknown): NexusDeckLists | null {
 }
 
 /**
- * Nexus sends the avatar as an absolute URL. Anything that is not https on the
- * expected host is dropped, so a changed upstream response cannot make the site
- * render an image from somewhere else.
+ * Nexus sends the avatar as an absolute URL. Anything that is not https on an
+ * expected host is dropped, so a changed upstream response cannot make the
+ * site render an image from somewhere else.
  */
 export function cleanAvatar(value: unknown): string {
   if (typeof value !== "string" || value.length === 0) return "";
   try {
     const url = new URL(value);
-    if (url.protocol !== "https:" || url.hostname !== AVATAR_HOST) return "";
+    if (url.protocol !== "https:" || !AVATAR_HOSTS.has(url.hostname)) return "";
     return url.toString();
   } catch {
     return "";

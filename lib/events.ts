@@ -648,3 +648,14 @@ export function formatDate(iso: string) {
 export function formatTime(iso: string) {
   return `${timeFormat.format(new Date(iso))} UTC`;
 }
+
+/**
+ * Deterministic mock placement, until there is a backend tracking real match
+ * results. Same seed always gives the same standing, so it does not flicker
+ * between renders.
+ */
+export function mockPlacement(seed: string, of: number): number {
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) hash = (hash * 31 + seed.charCodeAt(i)) >>> 0;
+  return 1 + (hash % Math.max(1, of));
+}

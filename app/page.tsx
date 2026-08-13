@@ -11,16 +11,6 @@ const facts = [
   { k: "Diverse meta", v: "Lot of different strategies to play" },
 ];
 
-  // const decks = [
-  //   { name: "Wind-Up", note: "Namesake" },
-  //   { name: "Agent", note: "Swarm" },
-  //   { name: "Geargia", note: "Gear Gigant X" },
-  //   { name: "Chaos Dragon", note: "Grind" },
-  //   { name: "Dino Rabbit", note: "Laggia / Dolkka" },
-  //   { name: "Dark World", note: "Punishes discard" },
-  //   { name: "Hero Beat", note: "Toolbox" },
-  // ];
-
 const faq = [
   {
     q: "What is REDU Format?",
@@ -36,7 +26,7 @@ const faq = [
   },
   {
     q: "Where can I play REDU Format?",
-    a: "On Dueling Nexus, with both automatic and manual duelling. REDU is also a Konami-supported Time Wizard format, so sanctioned events run in OTS stores and at YCS events.",
+    a: "On Dueling Nexus, with both automatic and manual dueling. REDU is also a Konami-supported Time Wizard format, so sanctioned events run in OTS stores and at YCS events.",
   },
 ];
 
@@ -66,11 +56,6 @@ export default function Home() {
 
       <div className="wrap">
         <section className="hero panel">
-          {/* <p className="hero__kicker">
-            <span>Welcome to</span>
-            <span>September 2012 banlist</span>
-            <span>Zexal era</span>
-          </p> */}
           <h1 className="hero__title">
             REDU
             <span>Format</span>
@@ -87,7 +72,7 @@ export default function Home() {
               target="_blank"
               rel="noopener noreferrer"
             >
-              Start duelling today
+              Start dueling today
             </a>
             <Link className="btn" href="/events">
               View the latest events
@@ -161,14 +146,6 @@ export default function Home() {
                 at YCS events.
               </p>
             </div>
-            {/* <ul className="rows">
-              {decks.map(({ name, note }) => (
-                <li className="rows__item" key={name}>
-                  <span className="rows__name">{name}</span>
-                  <span className="rows__note">{note}</span>
-                </li>
-              ))}
-            </ul> */}
           </div>
         </section>
 
@@ -211,7 +188,7 @@ export default function Home() {
             <p>REDU Format</p>
             <div className="site-footer__links">
               <Link href="/banlist">Banlist</Link>
-              <a href={'https://duelingnexus.com/home'} target="_blank" rel="noopener noreferrer">
+              <a href="https://duelingnexus.com/home" target="_blank" rel="noopener noreferrer">
                 Dueling Nexus
               </a>
               <a href={DISCORD} target="_blank" rel="noopener noreferrer">

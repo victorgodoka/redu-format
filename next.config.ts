@@ -18,6 +18,11 @@ const nextConfig: NextConfig = {
         hostname: "ygopro.online",
         pathname: "/assets/card-arts/**",
       },
+      {
+        protocol: "https",
+        hostname: "ygopro.online",
+        pathname: "/assets/profile/Avatars/**",
+      },
     ],
   },
 };

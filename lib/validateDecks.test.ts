@@ -2,15 +2,19 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { BANLIST_IDS } from "./banlist.ts";
 import { CARD_LIB } from "./cardLib.ts";
-import { ERRATAS } from "./erratas.ts";
 import {
   describeError,
   validateDeck,
   validateDecks,
 } from "./validateDecks.ts";
 
-const bannedIds = new Set(BANLIST_IDS.flatMap((s) => s.cards.map(([id]) => id)));
-const errataIds = new Set(ERRATAS.map((e) => e.id));
+/** The errata'd row for a passcode: same id, but errataId/errataText set. */
+const ERRATA_ROWS = CARD_LIB.filter((c) => c.errataId !== null);
+
+// .flat(): a banlist entry is a group of ids (canonical passcode, alt-art
+// aliases, and an errata id when the card has one), all under the same limit.
+const bannedIds = new Set(BANLIST_IDS.flatMap((s) => s.cards).flat());
+const errataIds = new Set(ERRATA_ROWS.map((c) => c.id));
 
 /** Real cards that are neither restricted nor errata'd, safe to pad with. */
 const FILLER = CARD_LIB.filter(
@@ -33,11 +37,10 @@ const pad = (cards: number[], to = 40) => {
   return [...cards, ...rest];
 };
 
-const idOf = (name: string) =>
-  BANLIST_IDS.flatMap((s) => s.cards).find(([, n]) => n === name)?.[0] as number;
+const idOf = (name: string) => CARD_LIB.find((c) => c.name === name)?.id as number;
 
 const POT_OF_GREED = idOf("Pot of Greed"); // Forbidden
-const SANGAN = ERRATAS.find((e) => e.name === "Sangan");
+const SANGAN = ERRATA_ROWS.find((c) => c.name === "Sangan");
 
 test("a clean deck passes", () => {
   const result = validateDeck(deck(pad([])));
@@ -175,17 +178,17 @@ test("the passcode of an errata'd card is never accepted, in any zone", () => {
 
 test("no errata'd card can be spelled with its passcode", () => {
   // Guards the whole table, not just the one card the cases above use.
-  for (const errata of ERRATAS.slice(0, 25)) {
-    const viaPasscode = validateDeck(deck(pad([errata.id])));
+  for (const row of ERRATA_ROWS.slice(0, 25)) {
+    const viaPasscode = validateDeck(deck(pad([row.id])));
     assert.ok(
       viaPasscode.errors.some((e) => e.type === "errata"),
-      `${errata.name} accepted its passcode`,
+      `${row.name} accepted its passcode`,
     );
 
-    const viaErrata = validateDeck(deck(pad([errata.errataId])));
+    const viaErrata = validateDeck(deck(pad([row.errataId as number])));
     assert.ok(
       !viaErrata.errors.some((e) => e.type === "errata"),
-      `${errata.name} rejected its own errata id`,
+      `${row.name} rejected its own errata id`,
     );
   }
 });

@@ -1,6 +1,5 @@
 import { BANLIST_IDS } from "./banlist.ts";
 import { CARD_LIB } from "./cardLib.ts";
-import { ERRATAS } from "./erratas.ts";
 import type { NexusDeckLists } from "./nexus-parse.ts";
 
 export type DeckValidationError =
@@ -44,35 +43,45 @@ const BAN_COPIES: Record<string, number> = {
 const DEFAULT_COPIES = 3;
 
 /**
- * A deck may never carry the passcode of a card that has an errata: this format
- * plays the original wording, so the errata id is the only accepted spelling.
- * Both ids still count as the same card when copies are tallied.
+ * A deck may never carry the plain passcode of a card that has an errata, nor
+ * one of its alt-art aliases: this format plays the original wording, so the
+ * errata id is the only accepted spelling. Every alternate id (alt-art alias
+ * or pre-errata printing) still counts as the same card when copies are
+ * tallied, and the banlist restricts all of them together.
  */
 
 // ---------------------------------------------------------------------------
 // Indexes, built once per process rather than rebuilt per deck.
 // ---------------------------------------------------------------------------
 
-/** Every id a deck may legally contain: passcodes plus pre-errata printings. */
+/** Every id a deck may legally contain: passcodes, their alt-art aliases, and pre-errata printings. */
 const POOL = new Set<number>();
 const NAME_BY_ID = new Map<number, string>();
-/** Pre-errata printing id -> passcode, so both spellings count as one card. */
-const PASSCODE_BY_PRINT = new Map<number, number>();
+/** Alt-art alias or pre-errata printing id -> the passcode it counts as. */
+const PASSCODE_BY_ALT = new Map<number, number>();
+/** Passcode -> its alt-art alias ids, empty when the card has none. */
+const ALIASES_BY_PASSCODE = new Map<number, number[]>();
 /** Passcode -> pre-errata printing id, for the "use the other one" message. */
 const PRINT_BY_PASSCODE = new Map<number, number>();
 
 for (const card of CARD_LIB) {
   POOL.add(card.id);
   NAME_BY_ID.set(card.id, card.name);
-}
 
-for (const errata of ERRATAS) {
-  POOL.add(errata.id);
-  POOL.add(errata.errataId);
-  NAME_BY_ID.set(errata.id, errata.name);
-  NAME_BY_ID.set(errata.errataId, errata.name);
-  PASSCODE_BY_PRINT.set(errata.errataId, errata.id);
-  PRINT_BY_PASSCODE.set(errata.id, errata.errataId);
+  const aliases = card.aliases ?? [];
+  ALIASES_BY_PASSCODE.set(card.id, aliases);
+  for (const alias of aliases) {
+    POOL.add(alias);
+    NAME_BY_ID.set(alias, card.name);
+    PASSCODE_BY_ALT.set(alias, card.id);
+  }
+
+  if (card.errataId !== null) {
+    POOL.add(card.errataId);
+    NAME_BY_ID.set(card.errataId, card.name);
+    PASSCODE_BY_ALT.set(card.errataId, card.id);
+    PRINT_BY_PASSCODE.set(card.id, card.errataId);
+  }
 }
 
 const LIMIT_BY_PASSCODE = new Map<
@@ -83,8 +92,12 @@ const LIMIT_BY_PASSCODE = new Map<
 for (const section of BANLIST_IDS) {
   const copies = BAN_COPIES[section.slug];
   if (copies === undefined) continue;
-  for (const [id] of section.cards) {
-    LIMIT_BY_PASSCODE.set(id, { copies, section: section.slug });
+  // Every printing in the group (canonical, alt-art alias or errata id)
+  // shares the same restriction.
+  for (const ids of section.cards) {
+    for (const id of ids) {
+      LIMIT_BY_PASSCODE.set(id, { copies, section: section.slug });
+    }
   }
 }
 
@@ -92,9 +105,9 @@ function nameOf(id: number): string {
   return NAME_BY_ID.get(id) ?? `Unknown card ${id}`;
 }
 
-/** Collapses a pre-errata printing onto its passcode. */
+/** Collapses an alt-art alias or pre-errata printing onto its passcode. */
 function normalise(id: number): number {
-  return PASSCODE_BY_PRINT.get(id) ?? id;
+  return PASSCODE_BY_ALT.get(id) ?? id;
 }
 
 export function validateDeck(deck: NexusDeckLists): DeckValidationResult {
@@ -143,15 +156,19 @@ export function validateDeck(deck: NexusDeckLists): DeckValidationResult {
       });
     }
 
-    // 3. Errata. The passcode of an errata'd card is never acceptable.
+    // 3. Errata. Neither the passcode nor one of its alt-art aliases is
+    //    acceptable: only the errata id carries the legal wording.
     const errataId = PRINT_BY_PASSCODE.get(passcode);
-    if (errataId !== undefined && prints.has(passcode)) {
-      errors.push({
-        type: "errata",
-        cardId: passcode,
-        cardName: nameOf(passcode),
-        errataId,
-      });
+    if (errataId !== undefined) {
+      const illegalIds = [passcode, ...(ALIASES_BY_PASSCODE.get(passcode) ?? [])];
+      if (illegalIds.some((id) => prints.has(id))) {
+        errors.push({
+          type: "errata",
+          cardId: passcode,
+          cardName: nameOf(passcode),
+          errataId,
+        });
+      }
     }
   }
 

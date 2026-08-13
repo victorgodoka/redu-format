@@ -3,6 +3,7 @@ import "server-only";
 import { createHash } from "node:crypto";
 import { getIronSession, type SessionOptions } from "iron-session";
 import { cookies } from "next/headers";
+import { cache } from "react";
 import {
   cleanAvatar,
   NexusDeckLists,
@@ -94,13 +95,23 @@ function cacheKey(token: string) {
   return createHash("sha256").update(token).digest("hex");
 }
 
+/** Drops the cached copy so the next read hits Nexus. Backs the refresh button. */
+export function invalidateProfile(token: string) {
+  profiles.delete(cacheKey(token));
+}
+
 /**
  * Reads the profile and deck list behind a Nexus token. Nexus answers HTTP 200
  * with `success: false` for a bad token, so only the body decides. Returns null
  * for anything that is not a confirmed success, which is also how a revoked
  * token surfaces on later reads.
  */
-export async function fetchProfile(token: string): Promise<NexusProfile | null> {
+// React.cache() dedupes repeat calls with the same token inside one request
+// (e.g. SiteHeader and the page both reading the session), on top of the
+// cross-request Map cache above.
+export const fetchProfile = cache(async function fetchProfile(
+  token: string,
+): Promise<NexusProfile | null> {
   // Cheap shape check first, so obvious junk never reaches the upstream API.
   if (!/^[A-Za-z0-9._-]{8,256}$/.test(token)) return null;
 
@@ -149,6 +160,6 @@ export async function fetchProfile(token: string): Promise<NexusProfile | null> 
   profiles.set(key, { profile, expires: Date.now() + CACHE_TTL });
 
   return profile;
-}
+});
 
 export { rateLimit } from "./rate-limit";

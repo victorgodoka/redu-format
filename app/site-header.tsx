@@ -5,11 +5,12 @@ import { fetchProfile, getSession } from "@/lib/auth";
 const nav = [
   { n: "01", label: "Home", href: "/" },
   { n: "02", label: "Events", href: "/events" },
-  { n: "03", label: "Banlist", href: "/banlist" },
-  { n: "04", label: "Rulings", href: "/rulings" },
-  { n: "05", label: "Decklists", href: "/events/ycs-providence-2012#decklists" },
-  { n: "06", label: "Format", href: "/#format" },
-  { n: "07", label: "Community", href: "/#community" },
+  { n: "03", label: "Leaderboard", href: "/leaderboard" },
+  { n: "04", label: "Banlist", href: "/banlist" },
+  { n: "05", label: "Rulings", href: "/rulings" },
+  { n: "06", label: "Decklists", href: "/events/ycs-providence-2012#decklists" },
+  { n: "07", label: "Format", href: "/#format" },
+  { n: "08", label: "Community", href: "/#community" },
 ];
 
 export default async function SiteHeader() {
