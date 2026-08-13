@@ -10,6 +10,7 @@ import { Card, cardsByIds } from "@/lib/cards";
 import {
   FEATURED_EVENT,
   formatDate,
+  formatEntry,
   formatTime,
   isPast,
   mockPlacement,
@@ -351,15 +352,17 @@ async function GenericEventPage({ slug }: { slug: string }) {
               <div className="facts__row">
                 <dt>Seats</dt>
                 <dd>
-                  {past
-                    ? `${event.taken} of ${event.seats} duelists`
-                    : `${left} of ${event.seats} left`}
+                  {event.seats === null
+                    ? `${event.taken} registered (unlimited)`
+                    : past
+                      ? `${event.taken} of ${event.seats} duelists`
+                      : `${left} of ${event.seats} left`}
                 </dd>
               </div>
               <div className="facts__row">
                 <dt>Host</dt>
                 <dd>
-                  {event.host} · {event.entry}
+                  {event.host} · {formatEntry(event.entry)}
                 </dd>
               </div>
             </dl>

@@ -8,6 +8,7 @@ import {
   listParticipants,
   listTournaments,
   removeParticipant,
+  setParticipantPayment,
   updateTournament,
 } from "./tournaments.ts";
 
@@ -69,4 +70,59 @@ test("participants can be added and removed", async () => {
   assert.equal(await removeParticipant(created.slug, participant.id), true);
   assert.equal(await removeParticipant(created.slug, participant.id), false);
   assert.deepEqual(await listParticipants(created.slug), []);
+});
+
+test("a new participant starts with payment pending and no proof", async () => {
+  const created = await createTournament(draft);
+  const participant = await addParticipant(created.slug, { name: "Duelist", deckName: "Wind-Up" });
+
+  assert.equal(participant.paymentStatus, "pending");
+  assert.equal(participant.proofUrl, null);
+  assert.equal(participant.paymentBy, null);
+});
+
+test("confirming payment records who and stamps a proof url", async () => {
+  const created = await createTournament(draft);
+  const participant = await addParticipant(created.slug, { name: "Duelist", deckName: "Wind-Up" });
+
+  const confirmed = await setParticipantPayment(created.slug, participant.id, {
+    status: "confirmed",
+    proofUrl: "https://example.com/receipt.png",
+    by: "Mod One",
+  });
+
+  assert.equal(confirmed?.paymentStatus, "confirmed");
+  assert.equal(confirmed?.proofUrl, "https://example.com/receipt.png");
+  assert.equal(confirmed?.paymentBy, "Mod One");
+  assert.ok(confirmed?.paymentAt);
+});
+
+test("contesting keeps the disputed proof visible while pending re-approval", async () => {
+  const created = await createTournament(draft);
+  const participant = await addParticipant(created.slug, { name: "Duelist", deckName: "Wind-Up" });
+  await setParticipantPayment(created.slug, participant.id, {
+    status: "confirmed",
+    proofUrl: "https://example.com/receipt.png",
+    by: "Mod One",
+  });
+
+  const contested = await setParticipantPayment(created.slug, participant.id, {
+    status: "contested",
+    proofUrl: "https://example.com/receipt.png",
+    by: "Mod Two",
+  });
+
+  assert.equal(contested?.paymentStatus, "contested");
+  assert.equal(contested?.proofUrl, "https://example.com/receipt.png");
+  assert.equal(contested?.paymentBy, "Mod Two");
+});
+
+test("setParticipantPayment on a missing participant returns null", async () => {
+  const created = await createTournament(draft);
+  const result = await setParticipantPayment(created.slug, "does-not-exist", {
+    status: "confirmed",
+    proofUrl: "https://example.com/receipt.png",
+    by: "Mod One",
+  });
+  assert.equal(result, null);
 });

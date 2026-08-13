@@ -1,9 +1,15 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { formatDate, formatTime } from "@/lib/events";
 import { getTournament, listParticipants } from "@/lib/tournaments";
 import DeleteButton from "../../../delete-button";
-import { addParticipantAction, removeParticipantAction } from "./actions";
+import {
+  addParticipantAction,
+  confirmPaymentAction,
+  contestPaymentAction,
+  removeParticipantAction,
+} from "./actions";
 
 export const metadata: Metadata = {
   title: "Tournament participants | REDU Format",
@@ -20,6 +26,7 @@ export default async function ParticipantsPage({
   if (!tournament) notFound();
 
   const participants = await listParticipants(slug);
+  const isPaid = tournament.entry.type === "paid";
 
   return (
     <>
@@ -60,7 +67,55 @@ export default async function ParticipantsPage({
                   <div className="admin-row__main">
                     <span className="admin-row__title">{p.name}</span>
                     <span className="admin-row__meta">{p.deckName}</span>
+                    {isPaid ? (
+                      <span className={`payment-status payment-status--${p.paymentStatus}`}>
+                        {p.paymentStatus === "confirmed"
+                          ? "Confirmed Entry"
+                          : p.paymentStatus === "contested"
+                            ? "Contested"
+                            : "Payment pending"}
+                        {p.paymentBy && p.paymentAt
+                          ? ` · by ${p.paymentBy} · ${formatDate(p.paymentAt)} ${formatTime(p.paymentAt)}`
+                          : ""}
+                        {p.proofUrl ? (
+                          <>
+                            {" · "}
+                            <a href={p.proofUrl} target="_blank" rel="noopener noreferrer">
+                              View proof
+                            </a>
+                          </>
+                        ) : null}
+                      </span>
+                    ) : null}
                   </div>
+
+                  {isPaid ? (
+                    <div className="admin-row__actions payment-controls">
+                      <form action={confirmPaymentAction} className="payment-controls__confirm">
+                        <input type="hidden" name="slug" value={slug} />
+                        <input type="hidden" name="participantId" value={p.id} />
+                        <input
+                          type="url"
+                          name="proofUrl"
+                          placeholder={p.proofUrl ? "New proof URL (optional)" : "Proof URL"}
+                          required={!p.proofUrl}
+                        />
+                        <button className="btn btn--solid" type="submit">
+                          {p.paymentStatus === "confirmed" ? "Re-confirm" : "Confirm entry"}
+                        </button>
+                      </form>
+                      {p.paymentStatus === "confirmed" ? (
+                        <form action={contestPaymentAction}>
+                          <input type="hidden" name="slug" value={slug} />
+                          <input type="hidden" name="participantId" value={p.id} />
+                          <button className="btn btn--danger" type="submit">
+                            Contest
+                          </button>
+                        </form>
+                      ) : null}
+                    </div>
+                  ) : null}
+
                   <div className="admin-row__actions">
                     <DeleteButton
                       action={removeParticipantAction}

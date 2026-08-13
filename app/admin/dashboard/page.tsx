@@ -99,7 +99,7 @@ export default async function AdminDashboardPage() {
                       <span className="admin-row__title">{t.name}</span>
                       <span className="admin-row__meta">
                         {formatDate(t.startsAt)} · {formatTime(t.startsAt)} ·{" "}
-                        {t.taken}/{t.seats} seats
+                        {t.taken}/{t.seats === null ? "unlimited" : t.seats} seats
                       </span>
                     </div>
                     <div className="admin-row__actions">

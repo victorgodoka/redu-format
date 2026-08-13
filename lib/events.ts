@@ -32,6 +32,9 @@ export type TournamentEvent = {
   signupUrl: string;
 };
 
+/** The admin form's Seats dropdown; null (Unlimited) is handled separately. */
+export const SEAT_OPTIONS = [8, 16, 32, 64, 128, 256, 512, 1024] as const;
+
 export const STRUCTURES: Record<Structure, { label: string; short: string }> = {
   swiss: { label: "Swiss", short: "Swiss" },
   "single-elim": { label: "Single Elimination", short: "Single elim" },

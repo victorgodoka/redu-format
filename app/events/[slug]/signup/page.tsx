@@ -4,7 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import FallbackImage from "../../../fallback-image";
 import { fetchProfile, getSession } from "@/lib/auth";
 import { Card } from "@/lib/cards";
-import { formatDate, formatTime, isPast, pastEvents, seatsLeft, STRUCTURES } from "@/lib/events";
+import { formatDate, formatEntry, formatTime, isPast, pastEvents, seatsLeft, STRUCTURES } from "@/lib/events";
 import { DEFAULT_AVATAR } from "@/lib/nexus-parse";
 import { getTournament } from "@/lib/tournaments";
 import SiteHeader from "../../../site-header";
@@ -181,15 +181,17 @@ export default async function SignupPage({
                 <div className="facts__row">
                   <dt>Seats</dt>
                   <dd>
-                    {past
-                      ? `${event.taken} of ${event.seats} duelists`
-                      : `${left} of ${event.seats} left`}
+                    {event.seats === null
+                      ? `${event.taken} registered (unlimited)`
+                      : past
+                        ? `${event.taken} of ${event.seats} duelists`
+                        : `${left} of ${event.seats} left`}
                   </dd>
                 </div>
                 <div className="facts__row">
                   <dt>Host</dt>
                   <dd>
-                    {event.host} · {event.entry}
+                    {event.host} · {formatEntry(event.entry)}
                   </dd>
                 </div>
               </dl>

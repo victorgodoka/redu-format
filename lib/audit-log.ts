@@ -13,6 +13,8 @@ export type AdminAction =
   | "tournament.delete"
   | "participant.add"
   | "participant.remove"
+  | "payment.confirm"
+  | "payment.contest"
   | "nexus.link"
   | "nexus.unlink";
 
@@ -51,15 +53,3 @@ export async function recordAction(
 export async function listAuditLog(): Promise<readonly AuditLogEntry[]> {
   return entries;
 }
-
-export const ACTION_LABELS: Record<AdminAction, string> = {
-  "admin.login": "Signed in",
-  "admin.logout": "Signed out",
-  "tournament.create": "Created tournament",
-  "tournament.update": "Updated tournament",
-  "tournament.delete": "Deleted tournament",
-  "participant.add": "Added participant",
-  "participant.remove": "Removed participant",
-  "nexus.link": "Linked Dueling Nexus account",
-  "nexus.unlink": "Unlinked Dueling Nexus account",
-};

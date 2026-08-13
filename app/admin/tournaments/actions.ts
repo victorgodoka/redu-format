@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { recordAction } from "@/lib/audit-log";
 import { getAdminSession } from "@/lib/auth/session";
-import { recommendedTopCut, type Structure } from "@/lib/events";
+import { recommendedTopCut, SEAT_OPTIONS, type Structure } from "@/lib/events";
 import {
   createTournament,
   deleteTournament,
@@ -18,7 +18,6 @@ export type TournamentFormState = { error?: string };
 
 const STRUCTURES: readonly Structure[] = ["swiss", "single-elim", "double-elim"];
 const MATCH_FORMATS = ["Bo1", "Bo3"] as const;
-export const SEAT_OPTIONS = [8, 16, 32, 64, 128, 256, 512, 1024] as const;
 
 function readDraft(form: FormData): TournamentDraft | { error: string } {
   const name = String(form.get("name") ?? "").trim();
@@ -124,7 +123,7 @@ export async function createTournamentAction(
     ...(await actor()),
     action: "tournament.create",
     target: tournament.slug,
-    detail: `Created tournament "${tournament.name}" (${tournament.structure}, ${tournament.seats} seats)`,
+    detail: `Created tournament "${tournament.name}" (${tournament.structure}, ${seatsLabel(tournament.seats)} seats)`,
   });
 
   revalidatePath("/admin/tournaments");
@@ -154,7 +153,7 @@ export async function updateTournamentAction(
     action: "tournament.update",
     target: updated.slug,
     detail: before
-      ? `Updated tournament "${before.name}" -> "${updated.name}" (${before.taken}/${before.seats} -> ${updated.taken}/${updated.seats} seats)`
+      ? `Updated tournament "${before.name}" -> "${updated.name}" (${before.taken}/${seatsLabel(before.seats)} -> ${updated.taken}/${seatsLabel(updated.seats)} seats)`
       : `Updated tournament "${updated.name}"`,
   });
 
@@ -175,7 +174,7 @@ export async function deleteTournamentAction(form: FormData) {
       action: "tournament.delete",
       target: slug,
       detail: before
-        ? `Deleted tournament "${before.name}" (had ${before.taken}/${before.seats} seats filled)`
+        ? `Deleted tournament "${before.name}" (had ${before.taken}/${seatsLabel(before.seats)} seats filled)`
         : `Deleted tournament "${slug}"`,
     });
   }

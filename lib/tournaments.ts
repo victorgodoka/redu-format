@@ -2,10 +2,18 @@ import { events as seedTournaments, type Structure, type TournamentEvent } from 
 
 export type TournamentDraft = Omit<TournamentEvent, "slug" | "taken">;
 
+export type PaymentStatus = "pending" | "confirmed" | "contested";
+
 export type Participant = {
   id: string;
   name: string;
   deckName: string;
+  /** Only meaningful when the tournament's entry is paid. */
+  paymentStatus: PaymentStatus;
+  proofUrl: string | null;
+  /** Display name of whoever last set the status; full history lives in the audit log. */
+  paymentBy: string | null;
+  paymentAt: string | null;
 };
 
 /**
@@ -87,7 +95,14 @@ export async function addParticipant(
   slug: string,
   input: { name: string; deckName: string },
 ): Promise<Participant> {
-  const participant: Participant = { id: crypto.randomUUID(), ...input };
+  const participant: Participant = {
+    id: crypto.randomUUID(),
+    ...input,
+    paymentStatus: "pending",
+    proofUrl: null,
+    paymentBy: null,
+    paymentAt: null,
+  };
   const list = participantsByTournament.get(slug) ?? [];
   participantsByTournament.set(slug, [...list, participant]);
   return participant;
@@ -98,6 +113,29 @@ export async function removeParticipant(slug: string, id: string): Promise<boole
   const next = list.filter((p) => p.id !== id);
   participantsByTournament.set(slug, next);
   return next.length !== list.length;
+}
+
+/** status stays "pending" until confirmed at least once; contest never clears proofUrl. */
+export async function setParticipantPayment(
+  slug: string,
+  id: string,
+  update: { status: PaymentStatus; proofUrl: string | null; by: string },
+): Promise<Participant | null> {
+  const list = participantsByTournament.get(slug) ?? [];
+  const index = list.findIndex((p) => p.id === id);
+  if (index === -1) return null;
+
+  const updated: Participant = {
+    ...list[index],
+    paymentStatus: update.status,
+    proofUrl: update.proofUrl,
+    paymentBy: update.by,
+    paymentAt: new Date().toISOString(),
+  };
+  const next = [...list];
+  next[index] = updated;
+  participantsByTournament.set(slug, next);
+  return updated;
 }
 
 export type { Structure, TournamentEvent };

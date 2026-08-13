@@ -6,6 +6,7 @@ import {
   FEATURED_EVENT,
   fillRatio,
   formatDate,
+  formatEntry,
   formatTime,
   isPast,
   pastEvents,
@@ -36,7 +37,7 @@ const structureOptions = [
   { value: "all", label: "All structures" },
   { value: "swiss", label: "Swiss" },
   { value: "single-elim", label: "Single Elimination" },
-  { value: "mixed", label: "Swiss + Top Cut" },
+  { value: "double-elim", label: "Double Elimination" },
 ];
 
 const whenOptions = [
@@ -249,7 +250,7 @@ export default async function EventsPage({
                         <span>{event.timeLimit} min + 3 turns</span>
                       </p>
                       <p className="event__host">
-                        {event.host} · {event.entry}
+                        {event.host} · {formatEntry(event.entry)}
                       </p>
                     </div>
 
@@ -257,7 +258,9 @@ export default async function EventsPage({
                       {/* A finished event has an attendance, not seats left. */}
                       {past ? (
                         <span className="event__seats">
-                          {event.taken} of {event.seats} duelists
+                          {event.seats === null
+                            ? `${event.taken} duelists`
+                            : `${event.taken} of ${event.seats} duelists`}
                         </span>
                       ) : (
                         <span
@@ -269,9 +272,11 @@ export default async function EventsPage({
                                 : ""
                           }`}
                         >
-                          {full
-                            ? "Sold out"
-                            : `${left} of ${event.seats} seats left`}
+                          {event.seats === null
+                            ? "Unlimited seats"
+                            : full
+                              ? "Sold out"
+                              : `${left} of ${event.seats} seats left`}
                         </span>
                       )}
 

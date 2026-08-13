@@ -15,6 +15,8 @@ export const metadata: Metadata = {
  * touched. "unlink" is checked before "link": it ends with "link" too.
  */
 function actionTone(action: AdminAction): "create" | "update" | "delete" | "system" {
+  if (action === "payment.confirm") return "create";
+  if (action === "payment.contest") return "delete";
   if (action.endsWith("delete") || action.endsWith("remove") || action.endsWith("unlink")) {
     return "delete";
   }

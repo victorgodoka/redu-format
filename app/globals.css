@@ -2253,6 +2253,51 @@ a {
   font-size: 15px;
 }
 
+/* --- payment confirmation (paid tournaments only) --- */
+
+.payment-status {
+  display: block;
+  margin-top: 4px;
+  font-family: var(--f-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--c-muted);
+}
+
+.payment-status a {
+  color: inherit;
+  text-decoration: underline;
+}
+
+.payment-status--confirmed {
+  color: var(--c-accent);
+}
+
+.payment-status--contested {
+  color: var(--c-danger);
+}
+
+.payment-controls {
+  align-items: center;
+}
+
+.payment-controls__confirm {
+  display: flex;
+  gap: 8px;
+}
+
+.payment-controls__confirm input {
+  width: 220px;
+  padding: 8px 12px;
+  border: 1px solid var(--c-line);
+  border-radius: 2px;
+  background: var(--c-raise);
+  color: var(--c-text);
+  font-family: var(--f-mono);
+  font-size: 12px;
+}
+
 /* --- admin logs: a terminal readout, not a card list --- */
 
 .log {
@@ -2386,6 +2431,58 @@ a {
 .form--grid > .btn {
   grid-column: 1 / -1;
   justify-self: start;
+}
+
+/* --- currency-prefixed amount input --- */
+
+.input-affix {
+  display: flex;
+  align-items: stretch;
+  border: 1px solid var(--c-line);
+  border-radius: 2px;
+  background: var(--c-raise);
+  overflow: hidden;
+}
+
+.input-affix__symbol {
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+  border-right: 1px solid var(--c-line);
+  background: var(--c-panel);
+  color: var(--c-muted);
+  font-family: var(--f-mono);
+  font-size: 14px;
+}
+
+.input-affix input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+/* --- top cut toggle --- */
+
+/* .form__field label (mono/uppercase) outranks a single-class override here,
+   since it combines a class with an element selector; match it in kind. */
+.form__field .topcut__toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 6px;
+  font-family: var(--f-body);
+  font-size: 14px;
+  color: var(--c-text);
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.topcut__toggle input {
+  accent-color: var(--c-accent);
+  width: 16px;
+  height: 16px;
 }
 
 /* --- footer --- */

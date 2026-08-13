@@ -66,7 +66,8 @@ export default async function AdminTournamentsPage() {
                     <span className="admin-row__title">{t.name}</span>
                     <span className="admin-row__meta">
                       {formatDate(t.startsAt)} · {formatTime(t.startsAt)} ·{" "}
-                      {STRUCTURES[t.structure].label} · {t.taken}/{t.seats} seats
+                      {STRUCTURES[t.structure].label} · {t.taken}/
+                      {t.seats === null ? "unlimited" : t.seats} seats
                     </span>
                   </div>
                   <div className="admin-row__actions">
