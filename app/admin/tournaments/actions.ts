@@ -4,27 +4,30 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { recordAction } from "@/lib/audit-log";
 import { getAdminSession } from "@/lib/auth/session";
-import type { Structure } from "@/lib/events";
+import { recommendedTopCut, type Structure } from "@/lib/events";
 import {
   createTournament,
   deleteTournament,
   getTournament,
+  slugify,
   updateTournament,
   type TournamentDraft,
 } from "@/lib/tournaments";
 
 export type TournamentFormState = { error?: string };
 
-const STRUCTURES: readonly Structure[] = ["swiss", "single-elim", "mixed"];
+const STRUCTURES: readonly Structure[] = ["swiss", "single-elim", "double-elim"];
 const MATCH_FORMATS = ["Bo1", "Bo3"] as const;
+export const SEAT_OPTIONS = [8, 16, 32, 64, 128, 256, 512, 1024] as const;
 
 function readDraft(form: FormData): TournamentDraft | { error: string } {
   const name = String(form.get("name") ?? "").trim();
   if (!name) return { error: "Name is required." };
 
-  const startsAtLocal = String(form.get("startsAt") ?? "");
-  const startsAtMs = new Date(startsAtLocal).getTime();
-  if (!startsAtLocal || Number.isNaN(startsAtMs)) {
+  const date = String(form.get("startsAtDate") ?? "");
+  const time = String(form.get("startsAtTime") ?? "");
+  const startsAtMs = new Date(`${date}T${time}`).getTime();
+  if (!date || !time || Number.isNaN(startsAtMs)) {
     return { error: "Pick a valid start date and time." };
   }
 
@@ -38,28 +41,47 @@ function readDraft(form: FormData): TournamentDraft | { error: string } {
 
   const rounds = Number(form.get("rounds"));
   const timeLimit = Number(form.get("timeLimit"));
-  const seats = Number(form.get("seats"));
-  const topCutRaw = String(form.get("topCut") ?? "").trim();
-  const topCut = topCutRaw ? Number(topCutRaw) : null;
-
   if (!Number.isInteger(rounds) || rounds <= 0) {
     return { error: "Rounds must be a positive whole number." };
   }
   if (!Number.isInteger(timeLimit) || timeLimit <= 0) {
     return { error: "Time limit must be a positive whole number." };
   }
-  if (!Number.isInteger(seats) || seats <= 0) {
-    return { error: "Seats must be a positive whole number." };
-  }
-  if (topCut !== null && (!Number.isInteger(topCut) || topCut <= 0)) {
-    return { error: "Top cut must be empty or a positive whole number." };
+
+  const seatsRaw = String(form.get("seats") ?? "");
+  let seats: number | null;
+  if (seatsRaw === "unlimited") {
+    seats = null;
+  } else {
+    seats = Number(seatsRaw);
+    if (!SEAT_OPTIONS.includes(seats as (typeof SEAT_OPTIONS)[number])) {
+      return { error: "Pick a seat count." };
+    }
   }
 
-  const entry = String(form.get("entry") ?? "").trim();
-  const host = String(form.get("host") ?? "").trim();
-  const signupUrl = String(form.get("signupUrl") ?? "").trim() || "#";
-  if (!entry) return { error: "Entry is required." };
-  if (!host) return { error: "Host is required." };
+  // The bracket size is always derived from the field size (see
+  // recommendedTopCut), never typed in directly, so the on-screen suggestion
+  // and the stored value can never drift apart. Unlimited fields cannot be
+  // sized yet, so they stay null until real signups exist to size against.
+  const hasTopCut = form.get("hasTopCut") === "on";
+  const topCut =
+    structure === "swiss" && hasTopCut && seats !== null ? recommendedTopCut(seats) : null;
+
+  const entryType = String(form.get("entryType") ?? "free");
+  let entry: TournamentDraft["entry"];
+  if (entryType === "paid") {
+    const amount = Number(form.get("entryAmount"));
+    const currency = String(form.get("entryCurrency") ?? "USD").trim();
+    if (!Number.isFinite(amount) || amount <= 0) {
+      return { error: "Entry amount must be greater than zero." };
+    }
+    entry = { type: "paid", amount, currency };
+  } else {
+    entry = { type: "free" };
+  }
+
+  const host = String(form.get("host") ?? "").trim() || "Dueling Nexus";
+  const signupUrl = String(form.get("signupUrl") ?? "").trim() || slugify(name);
 
   return {
     name,
@@ -74,6 +96,10 @@ function readDraft(form: FormData): TournamentDraft | { error: string } {
     host,
     signupUrl,
   };
+}
+
+function seatsLabel(seats: number | null): string {
+  return seats === null ? "unlimited" : String(seats);
 }
 
 /** Every action here runs behind the admin middleware, so a session always exists. */
