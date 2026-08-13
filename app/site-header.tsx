@@ -1,6 +1,7 @@
-import Image from "next/image";
 import Link from "next/link";
+import FallbackImage from "./fallback-image";
 import { fetchProfile, getSession } from "@/lib/auth";
+import { DEFAULT_AVATAR } from "@/lib/nexus-parse";
 
 const nav = [
   { n: "01", label: "Home", href: "/" },
@@ -51,9 +52,11 @@ export default async function SiteHeader() {
           {account ? (
             <Link className="account" href="/dashboard">
               {account.avatar ? (
-                <Image
+                <FallbackImage
+                  key={account.avatar}
                   className="account__avatar"
                   src={account.avatar}
+                  fallbackSrc={DEFAULT_AVATAR}
                   alt=""
                   width={32}
                   height={32}

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
-import CardImage from "@/app/card-image";
+import FallbackImage from "@/app/fallback-image";
 import { CARD_IMAGE } from "@/lib/banlist";
 import { parseCardText, type CardJson } from "@/lib/card-text";
 
@@ -44,7 +44,7 @@ function useCompact() {
 function CardDetail({ card, legality }: Selection) {
   return (
     <>
-      <CardImage
+      <FallbackImage
         key={card.printId}
         className="preview__art"
         src={`${CARD_IMAGE}/${card.printId}.jpg`}
@@ -186,7 +186,7 @@ export default function CardBrowser({
                           : `${card.name}, ${section.legality}`
                       }
                     >
-                      <CardImage
+                      <FallbackImage
                         src={`${CARD_IMAGE}/${card.printId}.jpg`}
                         fallbackSrc={`${CARD_IMAGE}/${card.id}.jpg`}
                         alt=""

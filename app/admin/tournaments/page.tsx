@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import { getAdminSession } from "@/lib/auth/session";
 import { formatDate, formatTime, STRUCTURES } from "@/lib/events";
 import { listTournaments } from "@/lib/tournaments";
-import SiteHeader from "../../site-header";
 import DeleteButton from "../delete-button";
 import { deleteTournamentAction } from "./actions";
 
@@ -12,19 +13,36 @@ export const metadata: Metadata = {
 };
 
 export default async function AdminTournamentsPage() {
+  // Middleware already gates this route; re-checking here is only to read
+  // the username for display, and to fail safe if that guarantee ever moves.
+  const admin = await getAdminSession();
+  if (!admin) redirect("/admin");
+
   const tournaments = await listTournaments();
 
   return (
     <>
-      <a className="skip-link" href="#main">
-        Skip to content
-      </a>
-
-      <SiteHeader />
-
       <main className="section" id="main">
         <div className="wrap">
-          <p className="tab">Admin</p>
+          <div className="admin-bar">
+            <p className="tab">Admin</p>
+            <div className="admin-identity">
+              <span>
+                Signed in as {admin.displayName} (@{admin.username})
+              </span>
+              <Link className="admin-identity__link" href="/admin/dashboard">
+                Admin home
+              </Link>
+              <Link className="admin-identity__link" href="/admin/logs">
+                Logs
+              </Link>
+              <form action="/admin/logout" method="post">
+                <button className="admin-identity__link admin-identity__signout" type="submit">
+                  Sign out
+                </button>
+              </form>
+            </div>
+          </div>
 
           <div className="admin-bar">
             <h1 className="section__title">Tournaments</h1>

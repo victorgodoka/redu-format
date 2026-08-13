@@ -4,10 +4,12 @@ import {
   ALMOST_FULL,
   allEvents as events,
   fillRatio,
+  formatEntry,
   isPast,
   mockPlacement,
   PAGE_SIZE,
   queryEvents,
+  recommendedTopCut,
   seatsLeft,
   type TournamentEvent,
 } from "./events.ts";
@@ -23,7 +25,7 @@ test("no filters returns every event, paged", () => {
 });
 
 test("structure filter keeps only that structure", () => {
-  for (const structure of ["swiss", "single-elim", "mixed"] as const) {
+  for (const structure of ["swiss", "single-elim"] as const) {
     const { items, total } = queryEvents(events, { structure }, NOW);
     assert.ok(total > 0, `${structure} should have events`);
     assert.ok(items.every((e) => e.structure === structure));
@@ -64,14 +66,14 @@ test("seat filters split on availability", () => {
 test("filters combine", () => {
   const { items } = queryEvents(
     events,
-    { structure: "mixed", when: "upcoming", seats: "open" },
+    { structure: "swiss", when: "upcoming", seats: "open" },
     NOW,
   );
   assert.ok(items.length > 0);
   assert.ok(
     items.every(
       (e) =>
-        e.structure === "mixed" &&
+        e.structure === "swiss" &&
         new Date(e.startsAt) >= NOW &&
         seatsLeft(e) > 0,
     ),
@@ -162,4 +164,45 @@ test("mockPlacement is stable and stays within the field", () => {
   assert.equal(mockPlacement(seed, 64), first, "same seed, same result");
   assert.ok(first >= 1 && first <= 64, "placement must be within the field");
   assert.equal(mockPlacement(seed, 0), 1, "an empty field never divides by zero");
+});
+
+test("uncapped events are never sold out or almost full", () => {
+  const event: TournamentEvent = {
+    slug: "open-invite",
+    name: "Open Invite",
+    startsAt: "2027-01-01T00:00:00Z",
+    structure: "swiss",
+    rounds: 5,
+    topCut: null,
+    matchFormat: "Bo3",
+    timeLimit: 40,
+    seats: null,
+    taken: 5000,
+    entry: { type: "free" },
+    host: "Dueling Nexus",
+    signupUrl: "#",
+  };
+
+  assert.equal(seatsLeft(event), Infinity);
+  assert.equal(fillRatio(event), 0);
+});
+
+test("formatEntry renders free plainly and paid with its currency", () => {
+  assert.equal(formatEntry({ type: "free" }), "Free entry");
+  assert.equal(formatEntry({ type: "paid", amount: 10, currency: "USD" }), "$10.00");
+  assert.equal(formatEntry({ type: "paid", amount: 25.5, currency: "BRL" }), "R$25.50");
+});
+
+test("recommendedTopCut follows the field-size table", () => {
+  assert.equal(recommendedTopCut(8), null);
+  assert.equal(recommendedTopCut(9), 4);
+  assert.equal(recommendedTopCut(16), 4);
+  assert.equal(recommendedTopCut(17), 8);
+  assert.equal(recommendedTopCut(128), 8);
+  assert.equal(recommendedTopCut(129), 16);
+  assert.equal(recommendedTopCut(256), 16);
+  assert.equal(recommendedTopCut(257), 32);
+  assert.equal(recommendedTopCut(512), 32);
+  assert.equal(recommendedTopCut(513), 64);
+  assert.equal(recommendedTopCut(2000), 64);
 });

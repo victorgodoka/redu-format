@@ -1,6 +1,9 @@
 /** Nexus serves avatars from its own uploads, or from ygopro.online for default ones. */
 const AVATAR_HOSTS = new Set(["duelingnexus.com", "ygopro.online"]);
 
+/** Nexus's own default avatar. Fallback whenever a profile's avatar 404s. */
+export const DEFAULT_AVATAR = "https://ygopro.online/assets/profile/Avatars/0.jpg";
+
 export type NexusDeck = {
   id: string;
   name: string;

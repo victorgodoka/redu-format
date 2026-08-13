@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import CardImage from "../card-image";
+import FallbackImage from "../fallback-image";
 import { deckLegality, fetchProfile, getSession } from "@/lib/auth";
 import { CARD_ART } from "@/lib/banlist";
 import { Card } from "@/lib/cards";
+import { DEFAULT_AVATAR } from "@/lib/nexus-parse";
 import {
   formatDate,
   formatTime,
@@ -19,7 +19,7 @@ import { logout, refresh } from "../login/actions";
 import SiteHeader from "../site-header";
 
 export const metadata: Metadata = {
-  title: "Your decks | REDU Format",
+  title: "Dashboard | REDU Format",
   robots: { index: false, follow: false },
 };
 
@@ -29,10 +29,14 @@ export default async function DashboardPage() {
   const session = await getSession();
   if (!session.token) redirect("/login");
 
+  const [profile, tournaments] = await Promise.all([
+    fetchProfile(session.token),
+    listTournaments(),
+  ]);
+
   // A revoked token fails here rather than at login. Hand off to the logout
   // route, which is allowed to clear the cookie; clearing it during this render
   // would throw, and leaving it would bounce between /login and /dashboard.
-  const profile = await fetchProfile(session.token);
   if (!profile) redirect("/api/auth/logout");
 
   // REDU-legal decks surface first, with their own visual treatment, so a
@@ -48,9 +52,11 @@ export default async function DashboardPage() {
       return { deck, legal, coverFallbackId };
     })
     .sort((a, b) => Number(b.legal) - Number(a.legal));
+  const legalDeckCount = deckRows.filter((row) => row.legal).length;
 
-  const allEvents = [...(await listTournaments()), ...pastEvents];
+  const allEvents = [...tournaments, ...pastEvents];
   const now = new Date();
+
   const yourEvents = (session.signups ?? [])
     .map((signup) => {
       const event = allEvents.find((e) => e.slug === signup.e);
@@ -83,13 +89,15 @@ export default async function DashboardPage() {
 
       <main className="section" id="main">
         <div className="wrap">
-          <p className="tab">Your account</p>
+          <p className="tab">Dashboard</p>
 
           <div className="profile">
             {profile.avatar ? (
-              <Image
+              <FallbackImage
+                key={profile.avatar}
                 className="profile__avatar"
                 src={profile.avatar}
+                fallbackSrc={DEFAULT_AVATAR}
                 alt=""
                 width={72}
                 height={72}
@@ -117,55 +125,88 @@ export default async function DashboardPage() {
             </div>
           </div>
 
-          {yourEvents.length > 0 ? (
-            <>
-              <h2 className="section__subtitle">Your events</h2>
+          <dl className="featured__stats dash-stats panel">
+            <div>
+              <dt>Decks</dt>
+              <dd>{profile.decks.length}</dd>
+            </div>
+            <div>
+              <dt>REDU legal</dt>
+              <dd>{legalDeckCount}</dd>
+            </div>
+            <div>
+              <dt>Upcoming signups</dt>
+              <dd>{upcomingEvents.length}</dd>
+            </div>
+          </dl>
 
-              {upcomingEvents.length > 0 ? (
-                <ul className="admin-list">
-                  {upcomingEvents.map(({ event, deck }) => (
-                    <li className="admin-row panel" key={event.slug}>
-                      <div className="admin-row__main">
-                        <span className="admin-row__title">{event.name}</span>
-                        <span className="admin-row__meta">
-                          {formatDate(event.startsAt)} · {formatTime(event.startsAt)}
-                          {deck ? ` · ${deck.name}` : ""}
-                        </span>
-                      </div>
-                      <div className="admin-row__actions">
-                        <Link className="btn" href={`/events/${event.slug}`}>
-                          View event
-                        </Link>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              ) : null}
+          <div className="dash-actions">
+            <Link className="btn btn--solid" href="/events">
+              Browse events
+            </Link>
+            <a
+              className="btn"
+              href={EDITOR}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Deck editor
+            </a>
+          </div>
+          <div className="section__grid">
+            <div className="section__content">
+              {yourEvents.length > 0 ? (
+                <>
+                  <h2 className="section__subtitle">Your events</h2>
 
-              {pastYourEvents.length > 0 ? (
-                <ul className="admin-list">
-                  {pastYourEvents.map(({ event, deck }) => (
-                    <li className="admin-row panel" key={event.slug}>
-                      <div className="admin-row__main">
-                        <span className="admin-row__title">{event.name}</span>
-                        <span className="admin-row__meta">
-                          {formatDate(event.startsAt)}
-                          {deck ? ` · ${deck.name}` : ""} · Mock standing{" "}
-                          {mockPlacement(`${event.slug}:${profile.name}`, event.taken)} of{" "}
-                          {event.taken}
-                        </span>
-                      </div>
-                      <div className="admin-row__actions">
-                        <Link className="btn" href={`/events/${event.slug}`}>
-                          View results
-                        </Link>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
+                  {upcomingEvents.length > 0 ? (
+                    <ul className="admin-list">
+                      {upcomingEvents.map(({ event, deck }) => (
+                        <li className="admin-row panel" key={event.slug}>
+                          <div className="admin-row__main">
+                            <span className="admin-row__title">{event.name}</span>
+                            <span className="admin-row__meta">
+                              {formatDate(event.startsAt)} · {formatTime(event.startsAt)}
+                              {deck ? ` · ${deck.name}` : ""}
+                            </span>
+                          </div>
+                          <div className="admin-row__actions">
+                            <Link className="btn" href={`/events/${event.slug}`}>
+                              View event
+                            </Link>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+
+                  {pastYourEvents.length > 0 ? (
+                    <ul className="admin-list">
+                      {pastYourEvents.map(({ event, deck }) => (
+                        <li className="admin-row panel" key={event.slug}>
+                          <div className="admin-row__main">
+                            <span className="admin-row__title">{event.name}</span>
+                            <span className="admin-row__meta">
+                              {formatDate(event.startsAt)}
+                              {deck ? ` · ${deck.name}` : ""} · Mock standing{" "}
+                              {mockPlacement(`${event.slug}:${profile.name}`, event.taken)} of{" "}
+                              {event.taken}
+                            </span>
+                          </div>
+                          <div className="admin-row__actions">
+                            <Link className="btn" href={`/events/${event.slug}`}>
+                              View results
+                            </Link>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                </>
               ) : null}
-            </>
-          ) : null}
+            </div>
+          </div>
+          <h2 className="section__subtitle">Your decks</h2>
 
           {profile.decks.length === 0 ? (
             <div className="empty panel">
@@ -197,7 +238,7 @@ export default async function DashboardPage() {
                   >
                     <span className="deck__cover">
                       {deck.coverId ? (
-                        <CardImage
+                        <FallbackImage
                           key={deck.coverId}
                           src={`${CARD_ART}/${deck.coverId}.jpg`}
                           fallbackSrc={`${CARD_ART}/${coverFallbackId}.jpg`}

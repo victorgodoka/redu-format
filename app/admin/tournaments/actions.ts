@@ -2,10 +2,13 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { recordAction } from "@/lib/audit-log";
+import { getAdminSession } from "@/lib/auth/session";
 import type { Structure } from "@/lib/events";
 import {
   createTournament,
   deleteTournament,
+  getTournament,
   updateTournament,
   type TournamentDraft,
 } from "@/lib/tournaments";
@@ -73,6 +76,16 @@ function readDraft(form: FormData): TournamentDraft | { error: string } {
   };
 }
 
+/** Every action here runs behind the admin middleware, so a session always exists. */
+async function actor() {
+  const session = await getAdminSession();
+  return {
+    actorId: session?.userId ?? "unknown",
+    actorUsername: session?.username ?? "unknown",
+    actorDisplayName: session?.displayName ?? "unknown",
+  };
+}
+
 export async function createTournamentAction(
   _prev: TournamentFormState,
   form: FormData,
@@ -81,6 +94,13 @@ export async function createTournamentAction(
   if ("error" in draft) return draft;
 
   const tournament = await createTournament(draft);
+  await recordAction({
+    ...(await actor()),
+    action: "tournament.create",
+    target: tournament.slug,
+    detail: `Created tournament "${tournament.name}" (${tournament.structure}, ${tournament.seats} seats)`,
+  });
+
   revalidatePath("/admin/tournaments");
   revalidatePath("/events");
   redirect(`/admin/tournaments/${tournament.slug}`);
@@ -99,8 +119,18 @@ export async function updateTournamentAction(
     return { error: "Seats taken must be zero or a positive whole number." };
   }
 
+  const before = await getTournament(slug);
   const updated = await updateTournament(slug, { ...draft, taken });
   if (!updated) return { error: "That tournament no longer exists." };
+
+  await recordAction({
+    ...(await actor()),
+    action: "tournament.update",
+    target: updated.slug,
+    detail: before
+      ? `Updated tournament "${before.name}" -> "${updated.name}" (${before.taken}/${before.seats} -> ${updated.taken}/${updated.seats} seats)`
+      : `Updated tournament "${updated.name}"`,
+  });
 
   revalidatePath("/admin/tournaments");
   revalidatePath(`/admin/tournaments/${slug}`);
@@ -110,7 +140,20 @@ export async function updateTournamentAction(
 
 export async function deleteTournamentAction(form: FormData) {
   const slug = String(form.get("slug") ?? "");
-  await deleteTournament(slug);
+  const before = await getTournament(slug);
+  const deleted = await deleteTournament(slug);
+
+  if (deleted) {
+    await recordAction({
+      ...(await actor()),
+      action: "tournament.delete",
+      target: slug,
+      detail: before
+        ? `Deleted tournament "${before.name}" (had ${before.taken}/${before.seats} seats filled)`
+        : `Deleted tournament "${slug}"`,
+    });
+  }
+
   revalidatePath("/admin/tournaments");
   revalidatePath("/events");
   redirect("/admin/tournaments");

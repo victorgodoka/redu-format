@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getTournament } from "@/lib/tournaments";
-import SiteHeader from "../../../site-header";
 import DeleteButton from "../../delete-button";
 import { deleteTournamentAction, updateTournamentAction } from "../actions";
 import TournamentForm from "../tournament-form";
@@ -23,12 +22,6 @@ export default async function EditTournamentPage({
 
   return (
     <>
-      <a className="skip-link" href="#main">
-        Skip to content
-      </a>
-
-      <SiteHeader />
-
       <main className="section" id="main">
         <div className="wrap">
           <p className="tab">Admin</p>

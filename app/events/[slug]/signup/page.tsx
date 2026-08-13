@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import FallbackImage from "../../../fallback-image";
 import { fetchProfile, getSession } from "@/lib/auth";
 import { Card } from "@/lib/cards";
 import { formatDate, formatTime, isPast, pastEvents, seatsLeft, STRUCTURES } from "@/lib/events";
+import { DEFAULT_AVATAR } from "@/lib/nexus-parse";
 import { getTournament } from "@/lib/tournaments";
 import SiteHeader from "../../../site-header";
 import { cancel } from "./actions";
@@ -137,9 +138,11 @@ export default async function SignupPage({
                 <p className="tab">Duelist</p>
                 <div className="profile-card__who">
                   {profile.avatar ? (
-                    <Image
+                    <FallbackImage
+                      key={profile.avatar}
                       className="profile__avatar"
                       src={profile.avatar}
+                      fallbackSrc={DEFAULT_AVATAR}
                       alt=""
                       width={56}
                       height={56}

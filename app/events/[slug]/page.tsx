@@ -3,7 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Bracket } from "@/app/bracket";
-import CardImage from "@/app/card-image";
+import FallbackImage from "@/app/fallback-image";
 import { fetchProfile, getSession } from "@/lib/auth";
 import { CARD_ART, CARD_IMAGE } from "@/lib/banlist";
 import { Card, cardsByIds } from "@/lib/cards";
@@ -135,7 +135,7 @@ function DeckCard({ deck }: { deck: YcsDeck }) {
     <li className="deck panel">
       <div className="deck__link">
         <div className="deck__cover">
-          <CardImage
+          <FallbackImage
             key={coverId}
             src={`${CARD_ART}/${coverId}.jpg`}
             fallbackSrc={`${CARD_ART}/${new Card(coverId).id}.jpg`}

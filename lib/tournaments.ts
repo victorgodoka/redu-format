@@ -24,7 +24,7 @@ const participantsByTournament = new Map<string, Participant[]>();
 // Strips combining diacritics (U+0300-U+036F) left behind by NFKD, e.g. "é" -> "e".
 const DIACRITICS = new RegExp("[\\u0300-\\u036f]", "g");
 
-function slugify(name: string): string {
+export function slugify(name: string): string {
   return (
     name
       .toLowerCase()

@@ -3,7 +3,14 @@
  * paging helpers below take a list, so nothing else has to change.
  */
 
-export type Structure = "swiss" | "single-elim" | "mixed";
+export type Structure = "swiss" | "single-elim" | "double-elim";
+
+/**
+ * Swiss can optionally cut to a bracket afterwards (TournamentEvent.topCut);
+ * that used to be its own "mixed" structure, but a top cut is an attribute of
+ * Swiss, not a different structure.
+ */
+export type EntryFee = { type: "free" } | { type: "paid"; amount: number; currency: string };
 
 export type TournamentEvent = {
   slug: string;
@@ -17,9 +24,10 @@ export type TournamentEvent = {
   matchFormat: "Bo1" | "Bo3";
   /** Round timer in minutes, before the end-of-match procedure. */
   timeLimit: number;
-  seats: number;
+  /** null means uncapped registration. */
+  seats: number | null;
   taken: number;
-  entry: string;
+  entry: EntryFee;
   host: string;
   signupUrl: string;
 };
@@ -27,8 +35,31 @@ export type TournamentEvent = {
 export const STRUCTURES: Record<Structure, { label: string; short: string }> = {
   swiss: { label: "Swiss", short: "Swiss" },
   "single-elim": { label: "Single Elimination", short: "Single elim" },
-  mixed: { label: "Swiss + Top Cut", short: "Swiss + cut" },
+  "double-elim": { label: "Double Elimination", short: "Double elim" },
 };
+
+export function formatEntry(entry: EntryFee): string {
+  if (entry.type === "free") return "Free entry";
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: entry.currency,
+  }).format(entry.amount);
+}
+
+/**
+ * The bracket size for a Swiss top cut, by field size. null means no cut is
+ * warranted at that size. Also the source of truth the admin form's live
+ * preview reads from, so the displayed suggestion and the persisted value
+ * can never drift apart.
+ */
+export function recommendedTopCut(seats: number): number | null {
+  if (seats <= 8) return null;
+  if (seats <= 16) return 4;
+  if (seats <= 128) return 8;
+  if (seats <= 256) return 16;
+  if (seats <= 512) return 32;
+  return 64;
+}
 
 export type FeaturedEvent = {
   slug: string;
@@ -66,7 +97,7 @@ export const events: readonly TournamentEvent[] = [
     timeLimit: 40,
     seats: 64,
     taken: 41,
-    entry: "Free entry",
+    entry: { type: "free" },
     host: "Dueling Nexus",
     signupUrl: "#",
   },
@@ -74,14 +105,14 @@ export const events: readonly TournamentEvent[] = [
     slug: "wind-up-cup-xi",
     name: "Wind-Up Cup XI",
     startsAt: "2026-08-15T18:00:00Z",
-    structure: "mixed",
+    structure: "swiss",
     rounds: 6,
     topCut: 8,
     matchFormat: "Bo3",
     timeLimit: 40,
     seats: 128,
     taken: 128,
-    entry: "Free · Playmat for Top 4",
+    entry: { type: "free" },
     host: "REDU Format Discord",
     signupUrl: "#",
   },
@@ -96,7 +127,7 @@ export const events: readonly TournamentEvent[] = [
     timeLimit: 45,
     seats: 32,
     taken: 19,
-    entry: "Free entry",
+    entry: { type: "free" },
     host: "Dueling Nexus",
     signupUrl: "#",
   },
@@ -104,14 +135,14 @@ export const events: readonly TournamentEvent[] = [
     slug: "providence-memorial-2026",
     name: "Providence Memorial 2026",
     startsAt: "2026-10-20T17:00:00Z",
-    structure: "mixed",
+    structure: "swiss",
     rounds: 8,
     topCut: 8,
     matchFormat: "Bo3",
     timeLimit: 45,
     seats: 256,
     taken: 173,
-    entry: "Free · Prize support",
+    entry: { type: "free" },
     host: "REDU Format Discord",
     signupUrl: "#",
   },
@@ -126,7 +157,7 @@ export const events: readonly TournamentEvent[] = [
     timeLimit: 40,
     seats: 96,
     taken: 58,
-    entry: "Free · Series points",
+    entry: { type: "free" },
     host: "Dueling Nexus",
     signupUrl: "#",
   },
@@ -141,7 +172,7 @@ export const events: readonly TournamentEvent[] = [
     timeLimit: 45,
     seats: 16,
     taken: 16,
-    entry: "Invite only",
+    entry: { type: "free" },
     host: "REDU Format Discord",
     signupUrl: "#",
   },
@@ -156,7 +187,7 @@ export const events: readonly TournamentEvent[] = [
     timeLimit: 40,
     seats: 64,
     taken: 12,
-    entry: "Free entry",
+    entry: { type: "free" },
     host: "Dueling Nexus",
     signupUrl: "#",
   },
@@ -164,14 +195,14 @@ export const events: readonly TournamentEvent[] = [
     slug: "heroic-challenger-cup",
     name: "Heroic Challenger Cup",
     startsAt: "2026-09-05T20:00:00Z",
-    structure: "mixed",
+    structure: "swiss",
     rounds: 6,
     topCut: 8,
     matchFormat: "Bo3",
     timeLimit: 40,
     seats: 128,
     taken: 74,
-    entry: "Free · Duel Points",
+    entry: { type: "free" },
     host: "Dueling Nexus",
     signupUrl: "#",
   },
@@ -186,7 +217,7 @@ export const events: readonly TournamentEvent[] = [
     timeLimit: 30,
     seats: 32,
     taken: 27,
-    entry: "Free entry",
+    entry: { type: "free" },
     host: "REDU Format Discord",
     signupUrl: "#",
   },
@@ -201,7 +232,7 @@ export const events: readonly TournamentEvent[] = [
     timeLimit: 40,
     seats: 64,
     taken: 33,
-    entry: "Free entry",
+    entry: { type: "free" },
     host: "Dueling Nexus",
     signupUrl: "#",
   },
@@ -209,14 +240,14 @@ export const events: readonly TournamentEvent[] = [
     slug: "prophecy-open",
     name: "Prophecy Open",
     startsAt: "2026-09-13T19:00:00Z",
-    structure: "mixed",
+    structure: "swiss",
     rounds: 7,
     topCut: 4,
     matchFormat: "Bo3",
     timeLimit: 45,
     seats: 128,
     taken: 96,
-    entry: "Free · Playmat for winner",
+    entry: { type: "free" },
     host: "REDU Format Discord",
     signupUrl: "#",
   },
@@ -231,7 +262,7 @@ export const events: readonly TournamentEvent[] = [
     timeLimit: 45,
     seats: 16,
     taken: 9,
-    entry: "Free entry",
+    entry: { type: "free" },
     host: "Dueling Nexus",
     signupUrl: "#",
   },
@@ -246,7 +277,7 @@ export const events: readonly TournamentEvent[] = [
     timeLimit: 40,
     seats: 64,
     taken: 21,
-    entry: "Free entry",
+    entry: { type: "free" },
     host: "Dueling Nexus",
     signupUrl: "#",
   },
@@ -254,14 +285,14 @@ export const events: readonly TournamentEvent[] = [
     slug: "nexus-retro-championship",
     name: "Nexus Retro Championship",
     startsAt: "2026-09-26T16:00:00Z",
-    structure: "mixed",
+    structure: "swiss",
     rounds: 9,
     topCut: 8,
     matchFormat: "Bo3",
     timeLimit: 50,
     seats: 512,
     taken: 288,
-    entry: "Free · Prize support",
+    entry: { type: "free" },
     host: "Dueling Nexus",
     signupUrl: "#",
   },
@@ -276,7 +307,7 @@ export const events: readonly TournamentEvent[] = [
     timeLimit: 45,
     seats: 32,
     taken: 32,
-    entry: "Free entry",
+    entry: { type: "free" },
     host: "REDU Format Discord",
     signupUrl: "#",
   },
@@ -291,7 +322,7 @@ export const events: readonly TournamentEvent[] = [
     timeLimit: 40,
     seats: 96,
     taken: 44,
-    entry: "Free · Series points",
+    entry: { type: "free" },
     host: "REDU Format Discord",
     signupUrl: "#",
   },
@@ -299,14 +330,14 @@ export const events: readonly TournamentEvent[] = [
     slug: "agent-ascension",
     name: "Agent Ascension",
     startsAt: "2026-10-04T22:00:00Z",
-    structure: "mixed",
+    structure: "swiss",
     rounds: 6,
     topCut: 8,
     matchFormat: "Bo3",
     timeLimit: 40,
     seats: 128,
     taken: 61,
-    entry: "Free · Duel Points",
+    entry: { type: "free" },
     host: "Dueling Nexus",
     signupUrl: "#",
   },
@@ -321,7 +352,7 @@ export const events: readonly TournamentEvent[] = [
     timeLimit: 40,
     seats: 64,
     taken: 64,
-    entry: "Free entry",
+    entry: { type: "free" },
     host: "Dueling Nexus",
     signupUrl: "#",
   },
@@ -329,14 +360,14 @@ export const events: readonly TournamentEvent[] = [
     slug: "wind-up-cup-x",
     name: "Wind-Up Cup X",
     startsAt: "2026-07-25T18:00:00Z",
-    structure: "mixed",
+    structure: "swiss",
     rounds: 6,
     topCut: 8,
     matchFormat: "Bo3",
     timeLimit: 40,
     seats: 128,
     taken: 128,
-    entry: "Free · Playmat for Top 4",
+    entry: { type: "free" },
     host: "REDU Format Discord",
     signupUrl: "#",
   },
@@ -351,7 +382,7 @@ export const events: readonly TournamentEvent[] = [
     timeLimit: 30,
     seats: 16,
     taken: 16,
-    entry: "Free entry",
+    entry: { type: "free" },
     host: "Dueling Nexus",
     signupUrl: "#",
   },
@@ -366,7 +397,7 @@ export const events: readonly TournamentEvent[] = [
     timeLimit: 40,
     seats: 64,
     taken: 57,
-    entry: "Free entry",
+    entry: { type: "free" },
     host: "Dueling Nexus",
     signupUrl: "#",
   },
@@ -374,14 +405,14 @@ export const events: readonly TournamentEvent[] = [
     slug: "six-samurai-showdown",
     name: "Six Samurai Showdown",
     startsAt: "2026-08-08T20:00:00Z",
-    structure: "mixed",
+    structure: "swiss",
     rounds: 5,
     topCut: 4,
     matchFormat: "Bo3",
     timeLimit: 40,
     seats: 64,
     taken: 52,
-    entry: "Free · Duel Points",
+    entry: { type: "free" },
     host: "REDU Format Discord",
     signupUrl: "#",
   },
@@ -400,7 +431,7 @@ export const pastEvents: readonly TournamentEvent[] = [
     timeLimit: 40,
     seats: 64,
     taken: 8,
-    entry: "Free entry",
+    entry: { type: "free" },
     host: "Dueling Nexus",
     signupUrl: "#",
   },
@@ -415,7 +446,7 @@ export const pastEvents: readonly TournamentEvent[] = [
     timeLimit: 40,
     seats: 64,
     taken: 39,
-    entry: "Free entry",
+    entry: { type: "free" },
     host: "Dueling Nexus",
     signupUrl: "#",
   },
@@ -430,7 +461,7 @@ export const pastEvents: readonly TournamentEvent[] = [
     timeLimit: 40,
     seats: 96,
     taken: 88,
-    entry: "Free · Series points",
+    entry: { type: "free" },
     host: "Dueling Nexus",
     signupUrl: "#",
   },
@@ -445,7 +476,7 @@ export const pastEvents: readonly TournamentEvent[] = [
     timeLimit: 45,
     seats: 32,
     taken: 14,
-    entry: "Free entry",
+    entry: { type: "free" },
     host: "REDU Format Discord",
     signupUrl: "#",
   },
@@ -460,7 +491,7 @@ export const pastEvents: readonly TournamentEvent[] = [
     timeLimit: 40,
     seats: 96,
     taken: 71,
-    entry: "Free · Series points",
+    entry: { type: "free" },
     host: "Dueling Nexus",
     signupUrl: "#",
   },
@@ -468,14 +499,14 @@ export const pastEvents: readonly TournamentEvent[] = [
     slug: "geargia-grand-prix",
     name: "Geargia Grand Prix",
     startsAt: "2026-06-20T18:00:00Z",
-    structure: "mixed",
+    structure: "swiss",
     rounds: 7,
     topCut: 8,
     matchFormat: "Bo3",
     timeLimit: 45,
     seats: 128,
     taken: 128,
-    entry: "Free · Playmat for Top 4",
+    entry: { type: "free" },
     host: "REDU Format Discord",
     signupUrl: "#",
   },
@@ -483,14 +514,14 @@ export const pastEvents: readonly TournamentEvent[] = [
     slug: "summer-nexus-cup",
     name: "Summer Nexus Cup",
     startsAt: "2026-06-13T20:00:00Z",
-    structure: "mixed",
+    structure: "swiss",
     rounds: 6,
     topCut: 4,
     matchFormat: "Bo3",
     timeLimit: 40,
     seats: 128,
     taken: 63,
-    entry: "Free · Duel Points",
+    entry: { type: "free" },
     host: "Dueling Nexus",
     signupUrl: "#",
   },
@@ -505,7 +536,7 @@ export const pastEvents: readonly TournamentEvent[] = [
     timeLimit: 30,
     seats: 16,
     taken: 16,
-    entry: "Free entry",
+    entry: { type: "free" },
     host: "REDU Format Discord",
     signupUrl: "#",
   },
@@ -520,7 +551,7 @@ export const pastEvents: readonly TournamentEvent[] = [
     timeLimit: 45,
     seats: 32,
     taken: 31,
-    entry: "Free · Duel Points",
+    entry: { type: "free" },
     host: "Dueling Nexus",
     signupUrl: "#",
   },
@@ -528,14 +559,14 @@ export const pastEvents: readonly TournamentEvent[] = [
     slug: "providence-memorial-2025",
     name: "Providence Memorial 2025",
     startsAt: "2025-10-20T17:00:00Z",
-    structure: "mixed",
+    structure: "swiss",
     rounds: 9,
     topCut: 8,
     matchFormat: "Bo3",
     timeLimit: 50,
     seats: 256,
     taken: 241,
-    entry: "Free · Prize support",
+    entry: { type: "free" },
     host: "REDU Format Discord",
     signupUrl: "#",
   },
@@ -545,8 +576,9 @@ export const allEvents: readonly TournamentEvent[] = [...events, ...pastEvents];
 
 export const PAGE_SIZE = 8;
 
-/** Fraction of seats claimed, 0 to 1. */
+/** Fraction of seats claimed, 0 to 1. Uncapped events can never be "almost full". */
 export function fillRatio(event: TournamentEvent): number {
+  if (event.seats === null) return 0;
   if (event.seats <= 0) return 1;
   return Math.min(1, event.taken / event.seats);
 }
@@ -573,6 +605,7 @@ export type EventResults = {
 };
 
 export function seatsLeft(event: TournamentEvent): number {
+  if (event.seats === null) return Infinity;
   return Math.max(0, event.seats - event.taken);
 }
 

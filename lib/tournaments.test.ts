@@ -20,7 +20,7 @@ const draft = {
   matchFormat: "Bo3" as const,
   timeLimit: 40,
   seats: 32,
-  entry: "Free entry",
+  entry: { type: "free" } as const,
   host: "Test Host",
   signupUrl: "#",
 };
