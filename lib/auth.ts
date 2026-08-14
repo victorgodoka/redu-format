@@ -46,9 +46,12 @@ export type Session = {
    * browser limit. ponytail: move to the events API once it exists.
    */
   signups?: { e: string; d: string }[];
+  /** Bookmarked tournament slugs, same cookie-cap reasoning as signups. */
+  savedTournaments?: string[];
 };
 
 export const MAX_SIGNUPS = 25;
+export const MAX_SAVED_TOURNAMENTS = 50;
 
 export {
   cleanAvatar,

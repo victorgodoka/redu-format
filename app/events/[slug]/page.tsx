@@ -26,6 +26,7 @@ import {
 } from "@/lib/ycs-providence-2012";
 import SiteHeader from "../../site-header";
 import { WikiLink } from "@/app/wiki-link";
+import { saveTournamentAction, unsaveTournamentAction } from "../saved-actions";
 
 const EDITOR = "https://duelingnexus.com/editor";
 
@@ -277,12 +278,26 @@ async function GenericEventPage({ slug }: { slug: string }) {
   const now = new Date();
   const past = isPast(event, now);
   const left = seatsLeft(event);
+  const isSaved = (session.savedTournaments ?? []).includes(slug);
 
   return (
     <main className="section" id="main">
       <div className="wrap">
         <p className="tab">{past ? "Results" : "Tournament"}</p>
-        <h1 className="section__title">{event.name}</h1>
+        <div className="admin-bar">
+          <h1 className="section__title">{event.name}</h1>
+          {session.token ? (
+            <form action={isSaved ? unsaveTournamentAction : saveTournamentAction}>
+              <input type="hidden" name="slug" value={slug} />
+              <button
+                className={`btn btn--quiet${isSaved ? " btn--in" : ""}`}
+                type="submit"
+              >
+                {isSaved ? "Saved" : "Save"}
+              </button>
+            </form>
+          ) : null}
+        </div>
 
         <div className="signup">
           <div className="signup__main">
@@ -320,9 +335,9 @@ async function GenericEventPage({ slug }: { slug: string }) {
                       ? "Every seat is taken."
                       : "You are not registered for this event yet."}
                 </p>
-                {past ? null : (
+                {past || left === 0 ? null : (
                   <Link className="btn btn--solid" href={`/events/${slug}/signup`}>
-                    {left === 0 ? "Join the waitlist" : "Sign up"}
+                    Sign up
                   </Link>
                 )}
               </div>

@@ -248,6 +248,18 @@ a {
   transform: none;
 }
 
+.btn[aria-disabled="true"] {
+  opacity: 0.55;
+  cursor: default;
+  transform: none;
+}
+
+.btn[aria-disabled="true"]:hover {
+  border-color: var(--c-line);
+  background: transparent;
+  color: inherit;
+}
+
 .lede {
   max-width: 56ch;
   color: var(--c-muted);

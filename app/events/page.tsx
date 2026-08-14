@@ -16,6 +16,7 @@ import {
   type EventQuery,
 } from "@/lib/events";
 import { listTournaments } from "@/lib/tournaments";
+import { saveTournamentAction, unsaveTournamentAction } from "./saved-actions";
 import SiteHeader from "../site-header";
 
 export const metadata: Metadata = {
@@ -93,6 +94,7 @@ export default async function EventsPage({
   const { items, page, pages, total } = queryEvents(allEvents, query, now);
 
   const registered = new Set((session.signups ?? []).map((s) => s.e));
+  const saved = new Set(session.savedTournaments ?? []);
 
   return (
     <>
@@ -294,14 +296,38 @@ export default async function EventsPage({
                         >
                           You are in
                         </Link>
+                      ) : full ? (
+                        <span className="btn btn--quiet" aria-disabled="true">
+                          Sold out
+                        </span>
                       ) : (
                         <Link
-                          className={`btn${full ? "" : " btn--solid"}`}
+                          className="btn btn--solid"
                           href={`/events/${event.slug}/signup`}
                         >
-                          {full ? "Waitlist" : "Sign up"}
+                          Sign up
                         </Link>
                       )}
+
+                      {session.token ? (
+                        <form
+                          action={
+                            saved.has(event.slug)
+                              ? unsaveTournamentAction
+                              : saveTournamentAction
+                          }
+                        >
+                          <input type="hidden" name="slug" value={event.slug} />
+                          <button
+                            className={`btn btn--quiet${
+                              saved.has(event.slug) ? " btn--in" : ""
+                            }`}
+                            type="submit"
+                          >
+                            {saved.has(event.slug) ? "Saved" : "Save"}
+                          </button>
+                        </form>
+                      ) : null}
                     </div>
                   </li>
                 );

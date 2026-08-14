@@ -15,6 +15,7 @@ import {
 } from "@/lib/events";
 import { listTournaments } from "@/lib/tournaments";
 import { validateDecks } from "@/lib/validateDecks";
+import { unsaveTournamentAction } from "../events/saved-actions";
 import { logout, refresh } from "../login/actions";
 import SiteHeader from "../site-header";
 
@@ -74,6 +75,21 @@ export default async function DashboardPage() {
       (a, b) => new Date(a.event.startsAt).getTime() - new Date(b.event.startsAt).getTime(),
     );
   const pastYourEvents = yourEvents
+    .filter((e) => e.past)
+    .sort(
+      (a, b) => new Date(b.event.startsAt).getTime() - new Date(a.event.startsAt).getTime(),
+    );
+
+  const savedEvents = (session.savedTournaments ?? [])
+    .map((slug) => allEvents.find((e) => e.slug === slug))
+    .filter((e) => e !== undefined)
+    .map((event) => ({ event, past: isPast(event, now) }));
+  const savedUpcoming = savedEvents
+    .filter((e) => !e.past)
+    .sort(
+      (a, b) => new Date(a.event.startsAt).getTime() - new Date(b.event.startsAt).getTime(),
+    );
+  const savedPast = savedEvents
     .filter((e) => e.past)
     .sort(
       (a, b) => new Date(b.event.startsAt).getTime() - new Date(a.event.startsAt).getTime(),
@@ -197,6 +213,66 @@ export default async function DashboardPage() {
                             <Link className="btn" href={`/events/${event.slug}`}>
                               View results
                             </Link>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                </>
+              ) : null}
+            </div>
+
+            <div className="section__content">
+              {savedEvents.length > 0 ? (
+                <>
+                  <h2 className="section__subtitle">Saved tournaments</h2>
+
+                  {savedUpcoming.length > 0 ? (
+                    <ul className="admin-list">
+                      {savedUpcoming.map(({ event }) => (
+                        <li className="admin-row panel" key={event.slug}>
+                          <div className="admin-row__main">
+                            <span className="admin-row__title">{event.name}</span>
+                            <span className="admin-row__meta">
+                              {formatDate(event.startsAt)} · {formatTime(event.startsAt)}
+                            </span>
+                          </div>
+                          <div className="admin-row__actions">
+                            <Link className="btn" href={`/events/${event.slug}`}>
+                              View event
+                            </Link>
+                            <form action={unsaveTournamentAction}>
+                              <input type="hidden" name="slug" value={event.slug} />
+                              <button className="btn btn--quiet" type="submit">
+                                Unsave
+                              </button>
+                            </form>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+
+                  {savedPast.length > 0 ? (
+                    <ul className="admin-list">
+                      {savedPast.map(({ event }) => (
+                        <li className="admin-row panel" key={event.slug}>
+                          <div className="admin-row__main">
+                            <span className="admin-row__title">{event.name}</span>
+                            <span className="admin-row__meta">
+                              {formatDate(event.startsAt)} · Finished
+                            </span>
+                          </div>
+                          <div className="admin-row__actions">
+                            <Link className="btn" href={`/events/${event.slug}`}>
+                              View results
+                            </Link>
+                            <form action={unsaveTournamentAction}>
+                              <input type="hidden" name="slug" value={event.slug} />
+                              <button className="btn btn--quiet" type="submit">
+                                Unsave
+                              </button>
+                            </form>
                           </div>
                         </li>
                       ))}
