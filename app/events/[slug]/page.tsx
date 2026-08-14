@@ -5,6 +5,8 @@ import { notFound } from "next/navigation";
 import { Bracket } from "@/app/bracket";
 import FallbackImage from "@/app/fallback-image";
 import { fetchProfile, getSession } from "@/lib/auth";
+import { findPlayerIdByToken } from "@/lib/backend/services/player.service";
+import { findSignupDeckId, listSavedSlugsForPlayer } from "@/lib/backend/services/registration.service";
 import { CARD_ART, CARD_IMAGE } from "@/lib/banlist";
 import { Card, cardsByIds } from "@/lib/cards";
 import {
@@ -271,14 +273,18 @@ async function GenericEventPage({ slug }: { slug: string }) {
   if (!event) notFound();
 
   const session = await getSession();
-  const profile = session.token ? await fetchProfile(session.token) : null;
-  const registeredId = session.signups?.find((s) => s.e === slug)?.d;
+  const playerId = session.token ? await findPlayerIdByToken(session.token) : null;
+  const [profile, registeredId, savedSlugs] = await Promise.all([
+    session.token ? fetchProfile(session.token) : null,
+    playerId ? findSignupDeckId(slug, playerId) : null,
+    playerId ? listSavedSlugsForPlayer(playerId) : Promise.resolve<string[]>([]),
+  ]);
   const registeredDeck = profile?.decks.find((d) => d.id === registeredId);
 
   const now = new Date();
   const past = isPast(event, now);
   const left = seatsLeft(event);
-  const isSaved = (session.savedTournaments ?? []).includes(slug);
+  const isSaved = savedSlugs.includes(slug);
 
   return (
     <main className="section" id="main">

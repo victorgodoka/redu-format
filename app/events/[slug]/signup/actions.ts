@@ -1,10 +1,12 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { fetchProfile, getSession, MAX_SIGNUPS } from "@/lib/auth";
+import { fetchProfile, getSession } from "@/lib/auth";
 import { deckLegality } from "@/lib/nexus-parse";
 import { seatsLeft } from "@/lib/events";
 import { getTournament } from "@/lib/tournaments";
+import { cancelSignup, registerSignup } from "@/lib/backend/services/registration.service";
+import { findPlayerIdByToken, resolvePlayerId } from "@/lib/backend/services/player.service";
 import { describeError, validateDeck } from "@/lib/validateDecks";
 
 export type SignupState = { error?: string };
@@ -52,10 +54,20 @@ export async function register(
     };
   }
 
-  const signups = (session.signups ?? []).filter((s) => s.e !== slug);
-  signups.push({ e: slug, d: deck.id });
-  session.signups = signups.slice(-MAX_SIGNUPS);
-  await session.save();
+  const playerId = await resolvePlayerId(session.token, {
+    name: profile.name,
+    avatar: profile.avatar,
+    contributor: profile.contributor,
+    contributorTime: profile.contributorTime,
+  });
+
+  await registerSignup(slug, {
+    playerId,
+    displayName: profile.name,
+    deckId: deck.id,
+    deckName: deck.name,
+    entry: event.entry,
+  });
 
   revalidatePath(`/events/${slug}/signup`);
   revalidatePath("/events");
@@ -68,8 +80,10 @@ export async function cancel(form: FormData) {
   const session = await getSession();
   if (!session.token) return;
 
-  session.signups = (session.signups ?? []).filter((s) => s.e !== slug);
-  await session.save();
+  const playerId = await findPlayerIdByToken(session.token);
+  if (!playerId) return;
+
+  await cancelSignup(slug, playerId);
 
   revalidatePath(`/events/${slug}/signup`);
   revalidatePath("/events");

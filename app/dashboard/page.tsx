@@ -3,6 +3,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import FallbackImage from "../fallback-image";
 import { deckLegality, fetchProfile, getSession } from "@/lib/auth";
+import { findPlayerIdByToken } from "@/lib/backend/services/player.service";
+import { listSavedSlugsForPlayer, listSignupsForPlayer } from "@/lib/backend/services/registration.service";
 import { CARD_ART } from "@/lib/banlist";
 import { Card } from "@/lib/cards";
 import { DEFAULT_AVATAR } from "@/lib/nexus-parse";
@@ -58,13 +60,18 @@ export default async function DashboardPage() {
   const allEvents = [...tournaments, ...pastEvents];
   const now = new Date();
 
-  const yourEvents = (session.signups ?? [])
-    .map((signup) => {
-      const event = allEvents.find((e) => e.slug === signup.e);
+  const playerId = await findPlayerIdByToken(session.token);
+  const [signups, savedSlugs] = playerId
+    ? await Promise.all([listSignupsForPlayer(playerId), listSavedSlugsForPlayer(playerId)])
+    : [new Map<string, string | null>(), []];
+
+  const yourEvents = [...signups.entries()]
+    .map(([slug, deckId]) => {
+      const event = allEvents.find((e) => e.slug === slug);
       if (!event) return null;
       return {
         event,
-        deck: profile.decks.find((d) => d.id === signup.d),
+        deck: profile.decks.find((d) => d.id === deckId),
         past: isPast(event, now),
       };
     })
@@ -80,7 +87,7 @@ export default async function DashboardPage() {
       (a, b) => new Date(b.event.startsAt).getTime() - new Date(a.event.startsAt).getTime(),
     );
 
-  const savedEvents = (session.savedTournaments ?? [])
+  const savedEvents = savedSlugs
     .map((slug) => allEvents.find((e) => e.slug === slug))
     .filter((e) => e !== undefined)
     .map((event) => ({ event, past: isPast(event, now) }));

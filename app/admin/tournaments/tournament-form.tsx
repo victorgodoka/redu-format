@@ -213,8 +213,10 @@ export default function TournamentForm({
 
       {tournament ? (
         <div className="form__field">
-          <label htmlFor="taken">Seats taken</label>
-          <input id="taken" name="taken" type="number" min={0} defaultValue={tournament.taken} required />
+          <label>Seats taken</label>
+          <p className="form__hint">
+            {tournament.taken} - counted from real registrations, not editable here
+          </p>
         </div>
       ) : null}
 

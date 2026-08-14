@@ -7,11 +7,14 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --experimental-strip-types --test app/draw.test.ts lib/rate-limit.test.ts lib/nexus-parse.test.ts lib/events.test.ts lib/safe-next.test.ts lib/cards.test.ts lib/validateDecks.test.ts lib/tournaments.test.ts"
+    "test": "node --experimental-strip-types --env-file=.env.local --test app/draw.test.ts lib/rate-limit.test.ts lib/nexus-parse.test.ts lib/events.test.ts lib/safe-next.test.ts lib/cards.test.ts lib/validateDecks.test.ts lib/tournaments.test.ts lib/audit-log.test.ts lib/player.test.ts lib/registration.test.ts lib/nexus-cache.test.ts",
+    "db:migrate": "node --experimental-strip-types --env-file=.env.local lib/backend/db/run-migrate.ts",
+    "db:seed": "node --experimental-strip-types --env-file=.env.local lib/backend/db/seed.ts"
   },
   "dependencies": {
     "iron-session": "^8.0.4",
     "jose": "^6.2.8",
+    "mysql2": "^3.23.3",
     "next": "16.3.0",
     "react": "19.2.8",
     "react-dom": "19.2.8"

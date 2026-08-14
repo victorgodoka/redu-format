@@ -12,6 +12,11 @@ import {
   parseDeckList,
   type NexusDeck,
 } from "./nexus-parse";
+import {
+  getCachedProfile,
+  invalidateCachedProfile,
+  setCachedProfile,
+} from "./backend/services/nexus-cache.service";
 
 const NEXUS_INFO = "https://duelingnexus.com/api/get-info.php";
 
@@ -40,18 +45,7 @@ export type Session = {
   avatar?: string;
   contributor?: boolean;
   contributorTime?: number;
-  /**
-   * Mock registrations: event slug -> deck id. Lives in the cookie because
-   * there is no backend yet, so it is capped to keep the cookie under the 4KB
-   * browser limit. ponytail: move to the events API once it exists.
-   */
-  signups?: { e: string; d: string }[];
-  /** Bookmarked tournament slugs, same cookie-cap reasoning as signups. */
-  savedTournaments?: string[];
 };
-
-export const MAX_SIGNUPS = 25;
-export const MAX_SAVED_TOURNAMENTS = 50;
 
 export {
   cleanAvatar,
@@ -87,8 +81,11 @@ export async function getSession() {
   return getIronSession<Session>(await cookies(), options());
 }
 
-// ponytail: per-instance memory with a hard cap, so it does not span serverless
-// workers. Redis if the API load ever justifies it.
+// L1: per-instance memory, near-free when warm but not shared across Vercel's
+// serverless instances. L2 is the nexus_profile_cache table (see
+// lib/backend/services/nexus-cache.service.ts), shared across instances - a
+// warm instance still skips the DB round trip via this Map, a cold or
+// different instance still gets the shared cache instead of hitting Nexus.
 const CACHE_TTL = 60_000;
 const CACHE_MAX = 500;
 const profiles = new Map<string, { profile: NexusProfile; expires: number }>();
@@ -98,9 +95,11 @@ function cacheKey(token: string) {
   return createHash("sha256").update(token).digest("hex");
 }
 
-/** Drops the cached copy so the next read hits Nexus. Backs the refresh button. */
-export function invalidateProfile(token: string) {
-  profiles.delete(cacheKey(token));
+/** Drops the cached copy (both tiers) so the next read hits Nexus. Backs the refresh button. */
+export async function invalidateProfile(token: string) {
+  const key = cacheKey(token);
+  profiles.delete(key);
+  await invalidateCachedProfile(key);
 }
 
 /**
@@ -122,6 +121,16 @@ export const fetchProfile = cache(async function fetchProfile(
   const hit = profiles.get(key);
   if (hit && Date.now() < hit.expires) return hit.profile;
 
+  const dbHit = await getCachedProfile<NexusProfile>(key);
+  if (dbHit) {
+    // Mirror the DB row's real expiry into L1, not a fresh CACHE_TTL window -
+    // otherwise a warm instance re-reading a near-expired entry would keep
+    // resetting its own clock and the cache would never truly expire.
+    if (profiles.size >= CACHE_MAX) profiles.clear();
+    profiles.set(key, { profile: dbHit.value, expires: dbHit.expiresAt });
+    return dbHit.value;
+  }
+
   let payload: unknown;
   try {
     const res = await fetch(`${NEXUS_INFO}?token=${encodeURIComponent(token)}`, {
@@ -139,6 +148,7 @@ export const fetchProfile = cache(async function fetchProfile(
     (payload as { success?: unknown }).success !== true
   ) {
     profiles.delete(key);
+    await invalidateCachedProfile(key);
     return null;
   }
 
@@ -161,6 +171,7 @@ export const fetchProfile = cache(async function fetchProfile(
 
   if (profiles.size >= CACHE_MAX) profiles.clear();
   profiles.set(key, { profile, expires: Date.now() + CACHE_TTL });
+  await setCachedProfile(key, profile, CACHE_TTL);
 
   return profile;
 });

@@ -1,7 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { listAuditLog, type AdminAction } from "@/lib/audit-log";
+import {
+  ADMIN_ACTIONS,
+  listAuditActors,
+  listAuditLog,
+  type AdminAction,
+  type AuditLogQuery,
+} from "@/lib/audit-log";
 import { getAdminSession } from "@/lib/auth/session";
 import { formatDate, formatTime } from "@/lib/events";
 
@@ -27,11 +33,40 @@ function actionTone(action: AdminAction): "create" | "update" | "delete" | "syst
   return "system";
 }
 
-export default async function AdminLogsPage() {
+/** Rebuilds the query string for a page link, keeping the active filters. */
+function pageHref(query: AuditLogQuery, page: number) {
+  const params = new URLSearchParams();
+  if (query.actor) params.set("actor", query.actor);
+  if (query.action) params.set("action", query.action);
+  if (query.target) params.set("target", query.target);
+  if (page > 1) params.set("page", String(page));
+
+  const qs = params.toString();
+  return qs ? `/admin/logs?${qs}` : "/admin/logs";
+}
+
+export default async function AdminLogsPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const session = await getAdminSession();
   if (!session) redirect("/admin");
 
-  const entries = await listAuditLog();
+  const raw = await searchParams;
+  const pick = (key: string) => (Array.isArray(raw[key]) ? raw[key][0] : raw[key]);
+
+  const query: AuditLogQuery = {
+    actor: pick("actor"),
+    action: pick("action"),
+    target: pick("target"),
+    page: pick("page"),
+  };
+
+  const [{ items, page, pages, total }, actors] = await Promise.all([
+    listAuditLog(query),
+    listAuditActors(),
+  ]);
 
   return (
     <main className="section" id="main">
@@ -63,12 +98,61 @@ export default async function AdminLogsPage() {
           <h1 className="section__title">Admin logs</h1>
         </div>
 
-        <p className="lede">
-          Every action taken from the admin panel, most recent first. Kept for
-          this process only: {entries.length} entries.
+        {/* GET form: filters live in the URL, so results are shareable and
+            the page works with JavaScript disabled. */}
+        <form className="filters panel" method="get">
+          <div className="filters__field">
+            <label htmlFor="actor">Actor</label>
+            <select id="actor" name="actor" defaultValue={query.actor ?? ""}>
+              <option value="">All actors</option>
+              {actors.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.displayName} (@{a.username})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="filters__field">
+            <label htmlFor="action">Action</label>
+            <select id="action" name="action" defaultValue={query.action ?? ""}>
+              <option value="">All actions</option>
+              {ADMIN_ACTIONS.map((a) => (
+                <option key={a} value={a}>
+                  {a}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="filters__field">
+            <label htmlFor="target">Target</label>
+            <input
+              id="target"
+              name="target"
+              type="text"
+              defaultValue={query.target ?? ""}
+              placeholder="Tournament slug or id"
+            />
+          </div>
+
+          <div className="filters__actions">
+            <button className="btn btn--solid" type="submit">
+              Apply
+            </button>
+            <Link className="filters__reset" href="/admin/logs">
+              Reset
+            </Link>
+          </div>
+        </form>
+
+        <p className="filters__count" role="status">
+          {total === 0
+            ? "No admin actions match these filters."
+            : `${total} ${total === 1 ? "entry" : "entries"} · page ${page} of ${pages}`}
         </p>
 
-        {entries.length === 0 ? (
+        {items.length === 0 ? (
           <div className="empty panel">
             <p className="lede">No admin actions recorded yet.</p>
           </div>
@@ -81,7 +165,7 @@ export default async function AdminLogsPage() {
               <span>Target</span>
               <span>Detail</span>
             </div>
-            {entries.map((entry) => (
+            {items.map((entry) => (
               <div className="log__line" key={entry.id}>
                 <span className="log__time">
                   {formatDate(entry.at)} {formatTime(entry.at)}
@@ -99,6 +183,44 @@ export default async function AdminLogsPage() {
             ))}
           </div>
         )}
+
+        {pages > 1 ? (
+          <nav className="pager" aria-label="Pagination">
+            {page > 1 ? (
+              <Link className="pager__step" href={pageHref(query, page - 1)}>
+                Previous
+              </Link>
+            ) : (
+              <span className="pager__step pager__step--off">Previous</span>
+            )}
+
+            <span className="pager__pages">
+              {Array.from({ length: pages }, (_, i) => i + 1).map((n) =>
+                n === page ? (
+                  <span
+                    className="pager__num pager__num--on"
+                    key={n}
+                    aria-current="page"
+                  >
+                    {n}
+                  </span>
+                ) : (
+                  <Link className="pager__num" key={n} href={pageHref(query, n)}>
+                    {n}
+                  </Link>
+                ),
+              )}
+            </span>
+
+            {page < pages ? (
+              <Link className="pager__step" href={pageHref(query, page + 1)}>
+                Next
+              </Link>
+            ) : (
+              <span className="pager__step pager__step--off">Next</span>
+            )}
+          </nav>
+        ) : null}
       </div>
     </main>
   );

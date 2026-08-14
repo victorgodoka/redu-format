@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getSession } from "@/lib/auth";
+import { findPlayerIdByToken } from "@/lib/backend/services/player.service";
+import { listSavedSlugsForPlayer, listSignupsForPlayer } from "@/lib/backend/services/registration.service";
 import {
   ALMOST_FULL,
   FEATURED_EVENT,
@@ -93,8 +95,12 @@ export default async function EventsPage({
   const allEvents = [...tournaments, ...pastEvents];
   const { items, page, pages, total } = queryEvents(allEvents, query, now);
 
-  const registered = new Set((session.signups ?? []).map((s) => s.e));
-  const saved = new Set(session.savedTournaments ?? []);
+  const playerId = session.token ? await findPlayerIdByToken(session.token) : null;
+  const [signups, savedSlugs] = playerId
+    ? await Promise.all([listSignupsForPlayer(playerId), listSavedSlugsForPlayer(playerId)])
+    : [new Map<string, string | null>(), []];
+  const registered = new Set(signups.keys());
+  const saved = new Set(savedSlugs);
 
   return (
     <>

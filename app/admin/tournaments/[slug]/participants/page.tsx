@@ -66,7 +66,9 @@ export default async function ParticipantsPage({
                 <li className="admin-row panel" key={p.id}>
                   <div className="admin-row__main">
                     <span className="admin-row__title">{p.name}</span>
-                    <span className="admin-row__meta">{p.deckName}</span>
+                    <span className="admin-row__meta">
+                      {p.deckName} · {p.source === "public_signup" ? "Public signup" : "Added by admin"}
+                    </span>
                     {isPaid ? (
                       <span className={`payment-status payment-status--${p.paymentStatus}`}>
                         {p.paymentStatus === "confirmed"

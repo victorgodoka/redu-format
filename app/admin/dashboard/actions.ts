@@ -24,7 +24,7 @@ export async function linkNexusToken(
   if (!token) return { error: "Paste your Dueling Nexus token." };
 
   const ip = (await headers()).get("x-forwarded-for")?.split(",")[0] ?? "local";
-  if (!rateLimit(ip)) {
+  if (!(await rateLimit(`nexus-link:${ip}`))) {
     return { error: "Too many attempts. Wait a minute and try again." };
   }
 

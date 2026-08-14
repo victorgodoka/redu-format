@@ -3,6 +3,8 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import FallbackImage from "../../../fallback-image";
 import { fetchProfile, getSession } from "@/lib/auth";
+import { findPlayerIdByToken } from "@/lib/backend/services/player.service";
+import { findSignupDeckId } from "@/lib/backend/services/registration.service";
 import { Card } from "@/lib/cards";
 import { formatDate, formatEntry, formatTime, isPast, pastEvents, seatsLeft, STRUCTURES } from "@/lib/events";
 import { DEFAULT_AVATAR } from "@/lib/nexus-parse";
@@ -47,7 +49,8 @@ export default async function SignupPage({
   const now = new Date();
   const past = isPast(event, now);
   const left = seatsLeft(event);
-  const registeredId = session.signups?.find((s) => s.e === slug)?.d;
+  const playerId = await findPlayerIdByToken(session.token);
+  const registeredId = playerId ? await findSignupDeckId(slug, playerId) : null;
   const registeredDeck = profile.decks.find((d) => d.id === registeredId);
 
   return (

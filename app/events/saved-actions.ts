@@ -1,7 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getSession, MAX_SAVED_TOURNAMENTS } from "@/lib/auth";
+import { getSession } from "@/lib/auth";
+import { findPlayerIdByToken } from "@/lib/backend/services/player.service";
+import { saveTournament, unsaveTournament } from "@/lib/backend/services/registration.service";
 import { FEATURED_EVENT, pastEvents } from "@/lib/events";
 import { getTournament } from "@/lib/tournaments";
 
@@ -31,10 +33,14 @@ export async function saveTournamentAction(form: FormData) {
   if (!session.token) return;
   if (!(await isKnownTournament(slug))) return;
 
-  const saved = new Set(session.savedTournaments ?? []);
-  saved.add(slug);
-  session.savedTournaments = [...saved].slice(-MAX_SAVED_TOURNAMENTS);
-  await session.save();
+  // Read-only: a player row exists for any session that has ever logged in,
+  // registered or saved since this shipped. A pre-existing cookie without one
+  // yet self-heals on its next login/refresh/register, so this stays a cheap
+  // lookup instead of fetching the Nexus profile just to upsert on every click.
+  const playerId = await findPlayerIdByToken(session.token);
+  if (!playerId) return;
+
+  await saveTournament(playerId, slug);
 
   revalidateSavedSurfaces(slug);
 }
@@ -46,8 +52,10 @@ export async function unsaveTournamentAction(form: FormData) {
   const session = await getSession();
   if (!session.token) return;
 
-  session.savedTournaments = (session.savedTournaments ?? []).filter((s) => s !== slug);
-  await session.save();
+  const playerId = await findPlayerIdByToken(session.token);
+  if (!playerId) return;
+
+  await unsaveTournament(playerId, slug);
 
   revalidateSavedSurfaces(slug);
 }

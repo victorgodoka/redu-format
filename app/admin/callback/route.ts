@@ -10,6 +10,7 @@ import {
 import { discordConfig } from "@/lib/discord/config";
 import { createAdminSession } from "@/lib/auth/session";
 import { recordAction } from "@/lib/audit-log";
+import { upsertAdmin } from "@/lib/backend/services/admins.service";
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
@@ -60,6 +61,14 @@ export async function GET(request: Request) {
 
     await createAdminSession({
       userId: user.id,
+      username: user.username,
+      displayName,
+    });
+
+    // Upsert before recordAction so this very login's own audit entry can
+    // already resolve actor_admin_id, not just the next one.
+    await upsertAdmin({
+      discordUserId: user.id,
       username: user.username,
       displayName,
     });

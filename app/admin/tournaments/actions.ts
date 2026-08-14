@@ -139,13 +139,8 @@ export async function updateTournamentAction(
   const draft = readDraft(form);
   if ("error" in draft) return draft;
 
-  const taken = Number(form.get("taken"));
-  if (!Number.isInteger(taken) || taken < 0) {
-    return { error: "Seats taken must be zero or a positive whole number." };
-  }
-
   const before = await getTournament(slug);
-  const updated = await updateTournament(slug, { ...draft, taken });
+  const updated = await updateTournament(slug, draft);
   if (!updated) return { error: "That tournament no longer exists." };
 
   await recordAction({
