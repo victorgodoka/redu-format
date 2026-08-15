@@ -39,6 +39,9 @@ export default async function EditTournamentPage({
             <Link className="btn" href={`/admin/tournaments/${tournament.slug}/participants`}>
               Manage participants
             </Link>
+            <Link className="btn" href={`/admin/tournaments/${tournament.slug}/bracket`}>
+              Manage bracket
+            </Link>
             <DeleteButton
               action={deleteTournamentAction}
               hidden={{ slug: tournament.slug }}

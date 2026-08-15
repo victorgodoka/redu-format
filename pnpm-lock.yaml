@@ -26,6 +26,9 @@ importers:
       react-dom:
         specifier: 19.2.8
         version: 19.2.8(react@19.2.8)
+      tournament-organizer:
+        specifier: ^4.1.1
+        version: 4.1.1
     devDependencies:
       '@types/node':
         specifier: ^20.19.43
@@ -869,6 +872,9 @@ packages:
   dunder-proto@1.0.1:
     resolution: {integrity: sha512-KIN/nDJBQRcXw0MLVhZE9iQHmG68qAVIBg9CqmUYjmQIhgij9U5MFvrqkUL5FbtyyzZuOeOt0zdeRe4UY7ct+A==}
     engines: {node: '>= 0.4'}
+
+  edmonds-blossom-fixed@1.0.1:
+    resolution: {integrity: sha512-wtpraSt4yJeUpNU8RGC4q2JBxsJbHFxI7/htm/mS4FgxSN90WBwmgE7QZwpcY70KJRqmfLCNxU49UIc+DfzLKQ==}
 
   electron-to-chromium@1.5.402:
     resolution: {integrity: sha512-/oOpMaPT6Yg+6/1XQhyIPlzgj7Ye9zf+nNM2Uh6OcE2G2oNptWazFa+qB2Pdqqbsc9KnIDzgAntoYN0dbwOXwA==}
@@ -1761,6 +1767,13 @@ packages:
   to-regex-range@5.0.1:
     resolution: {integrity: sha512-65P7iz6X5yEr1cwcgvQxbbIw7Uk3gOy5dIdtZ4rDveLqhrdJP+Li/Hx6tyK0NEb+2GCyneCMJiGqrADCSNk8sQ==}
     engines: {node: '>=8.0'}
+
+  tournament-organizer@4.1.1:
+    resolution: {integrity: sha512-DLN2SDScV/ukvK8tzpJtcg7oh1+FVAnYKvuJ/MgbioPr+JS2GeipOeNjnGbmeZ2gbJeCcqJa1+0q9mAbKTBQVw==}
+    engines: {node: '>=16.7'}
+
+  tournament-pairings@2.0.1:
+    resolution: {integrity: sha512-Vp+7zj+eykGtj4Fxl3l3vqDrfXz2MMOgx6A52oAIo7hbsPC/euCqImU2d2I6oXtOpy6Kim5qqXBb6Zwktpy2YA==}
 
   ts-api-utils@2.5.0:
     resolution: {integrity: sha512-OJ/ibxhPlqrMM0UiNHJ/0CKQkoKF243/AEmplt3qpRgkW8VG7IfOS41h7V8TjITqdByHzrjcS/2si+y4lIh8NA==}
@@ -2660,6 +2673,8 @@ snapshots:
       call-bind-apply-helpers: 1.0.2
       es-errors: 1.3.0
       gopd: 1.2.0
+
+  edmonds-blossom-fixed@1.0.1: {}
 
   electron-to-chromium@1.5.402: {}
 
@@ -3780,6 +3795,14 @@ snapshots:
   to-regex-range@5.0.1:
     dependencies:
       is-number: 7.0.0
+
+  tournament-organizer@4.1.1:
+    dependencies:
+      tournament-pairings: 2.0.1
+
+  tournament-pairings@2.0.1:
+    dependencies:
+      edmonds-blossom-fixed: 1.0.1
 
   ts-api-utils@2.5.0(typescript@5.9.3):
     dependencies:

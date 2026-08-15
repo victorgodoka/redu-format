@@ -1,5 +1,5 @@
 import type { Pool, ResultSetHeader, RowDataPacket } from "mysql2/promise";
-import type { EntryFee, Structure, TournamentEvent } from "../../events.ts";
+import type { EntryFee, Engine, Structure, TournamentEvent } from "../../events.ts";
 import { fromMysqlDatetime, toMysqlDatetime } from "../db/datetime.ts";
 
 export type TournamentDraft = Omit<TournamentEvent, "slug" | "taken">;
@@ -12,7 +12,8 @@ type TournamentRow = RowDataPacket & {
   rounds: number;
   top_cut: number | null;
   match_format: "Bo1" | "Bo3";
-  time_limit_minutes: number;
+  round_limit_days: number;
+  engine: Engine;
   seat_cap: number | null;
   taken: number;
   entry_type: "free" | "paid";
@@ -41,7 +42,8 @@ function rowToTournament(row: TournamentRow): TournamentEvent {
     rounds: row.rounds,
     topCut: row.top_cut,
     matchFormat: row.match_format,
-    timeLimit: row.time_limit_minutes,
+    roundLimitDays: row.round_limit_days,
+    engine: row.engine,
     seats: row.seat_cap,
     taken: Number(row.taken),
     entry: toEntry(row),
@@ -66,7 +68,7 @@ export class TournamentsRepository {
   async findAll(): Promise<TournamentEvent[]> {
     const [rows] = await this.pool.query<TournamentRow[]>(
       `SELECT t.slug, t.name, t.starts_at, t.structure, t.rounds, t.top_cut, t.match_format,
-              t.time_limit_minutes, t.seat_cap, t.entry_type, t.entry_amount_minor, t.entry_currency,
+              t.round_limit_days, t.engine, t.seat_cap, t.entry_type, t.entry_amount_minor, t.entry_currency,
               t.host, t.signup_url, ${TAKEN_SUBQUERY}
        FROM tournaments t
        WHERE t.deleted_at IS NULL
@@ -78,7 +80,7 @@ export class TournamentsRepository {
   async findBySlug(slug: string): Promise<TournamentEvent | null> {
     const [rows] = await this.pool.query<TournamentRow[]>(
       `SELECT t.slug, t.name, t.starts_at, t.structure, t.rounds, t.top_cut, t.match_format,
-              t.time_limit_minutes, t.seat_cap, t.entry_type, t.entry_amount_minor, t.entry_currency,
+              t.round_limit_days, t.engine, t.seat_cap, t.entry_type, t.entry_amount_minor, t.entry_currency,
               t.host, t.signup_url, ${TAKEN_SUBQUERY}
        FROM tournaments t
        WHERE t.slug = ? AND t.deleted_at IS NULL
@@ -96,12 +98,21 @@ export class TournamentsRepository {
     return rows.length > 0;
   }
 
+  /** The internal id, for tables that FK to tournaments.id instead of using the slug directly (tournament_brackets, tournament_placings). */
+  async findIdBySlug(slug: string): Promise<string | null> {
+    const [rows] = await this.pool.query<RowDataPacket[]>(
+      "SELECT id FROM tournaments WHERE slug = ? AND deleted_at IS NULL LIMIT 1",
+      [slug],
+    );
+    return rows[0]?.id ?? null;
+  }
+
   async insert(id: string, slug: string, draft: TournamentDraft): Promise<void> {
     const [entryType, entryAmountMinor, entryCurrency] = entryColumns(draft.entry);
     await this.pool.query(
       `INSERT INTO tournaments
-        (id, slug, name, starts_at, structure, rounds, top_cut, match_format, time_limit_minutes, seat_cap, entry_type, entry_amount_minor, entry_currency, host, signup_url)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        (id, slug, name, starts_at, structure, rounds, top_cut, match_format, round_limit_days, engine, seat_cap, entry_type, entry_amount_minor, entry_currency, host, signup_url)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id,
         slug,
@@ -111,7 +122,8 @@ export class TournamentsRepository {
         draft.rounds,
         draft.topCut,
         draft.matchFormat,
-        draft.timeLimit,
+        draft.roundLimitDays,
+        draft.engine,
         draft.seats,
         entryType,
         entryAmountMinor,
@@ -127,7 +139,7 @@ export class TournamentsRepository {
     const [result] = await this.pool.query<ResultSetHeader>(
       `UPDATE tournaments SET
         name = ?, starts_at = ?, structure = ?, rounds = ?, top_cut = ?, match_format = ?,
-        time_limit_minutes = ?, seat_cap = ?, entry_type = ?, entry_amount_minor = ?,
+        round_limit_days = ?, engine = ?, seat_cap = ?, entry_type = ?, entry_amount_minor = ?,
         entry_currency = ?, host = ?, signup_url = ?
        WHERE slug = ? AND deleted_at IS NULL`,
       [
@@ -137,7 +149,8 @@ export class TournamentsRepository {
         draft.rounds,
         draft.topCut,
         draft.matchFormat,
-        draft.timeLimit,
+        draft.roundLimitDays,
+        draft.engine,
         draft.seats,
         entryType,
         entryAmountMinor,

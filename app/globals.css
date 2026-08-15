@@ -1018,6 +1018,24 @@ a {
   gap: 12px;
 }
 
+.notice__drop summary {
+  cursor: pointer;
+  list-style: none;
+  display: inline-flex;
+}
+
+.notice__drop summary::-webkit-details-marker {
+  display: none;
+}
+
+.notice__drop-body {
+  display: flex;
+  flex-direction: column;
+  align-items: start;
+  gap: 12px;
+  margin-top: 12px;
+}
+
 /* --- deck picker --- */
 
 .picker {

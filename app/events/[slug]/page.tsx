@@ -6,7 +6,12 @@ import { Bracket } from "@/app/bracket";
 import FallbackImage from "@/app/fallback-image";
 import { fetchProfile, getSession } from "@/lib/auth";
 import { findPlayerIdByToken } from "@/lib/backend/services/player.service";
-import { findSignupDeckId, listSavedSlugsForPlayer } from "@/lib/backend/services/registration.service";
+import {
+  findMyRegistrationId,
+  findSignupDeckId,
+  listSavedSlugsForPlayer,
+} from "@/lib/backend/services/registration.service";
+import { getMyCurrentMatch, getMyMatchHistory, getPlacingsForPlayer } from "@/lib/backend/services/results.service";
 import { CARD_ART, CARD_IMAGE } from "@/lib/banlist";
 import { Card, cardsByIds } from "@/lib/cards";
 import {
@@ -15,7 +20,6 @@ import {
   formatEntry,
   formatTime,
   isPast,
-  mockPlacement,
   pastEvents,
   seatsLeft,
   STRUCTURES,
@@ -29,6 +33,7 @@ import {
 import SiteHeader from "../../site-header";
 import { WikiLink } from "@/app/wiki-link";
 import { saveTournamentAction, unsaveTournamentAction } from "../saved-actions";
+import { submitMatchReportAction } from "./report-actions";
 
 const EDITOR = "https://duelingnexus.com/editor";
 
@@ -274,12 +279,17 @@ async function GenericEventPage({ slug }: { slug: string }) {
 
   const session = await getSession();
   const playerId = session.token ? await findPlayerIdByToken(session.token) : null;
-  const [profile, registeredId, savedSlugs] = await Promise.all([
+  const [profile, registeredId, myRegistrationId, savedSlugs, placings] = await Promise.all([
     session.token ? fetchProfile(session.token) : null,
     playerId ? findSignupDeckId(slug, playerId) : null,
+    playerId ? findMyRegistrationId(slug, playerId) : null,
     playerId ? listSavedSlugsForPlayer(playerId) : Promise.resolve<string[]>([]),
+    playerId ? getPlacingsForPlayer(playerId) : Promise.resolve(new Map<string, { place: number; points: number }>()),
   ]);
   const registeredDeck = profile?.decks.find((d) => d.id === registeredId);
+  const placing = placings.get(slug);
+  const myMatch = myRegistrationId ? await getMyCurrentMatch(slug, myRegistrationId) : null;
+  const myHistory = myRegistrationId ? await getMyMatchHistory(slug, myRegistrationId) : [];
 
   const now = new Date();
   const past = isPast(event, now);
@@ -315,9 +325,9 @@ async function GenericEventPage({ slug }: { slug: string }) {
                 </h2>
                 {past ? (
                   <p className="lede">
-                    Mock standing: {mockPlacement(`${slug}:${profile?.name ?? ""}`, event.taken)} of{" "}
-                    {event.taken}. Real results land here once the backend
-                    tracks match outcomes.
+                    {placing
+                      ? `Placed #${placing.place} of ${event.taken}, ${placing.points} pts.`
+                      : "Results for this event have not been finalized yet."}
                   </p>
                 ) : (
                   <p className="lede">
@@ -348,6 +358,78 @@ async function GenericEventPage({ slug }: { slug: string }) {
                 )}
               </div>
             )}
+
+            {myMatch ? (
+              <div className="notice panel">
+                <p className="tab">Round {myMatch.round} · Your duel</p>
+                <h2 className="notice__title">vs {myMatch.opponentName ?? "TBD"}</h2>
+                {myMatch.deadlineAt ? (
+                  <p className="lede">
+                    Round closes {formatDate(myMatch.deadlineAt)} at {formatTime(myMatch.deadlineAt)}.
+                  </p>
+                ) : null}
+                {myMatch.roomHash ? (
+                  <a
+                    className="btn btn--solid"
+                    href={`https://duelingnexus.com/duel/NA-${myMatch.roomHash}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Open the duel room
+                  </a>
+                ) : null}
+                {myMatch.disputed ? (
+                  <p className="lede">
+                    You and your opponent reported different results - a staff member will
+                    step in to sort it out.
+                  </p>
+                ) : myMatch.myReport ? (
+                  <p className="lede">
+                    You reported <b>{myMatch.myReport}</b>.{" "}
+                    {myMatch.opponentReported
+                      ? "Reconciling with your opponent's report."
+                      : "Waiting on your opponent to report too."}
+                  </p>
+                ) : (
+                  <p className="lede">Report your result once the duel is over.</p>
+                )}
+                <form action={submitMatchReportAction} className="admin-row__actions">
+                  <input type="hidden" name="slug" value={slug} />
+                  <input type="hidden" name="matchId" value={myMatch.matchId} />
+                  <button className="btn btn--solid" type="submit" name="result" value="win">
+                    I won
+                  </button>
+                  <button className="btn" type="submit" name="result" value="loss">
+                    I lost
+                  </button>
+                  <button className="btn btn--quiet" type="submit" name="result" value="draw">
+                    Draw
+                  </button>
+                </form>
+              </div>
+            ) : null}
+
+            {myHistory.length > 0 ? (
+              <div className="notice panel">
+                <p className="tab">Your duels</p>
+                <ul className="admin-list">
+                  {myHistory.map((entry) => (
+                    <li className="admin-row" key={entry.round}>
+                      <div className="admin-row__main">
+                        <span className="admin-row__title">
+                          Round {entry.round} · {entry.result === "bye" ? "Bye" : `vs ${entry.opponentName ?? "?"}`}
+                        </span>
+                        <span className="admin-row__meta">
+                          {entry.result === "bye"
+                            ? "Automatic win"
+                            : `${entry.result === "win" ? "Won" : entry.result === "loss" ? "Lost" : "Drew"} ${entry.score}`}
+                        </span>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
           </div>
 
           <aside className="signup__side">
@@ -365,8 +447,8 @@ async function GenericEventPage({ slug }: { slug: string }) {
               <div className="facts__row">
                 <dt>Rounds</dt>
                 <dd>
-                  {event.rounds} · {event.matchFormat} · {event.timeLimit} min +
-                  3 turns
+                  {event.rounds} · {event.matchFormat} · {event.roundLimitDays}-day round
+                  deadline
                   {event.topCut ? ` · Top ${event.topCut}` : ""}
                 </dd>
               </div>

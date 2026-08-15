@@ -1,7 +1,8 @@
 import type { EntryFee } from "../../events.ts";
 import { getPool } from "../db/client.ts";
-import { RegistrationsRepository } from "../repositories/registrations.repository.ts";
+import { RegistrationsRepository, type PublicSignup } from "../repositories/registrations.repository.ts";
 import { SavedTournamentsRepository } from "../repositories/saved-tournaments.repository.ts";
+import { dropFromStartedTournament, hasBracket } from "./results.service.ts";
 import type { PaymentStatus } from "./tournament.service.ts";
 
 function repos() {
@@ -41,10 +42,47 @@ export async function cancelSignup(slug: string, playerId: string): Promise<void
   await repos().registrations.deletePublicSignup(slug, playerId);
 }
 
+export type DropOutcome = "left" | "blocked" | "dropped";
+
+/**
+ * Leaving before the bracket starts just deletes the registration outright -
+ * free tournaments, and paid ones with no confirmed payment yet, are free to
+ * walk away and re-register later. Once a payment is confirmed pre-start,
+ * only Staff can undo that (returns "blocked" so the UI can point there).
+ * Once the bracket has started, this is a real drop with in-bracket
+ * consequences (an automatic loss, tiebreaker impact) instead of a delete.
+ */
+export async function dropRegistration(slug: string, playerId: string): Promise<DropOutcome> {
+  const { registrations } = repos();
+  const signup = await registrations.findPublicSignup(slug, playerId);
+  if (!signup) return "blocked";
+
+  if (await hasBracket(slug)) {
+    await dropFromStartedTournament(slug, signup.registrationId);
+    return "dropped";
+  }
+
+  if (signup.paymentStatus === "confirmed") return "blocked";
+
+  await registrations.deletePublicSignup(slug, playerId);
+  return "left";
+}
+
 /** The deck id this player registered for this tournament with, or null if not registered. */
 export async function findSignupDeckId(slug: string, playerId: string): Promise<string | null> {
   const signup = await repos().registrations.findPublicSignup(slug, playerId);
   return signup?.deckId ?? null;
+}
+
+/** This player's registrations.id for this tournament, or null if not registered - what match reporting keys off. */
+export async function findMyRegistrationId(slug: string, playerId: string): Promise<string | null> {
+  const signup = await repos().registrations.findPublicSignup(slug, playerId);
+  return signup?.registrationId ?? null;
+}
+
+/** The full signup row (registration id, deck, payment status) - what the signup page needs to decide which drop UI to show. */
+export async function findMySignup(slug: string, playerId: string): Promise<PublicSignup | null> {
+  return repos().registrations.findPublicSignup(slug, playerId);
 }
 
 /** tournament slug -> deck id, for every public signup this player has. */

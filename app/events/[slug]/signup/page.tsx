@@ -4,7 +4,8 @@ import { notFound, redirect } from "next/navigation";
 import FallbackImage from "../../../fallback-image";
 import { fetchProfile, getSession } from "@/lib/auth";
 import { findPlayerIdByToken } from "@/lib/backend/services/player.service";
-import { findSignupDeckId } from "@/lib/backend/services/registration.service";
+import { findMySignup } from "@/lib/backend/services/registration.service";
+import { hasBracket } from "@/lib/backend/services/results.service";
 import { Card } from "@/lib/cards";
 import { formatDate, formatEntry, formatTime, isPast, pastEvents, seatsLeft, STRUCTURES } from "@/lib/events";
 import { DEFAULT_AVATAR } from "@/lib/nexus-parse";
@@ -50,8 +51,9 @@ export default async function SignupPage({
   const past = isPast(event, now);
   const left = seatsLeft(event);
   const playerId = await findPlayerIdByToken(session.token);
-  const registeredId = playerId ? await findSignupDeckId(slug, playerId) : null;
-  const registeredDeck = profile.decks.find((d) => d.id === registeredId);
+  const signup = playerId ? await findMySignup(slug, playerId) : null;
+  const registeredDeck = profile.decks.find((d) => d.id === signup?.deckId);
+  const started = await hasBracket(slug);
 
   return (
     <>
@@ -99,17 +101,41 @@ export default async function SignupPage({
                     {registeredDeck.side} side. Bring it to{" "}
                     {formatDate(event.startsAt)} at {formatTime(event.startsAt)}.
                   </p>
-                  <div className="notice__actions">
-                    <form action={cancel}>
-                      <input type="hidden" name="slug" value={slug} />
-                      <button className="btn" type="submit">
-                        Cancel registration
-                      </button>
-                    </form>
-                    <Link className="btn btn--quiet" href="/events">
-                      Back to events
-                    </Link>
-                  </div>
+                  {started ? (
+                    <details className="notice__drop">
+                      <summary className="btn">Drop from tournament</summary>
+                      <div className="notice__drop-body">
+                        <p className="lede">
+                          Dropping counts as a loss and negatively affects the tiebreakers of
+                          the players still in it.
+                          {event.entry.type === "paid" ? " There is no refund." : ""}
+                        </p>
+                        <form action={cancel}>
+                          <input type="hidden" name="slug" value={slug} />
+                          <button className="btn btn--solid" type="submit">
+                            Yes, drop me
+                          </button>
+                        </form>
+                      </div>
+                    </details>
+                  ) : signup?.paymentStatus === "confirmed" ? (
+                    <p className="lede">
+                      Your payment is already confirmed. Contact a Staff member if you need to
+                      drop before the event starts.
+                    </p>
+                  ) : (
+                    <div className="notice__actions">
+                      <form action={cancel}>
+                        <input type="hidden" name="slug" value={slug} />
+                        <button className="btn" type="submit">
+                          Cancel registration
+                        </button>
+                      </form>
+                      <Link className="btn btn--quiet" href="/events">
+                        Back to events
+                      </Link>
+                    </div>
+                  )}
                 </div>
               ) : profile.decks.length === 0 ? (
                 <div className="notice panel">
@@ -177,7 +203,7 @@ export default async function SignupPage({
                   <dt>Rounds</dt>
                   <dd>
                     {event.rounds} · {event.matchFormat} ·{" "}
-                    {event.timeLimit} min + 3 turns
+                    {event.roundLimitDays}-day round deadline
                     {event.topCut ? ` · Top ${event.topCut}` : ""}
                   </dd>
                 </div>

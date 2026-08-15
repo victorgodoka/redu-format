@@ -19,8 +19,8 @@ async function seed(): Promise<void> {
   for (const event of events) {
     await pool.query(
       `INSERT INTO tournaments
-        (id, slug, name, starts_at, structure, rounds, top_cut, match_format, time_limit_minutes, seat_cap, taken, entry_type, entry_amount_minor, entry_currency, host, signup_url)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        (id, slug, name, starts_at, structure, rounds, top_cut, match_format, round_limit_days, engine, seat_cap, taken, entry_type, entry_amount_minor, entry_currency, host, signup_url)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         crypto.randomUUID(),
         event.slug,
@@ -30,7 +30,8 @@ async function seed(): Promise<void> {
         event.rounds,
         event.topCut,
         event.matchFormat,
-        event.timeLimit,
+        event.roundLimitDays,
+        event.engine,
         event.seats,
         event.taken,
         event.entry.type,

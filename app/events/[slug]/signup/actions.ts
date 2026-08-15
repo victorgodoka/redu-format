@@ -5,7 +5,8 @@ import { fetchProfile, getSession } from "@/lib/auth";
 import { deckLegality } from "@/lib/nexus-parse";
 import { seatsLeft } from "@/lib/events";
 import { getTournament } from "@/lib/tournaments";
-import { cancelSignup, registerSignup } from "@/lib/backend/services/registration.service";
+import { dropRegistration, registerSignup } from "@/lib/backend/services/registration.service";
+import { hasBracket } from "@/lib/backend/services/results.service";
 import { findPlayerIdByToken, resolvePlayerId } from "@/lib/backend/services/player.service";
 import { describeError, validateDeck } from "@/lib/validateDecks";
 
@@ -27,6 +28,9 @@ export async function register(
     return { error: "That event has already finished." };
   }
   if (seatsLeft(event) === 0) return { error: "That event is sold out." };
+  if (await hasBracket(slug)) {
+    return { error: "This event has already started - registration is closed." };
+  }
 
   if (!deckId) return { error: "Pick a deck to register." };
 
@@ -74,6 +78,12 @@ export async function register(
   return {};
 }
 
+/**
+ * Fire-and-forget, same as the admin bracket actions: the page already gates
+ * which button/state is shown (payment confirmed pre-start, bracket started)
+ * from server-rendered data, so a rejected drop here (e.g. payment got
+ * confirmed a moment after the page loaded) is just a safety-net no-op.
+ */
 export async function cancel(form: FormData) {
   const slug = String(form.get("slug") ?? "");
 
@@ -83,8 +93,10 @@ export async function cancel(form: FormData) {
   const playerId = await findPlayerIdByToken(session.token);
   if (!playerId) return;
 
-  await cancelSignup(slug, playerId);
+  await dropRegistration(slug, playerId);
 
   revalidatePath(`/events/${slug}/signup`);
+  revalidatePath(`/events/${slug}`);
   revalidatePath("/events");
+  revalidatePath("/dashboard");
 }

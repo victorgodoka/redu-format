@@ -12,7 +12,11 @@ export type AdminAction =
   | "payment.confirm"
   | "payment.contest"
   | "nexus.link"
-  | "nexus.unlink";
+  | "nexus.unlink"
+  | "bracket.start"
+  | "bracket.round"
+  | "bracket.result"
+  | "bracket.complete";
 
 export const ADMIN_ACTIONS: readonly AdminAction[] = [
   "admin.login",
@@ -26,6 +30,10 @@ export const ADMIN_ACTIONS: readonly AdminAction[] = [
   "payment.contest",
   "nexus.link",
   "nexus.unlink",
+  "bracket.start",
+  "bracket.round",
+  "bracket.result",
+  "bracket.complete",
 ];
 
 export type AuditLogEntry = {

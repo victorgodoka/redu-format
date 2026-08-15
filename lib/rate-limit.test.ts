@@ -24,11 +24,13 @@ test("keys are independent", async () => {
 
 test("window expiry lets the key through again", async () => {
   // Each hit is a real DB round trip, so the window has to be wide enough that
-  // the calls below it can't themselves eat into it (unlike the old in-memory
-  // version, where every call was effectively instant).
-  for (let i = 0; i < 2; i++) await rateLimit("slow", 2, 300);
-  assert.equal(await rateLimit("slow", 2, 300), false);
+  // the calls below it - and everything else the test runner has going on
+  // concurrently, now that several DB-backed test files run at once - can't
+  // themselves eat into it (unlike the old in-memory version, where every
+  // call was effectively instant).
+  for (let i = 0; i < 2; i++) await rateLimit("slow", 2, 1000);
+  assert.equal(await rateLimit("slow", 2, 1000), false);
 
-  await new Promise((r) => setTimeout(r, 400));
-  assert.equal(await rateLimit("slow", 2, 300), true);
+  await new Promise((r) => setTimeout(r, 1200));
+  assert.equal(await rateLimit("slow", 2, 1000), true);
 });

@@ -5,6 +5,7 @@ import FallbackImage from "../fallback-image";
 import { deckLegality, fetchProfile, getSession } from "@/lib/auth";
 import { findPlayerIdByToken } from "@/lib/backend/services/player.service";
 import { listSavedSlugsForPlayer, listSignupsForPlayer } from "@/lib/backend/services/registration.service";
+import { getPlacingsForPlayer } from "@/lib/backend/services/results.service";
 import { CARD_ART } from "@/lib/banlist";
 import { Card } from "@/lib/cards";
 import { DEFAULT_AVATAR } from "@/lib/nexus-parse";
@@ -12,7 +13,6 @@ import {
   formatDate,
   formatTime,
   isPast,
-  mockPlacement,
   pastEvents,
 } from "@/lib/events";
 import { listTournaments } from "@/lib/tournaments";
@@ -61,9 +61,13 @@ export default async function DashboardPage() {
   const now = new Date();
 
   const playerId = await findPlayerIdByToken(session.token);
-  const [signups, savedSlugs] = playerId
-    ? await Promise.all([listSignupsForPlayer(playerId), listSavedSlugsForPlayer(playerId)])
-    : [new Map<string, string | null>(), []];
+  const [signups, savedSlugs, placings] = playerId
+    ? await Promise.all([
+        listSignupsForPlayer(playerId),
+        listSavedSlugsForPlayer(playerId),
+        getPlacingsForPlayer(playerId),
+      ])
+    : [new Map<string, string | null>(), [], new Map<string, { place: number; points: number }>()];
 
   const yourEvents = [...signups.entries()]
     .map(([slug, deckId]) => {
@@ -205,15 +209,16 @@ export default async function DashboardPage() {
 
                   {pastYourEvents.length > 0 ? (
                     <ul className="admin-list">
-                      {pastYourEvents.map(({ event, deck }) => (
+                      {pastYourEvents.map(({ event, deck }) => {
+                        const placing = placings.get(event.slug);
+                        return (
                         <li className="admin-row panel" key={event.slug}>
                           <div className="admin-row__main">
                             <span className="admin-row__title">{event.name}</span>
                             <span className="admin-row__meta">
                               {formatDate(event.startsAt)}
-                              {deck ? ` · ${deck.name}` : ""} · Mock standing{" "}
-                              {mockPlacement(`${event.slug}:${profile.name}`, event.taken)} of{" "}
-                              {event.taken}
+                              {deck ? ` · ${deck.name}` : ""}
+                              {placing ? ` · Placed #${placing.place}` : ""}
                             </span>
                           </div>
                           <div className="admin-row__actions">
@@ -222,7 +227,8 @@ export default async function DashboardPage() {
                             </Link>
                           </div>
                         </li>
-                      ))}
+                        );
+                      })}
                     </ul>
                   ) : null}
                 </>

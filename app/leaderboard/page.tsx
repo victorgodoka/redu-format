@@ -1,11 +1,10 @@
 import type { Metadata } from "next";
-import { LEADERBOARD } from "@/lib/leaderboard";
+import { getLeaderboard } from "@/lib/leaderboard";
 import SiteHeader from "../site-header";
 
 export const metadata: Metadata = {
   title: "REDU Format leaderboard | Duelist rankings",
-  description:
-    "Community rankings for REDU Format, by tournament points, wins and top cuts.",
+  description: "Community rankings for REDU Format, by tournament points.",
   alternates: { canonical: "/leaderboard" },
   openGraph: {
     type: "website",
@@ -19,7 +18,9 @@ export const metadata: Metadata = {
 /** Trophy tiers for the top of the board; everyone else just gets a number. */
 const TOP_BADGE: Record<number, string> = { 1: "1st", 2: "2nd", 3: "3rd" };
 
-export default function LeaderboardPage() {
+export default async function LeaderboardPage() {
+  const rows = await getLeaderboard();
+
   return (
     <>
       <a className="skip-link" href="#main">
@@ -33,34 +34,43 @@ export default function LeaderboardPage() {
           <p className="tab">Standings</p>
           <h1 className="section__title">Leaderboard</h1>
           <p className="lede">
-            Ranked by tournament points across REDU Format events. Points come
-            from event placements, weighted by field size.
+            Ranked by tournament points across completed REDU Format events - 3 per
+            match win, 1 per draw, plus 5 for every top cut match won.
           </p>
 
-          <ul className="admin-list leaderboard">
-            {LEADERBOARD.map((entry) => (
-              <li className="admin-row leaderboard-row panel" key={entry.rank}>
-                <span
-                  className={`leaderboard-row__rank${
-                    entry.rank <= 3 ? " leaderboard-row__rank--top" : ""
-                  }`}
-                >
-                  {TOP_BADGE[entry.rank] ?? `#${entry.rank}`}
-                </span>
+          {rows.length === 0 ? (
+            <div className="empty panel">
+              <p className="lede">
+                No completed tournaments yet. Rankings appear here once an admin
+                finishes running one.
+              </p>
+            </div>
+          ) : (
+            <ul className="admin-list leaderboard">
+              {rows.map((row, i) => {
+                const rank = i + 1;
+                return (
+                  <li className="admin-row leaderboard-row panel" key={row.playerId}>
+                    <span
+                      className={`leaderboard-row__rank${
+                        rank <= 3 ? " leaderboard-row__rank--top" : ""
+                      }`}
+                    >
+                      {TOP_BADGE[rank] ?? `#${rank}`}
+                    </span>
 
-                <div className="admin-row__main">
-                  <span className="admin-row__title">{entry.name}</span>
-                  <span className="admin-row__meta">
-                    {entry.points} pts · {entry.wins}{" "}
-                    {entry.wins === 1 ? "win" : "wins"} · {entry.topCuts} top{" "}
-                    {entry.topCuts === 1 ? "cut" : "cuts"} · {entry.events}{" "}
-                    {entry.events === 1 ? "event" : "events"} ·{" "}
-                    {entry.signatureDeck}
-                  </span>
-                </div>
-              </li>
-            ))}
-          </ul>
+                    <div className="admin-row__main">
+                      <span className="admin-row__title">{row.playerName}</span>
+                      <span className="admin-row__meta">
+                        {row.totalPoints} pts · {row.eventsPlayed}{" "}
+                        {row.eventsPlayed === 1 ? "event" : "events"}
+                      </span>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
         </div>
       </main>
     </>

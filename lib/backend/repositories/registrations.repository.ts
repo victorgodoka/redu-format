@@ -26,7 +26,12 @@ function rowToParticipant(row: RegistrationRow): Participant {
   };
 }
 
-export type PublicSignup = { registrationId: string; deckId: string | null; deckName: string };
+export type PublicSignup = {
+  registrationId: string;
+  deckId: string | null;
+  deckName: string;
+  paymentStatus: PaymentStatus;
+};
 
 export class RegistrationsRepository {
   private pool: Pool;
@@ -96,16 +101,19 @@ export class RegistrationsRepository {
 
   // --- Public signup path (Fase 3) ---
 
+  /** A dropped registration doesn't count as "still signed up" - the row stays (history, tiebreakers) but the player shouldn't see themselves as registered anymore. */
   async findPublicSignup(slug: string, playerId: string): Promise<PublicSignup | null> {
     const [rows] = await this.pool.query<RowDataPacket[]>(
-      `SELECT r.id, r.deck_id, r.deck_name FROM registrations r
+      `SELECT r.id, r.deck_id, r.deck_name, r.payment_status FROM registrations r
        JOIN tournaments t ON t.id = r.tournament_id
-       WHERE t.slug = ? AND r.player_id = ? AND r.source = 'public_signup'
+       WHERE t.slug = ? AND r.player_id = ? AND r.source = 'public_signup' AND r.dropped_at IS NULL
        LIMIT 1`,
       [slug, playerId],
     );
     const row = rows[0];
-    return row ? { registrationId: row.id, deckId: row.deck_id, deckName: row.deck_name } : null;
+    return row
+      ? { registrationId: row.id, deckId: row.deck_id, deckName: row.deck_name, paymentStatus: row.payment_status }
+      : null;
   }
 
   /** tournament_slug -> deck_id, for every public signup this player has, across all tournaments. */
@@ -113,7 +121,7 @@ export class RegistrationsRepository {
     const [rows] = await this.pool.query<RowDataPacket[]>(
       `SELECT t.slug, r.deck_id FROM registrations r
        JOIN tournaments t ON t.id = r.tournament_id
-       WHERE r.player_id = ? AND r.source = 'public_signup'`,
+       WHERE r.player_id = ? AND r.source = 'public_signup' AND r.dropped_at IS NULL`,
       [playerId],
     );
     return rows.map((r) => ({ slug: r.slug, deckId: r.deck_id }));
@@ -144,6 +152,34 @@ export class RegistrationsRepository {
        ON DUPLICATE KEY UPDATE display_name = VALUES(display_name), deck_name = VALUES(deck_name), deck_id = VALUES(deck_id)`,
       [id, input.playerId, input.displayName, input.deckName, input.deckId, input.initialPaymentStatus, slug],
     );
+  }
+
+  // --- Drops (Fase 5.2) ---
+
+  async markDropped(registrationId: string): Promise<void> {
+    await this.pool.query(
+      "UPDATE registrations SET dropped_at = ? WHERE id = ?",
+      [toMysqlDatetime(new Date().toISOString()), registrationId],
+    );
+  }
+
+  /** They showed up this round - clears any streak of missed rounds. */
+  async resetAbsences(registrationIds: string[]): Promise<void> {
+    if (registrationIds.length === 0) return;
+    await this.pool.query("UPDATE registrations SET consecutive_absences = 0 WHERE id IN (?)", [registrationIds]);
+  }
+
+  /** They missed this round - bumps the streak and returns the new count, for the caller to decide whether that's the second miss in a row. */
+  async incrementAbsences(registrationId: string): Promise<number> {
+    await this.pool.query(
+      "UPDATE registrations SET consecutive_absences = consecutive_absences + 1 WHERE id = ?",
+      [registrationId],
+    );
+    const [rows] = await this.pool.query<RowDataPacket[]>(
+      "SELECT consecutive_absences FROM registrations WHERE id = ?",
+      [registrationId],
+    );
+    return rows[0]?.consecutive_absences ?? 0;
   }
 
   async deletePublicSignup(slug: string, playerId: string): Promise<boolean> {

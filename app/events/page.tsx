@@ -255,7 +255,7 @@ export default async function EventsPage({
                         <span>{event.rounds} rounds</span>
                         {event.topCut ? <span>Top {event.topCut}</span> : null}
                         <span>{event.matchFormat}</span>
-                        <span>{event.timeLimit} min + 3 turns</span>
+                        <span>{event.roundLimitDays}-day round deadline</span>
                       </p>
                       <p className="event__host">
                         {event.host} · {formatEntry(event.entry)}

@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { recordAction } from "@/lib/audit-log";
 import { getAdminSession } from "@/lib/auth/session";
-import { recommendedTopCut, SEAT_OPTIONS, type Structure } from "@/lib/events";
+import { ENGINES, recommendedTopCut, SEAT_OPTIONS, type Engine, type Structure } from "@/lib/events";
 import {
   createTournament,
   deleteTournament,
@@ -38,13 +38,16 @@ function readDraft(form: FormData): TournamentDraft | { error: string } {
     return { error: "Pick a match format." };
   }
 
+  const engine = String(form.get("engine") ?? "") as Engine;
+  if (!(engine in ENGINES)) return { error: "Pick an engine." };
+
   const rounds = Number(form.get("rounds"));
-  const timeLimit = Number(form.get("timeLimit"));
+  const roundLimitDays = Number(form.get("roundLimitDays"));
   if (!Number.isInteger(rounds) || rounds <= 0) {
     return { error: "Rounds must be a positive whole number." };
   }
-  if (!Number.isInteger(timeLimit) || timeLimit <= 0) {
-    return { error: "Time limit must be a positive whole number." };
+  if (!Number.isInteger(roundLimitDays) || roundLimitDays <= 0) {
+    return { error: "Round deadline must be a positive whole number of days." };
   }
 
   const seatsRaw = String(form.get("seats") ?? "");
@@ -89,7 +92,8 @@ function readDraft(form: FormData): TournamentDraft | { error: string } {
     rounds,
     topCut,
     matchFormat: matchFormat as (typeof MATCH_FORMATS)[number],
-    timeLimit,
+    roundLimitDays,
+    engine,
     seats,
     entry,
     host,

@@ -4,6 +4,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   cancelSignup,
+  dropRegistration,
+  findMyRegistrationId,
   findSignupDeckId,
   listSavedSlugsForPlayer,
   listSignupsForPlayer,
@@ -12,7 +14,7 @@ import {
   unsaveTournament,
 } from "./backend/services/registration.service.ts";
 import { resolvePlayerId } from "./backend/services/player.service.ts";
-import { createTournament, listParticipants } from "./tournaments.ts";
+import { createTournament, listParticipants, setParticipantPayment } from "./tournaments.ts";
 
 test.after(teardownTestDb);
 
@@ -23,7 +25,8 @@ const draft = {
   rounds: 5,
   topCut: null,
   matchFormat: "Bo3" as const,
-  timeLimit: 40,
+  roundLimitDays: 2,
+  engine: "dueling-nexus",
   seats: 32,
   entry: { type: "free" } as const,
   host: "Test Host",
@@ -133,6 +136,62 @@ test("cancelling a signup that never existed does not error", async () => {
   const playerId = await player("Reg6");
   await cancelSignup(tournament.slug, playerId);
   assert.equal(await findSignupDeckId(tournament.slug, playerId), null);
+});
+
+test("dropRegistration before the bracket starts deletes the signup, whether free or paid-unconfirmed", async () => {
+  const tournament = await createTournament(draft);
+  const playerId = await player("Drop1");
+  await registerSignup(tournament.slug, {
+    playerId,
+    displayName: "Drop1",
+    deckId: "deck-1",
+    deckName: "Wind-Up",
+    entry: tournament.entry,
+  });
+
+  assert.equal(await dropRegistration(tournament.slug, playerId), "left");
+  assert.equal(await findSignupDeckId(tournament.slug, playerId), null);
+
+  const paid = await createTournament(paidDraft);
+  const paidPlayerId = await player("Drop2");
+  await registerSignup(paid.slug, {
+    playerId: paidPlayerId,
+    displayName: "Drop2",
+    deckId: "deck-1",
+    deckName: "Wind-Up",
+    entry: paid.entry,
+  });
+
+  assert.equal(await dropRegistration(paid.slug, paidPlayerId), "left");
+  assert.equal(await findSignupDeckId(paid.slug, paidPlayerId), null);
+});
+
+test("dropRegistration is blocked once a paid signup's payment is confirmed, pre-start", async () => {
+  const tournament = await createTournament(paidDraft);
+  const playerId = await player("Drop3");
+  await registerSignup(tournament.slug, {
+    playerId,
+    displayName: "Drop3",
+    deckId: "deck-1",
+    deckName: "Wind-Up",
+    entry: tournament.entry,
+  });
+  const registrationId = await findMyRegistrationId(tournament.slug, playerId);
+  await setParticipantPayment(tournament.slug, registrationId!, {
+    status: "confirmed",
+    proofUrl: null,
+    by: "admin-test",
+  });
+
+  assert.equal(await dropRegistration(tournament.slug, playerId), "blocked");
+  // Still registered - blocking means blocking, not a silent no-op that also drops them.
+  assert.equal(await findSignupDeckId(tournament.slug, playerId), "deck-1");
+});
+
+test("dropRegistration on someone who was never registered is blocked, not an error", async () => {
+  const tournament = await createTournament(draft);
+  const playerId = await player("Drop4");
+  assert.equal(await dropRegistration(tournament.slug, playerId), "blocked");
 });
 
 test("listSignupsForPlayer maps every registered slug to its deck", async () => {

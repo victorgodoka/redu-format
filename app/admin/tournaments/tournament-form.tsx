@@ -2,9 +2,11 @@
 
 import { useActionState, useState, useSyncExternalStore } from "react";
 import {
+  ENGINES,
   recommendedTopCut,
   SEAT_OPTIONS,
   STRUCTURES,
+  type Engine,
   type Structure,
 } from "@/lib/events";
 import type { TournamentEvent } from "@/lib/tournaments";
@@ -200,15 +202,30 @@ export default function TournamentForm({
       </div>
 
       <div className="form__field">
-        <label htmlFor="timeLimit">Time limit (minutes)</label>
+        <label htmlFor="engine">Engine</label>
+        <select id="engine" name="engine" defaultValue={tournament?.engine ?? "dueling-nexus"}>
+          {(Object.keys(ENGINES) as Engine[]).map((value) => (
+            <option key={value} value={value}>
+              {ENGINES[value].label}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div className="form__field">
+        <label htmlFor="roundLimitDays">Round deadline (days)</label>
         <input
-          id="timeLimit"
-          name="timeLimit"
+          id="roundLimitDays"
+          name="roundLimitDays"
           type="number"
           min={1}
-          defaultValue={tournament?.timeLimit ?? 40}
+          defaultValue={tournament?.roundLimitDays ?? 2}
           required
         />
+        <p className="form__hint">
+          How long a round stays open for players to duel before it&apos;s force-closed and
+          anyone missing a result auto-loses.
+        </p>
       </div>
 
       {tournament ? (

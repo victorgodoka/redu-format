@@ -5,6 +5,13 @@
 
 export type Structure = "swiss" | "single-elim" | "double-elim";
 
+/** Which platform hosts the duels. Only one exists today; kept as a real field (not an assumption) so a second one can be added later without a schema change. */
+export type Engine = "dueling-nexus";
+
+export const ENGINES: Record<Engine, { label: string }> = {
+  "dueling-nexus": { label: "Dueling Nexus" },
+};
+
 /**
  * Swiss can optionally cut to a bracket afterwards (TournamentEvent.topCut);
  * that used to be its own "mixed" structure, but a top cut is an attribute of
@@ -22,8 +29,12 @@ export type TournamentEvent = {
   /** Size of the elimination bracket after Swiss, null when there is none. */
   topCut: number | null;
   matchFormat: "Bo1" | "Bo3";
-  /** Round timer in minutes, before the end-of-match procedure. */
-  timeLimit: number;
+  /**
+   * How many days a round stays open before it's force-closed - not a per-duel
+   * clock. Players coordinate and duel at their own pace within that window.
+   */
+  roundLimitDays: number;
+  engine: Engine;
   /** null means uncapped registration. */
   seats: number | null;
   taken: number;
@@ -97,11 +108,12 @@ export const events: readonly TournamentEvent[] = [
     rounds: 5,
     topCut: null,
     matchFormat: "Bo3",
-    timeLimit: 40,
+    roundLimitDays: 2,
     seats: 64,
     taken: 41,
     entry: { type: "free" },
     host: "Dueling Nexus",
+    engine: "dueling-nexus",
     signupUrl: "#",
   },
   {
@@ -112,11 +124,12 @@ export const events: readonly TournamentEvent[] = [
     rounds: 6,
     topCut: 8,
     matchFormat: "Bo3",
-    timeLimit: 40,
+    roundLimitDays: 2,
     seats: 128,
     taken: 128,
     entry: { type: "free" },
     host: "REDU Format Discord",
+    engine: "dueling-nexus",
     signupUrl: "#",
   },
   {
@@ -127,11 +140,12 @@ export const events: readonly TournamentEvent[] = [
     rounds: 5,
     topCut: null,
     matchFormat: "Bo3",
-    timeLimit: 45,
+    roundLimitDays: 2,
     seats: 32,
     taken: 19,
     entry: { type: "free" },
     host: "Dueling Nexus",
+    engine: "dueling-nexus",
     signupUrl: "#",
   },
   {
@@ -142,11 +156,12 @@ export const events: readonly TournamentEvent[] = [
     rounds: 8,
     topCut: 8,
     matchFormat: "Bo3",
-    timeLimit: 45,
+    roundLimitDays: 2,
     seats: 256,
     taken: 173,
     entry: { type: "free" },
     host: "REDU Format Discord",
+    engine: "dueling-nexus",
     signupUrl: "#",
   },
   {
@@ -157,11 +172,12 @@ export const events: readonly TournamentEvent[] = [
     rounds: 6,
     topCut: null,
     matchFormat: "Bo3",
-    timeLimit: 40,
+    roundLimitDays: 2,
     seats: 96,
     taken: 58,
     entry: { type: "free" },
     host: "Dueling Nexus",
+    engine: "dueling-nexus",
     signupUrl: "#",
   },
   {
@@ -172,11 +188,12 @@ export const events: readonly TournamentEvent[] = [
     rounds: 4,
     topCut: null,
     matchFormat: "Bo3",
-    timeLimit: 45,
+    roundLimitDays: 2,
     seats: 16,
     taken: 16,
     entry: { type: "free" },
     host: "REDU Format Discord",
+    engine: "dueling-nexus",
     signupUrl: "#",
   },
   {
@@ -187,11 +204,12 @@ export const events: readonly TournamentEvent[] = [
     rounds: 7,
     topCut: null,
     matchFormat: "Bo3",
-    timeLimit: 40,
+    roundLimitDays: 2,
     seats: 64,
     taken: 12,
     entry: { type: "free" },
     host: "Dueling Nexus",
+    engine: "dueling-nexus",
     signupUrl: "#",
   },
   {
@@ -202,11 +220,12 @@ export const events: readonly TournamentEvent[] = [
     rounds: 6,
     topCut: 8,
     matchFormat: "Bo3",
-    timeLimit: 40,
+    roundLimitDays: 2,
     seats: 128,
     taken: 74,
     entry: { type: "free" },
     host: "Dueling Nexus",
+    engine: "dueling-nexus",
     signupUrl: "#",
   },
   {
@@ -217,11 +236,12 @@ export const events: readonly TournamentEvent[] = [
     rounds: 5,
     topCut: null,
     matchFormat: "Bo1",
-    timeLimit: 30,
+    roundLimitDays: 2,
     seats: 32,
     taken: 27,
     entry: { type: "free" },
     host: "REDU Format Discord",
+    engine: "dueling-nexus",
     signupUrl: "#",
   },
   {
@@ -232,11 +252,12 @@ export const events: readonly TournamentEvent[] = [
     rounds: 5,
     topCut: null,
     matchFormat: "Bo3",
-    timeLimit: 40,
+    roundLimitDays: 2,
     seats: 64,
     taken: 33,
     entry: { type: "free" },
     host: "Dueling Nexus",
+    engine: "dueling-nexus",
     signupUrl: "#",
   },
   {
@@ -247,11 +268,12 @@ export const events: readonly TournamentEvent[] = [
     rounds: 7,
     topCut: 4,
     matchFormat: "Bo3",
-    timeLimit: 45,
+    roundLimitDays: 2,
     seats: 128,
     taken: 96,
     entry: { type: "free" },
     host: "REDU Format Discord",
+    engine: "dueling-nexus",
     signupUrl: "#",
   },
   {
@@ -262,11 +284,12 @@ export const events: readonly TournamentEvent[] = [
     rounds: 4,
     topCut: null,
     matchFormat: "Bo3",
-    timeLimit: 45,
+    roundLimitDays: 2,
     seats: 16,
     taken: 9,
     entry: { type: "free" },
     host: "Dueling Nexus",
+    engine: "dueling-nexus",
     signupUrl: "#",
   },
   {
@@ -277,11 +300,12 @@ export const events: readonly TournamentEvent[] = [
     rounds: 5,
     topCut: null,
     matchFormat: "Bo3",
-    timeLimit: 40,
+    roundLimitDays: 2,
     seats: 64,
     taken: 21,
     entry: { type: "free" },
     host: "Dueling Nexus",
+    engine: "dueling-nexus",
     signupUrl: "#",
   },
   {
@@ -292,11 +316,12 @@ export const events: readonly TournamentEvent[] = [
     rounds: 9,
     topCut: 8,
     matchFormat: "Bo3",
-    timeLimit: 50,
+    roundLimitDays: 2,
     seats: 512,
     taken: 288,
     entry: { type: "free" },
     host: "Dueling Nexus",
+    engine: "dueling-nexus",
     signupUrl: "#",
   },
   {
@@ -307,11 +332,12 @@ export const events: readonly TournamentEvent[] = [
     rounds: 5,
     topCut: null,
     matchFormat: "Bo3",
-    timeLimit: 45,
+    roundLimitDays: 2,
     seats: 32,
     taken: 32,
     entry: { type: "free" },
     host: "REDU Format Discord",
+    engine: "dueling-nexus",
     signupUrl: "#",
   },
   {
@@ -322,11 +348,12 @@ export const events: readonly TournamentEvent[] = [
     rounds: 6,
     topCut: null,
     matchFormat: "Bo3",
-    timeLimit: 40,
+    roundLimitDays: 2,
     seats: 96,
     taken: 44,
     entry: { type: "free" },
     host: "REDU Format Discord",
+    engine: "dueling-nexus",
     signupUrl: "#",
   },
   {
@@ -337,11 +364,12 @@ export const events: readonly TournamentEvent[] = [
     rounds: 6,
     topCut: 8,
     matchFormat: "Bo3",
-    timeLimit: 40,
+    roundLimitDays: 2,
     seats: 128,
     taken: 61,
     entry: { type: "free" },
     host: "Dueling Nexus",
+    engine: "dueling-nexus",
     signupUrl: "#",
   },
   {
@@ -352,11 +380,12 @@ export const events: readonly TournamentEvent[] = [
     rounds: 5,
     topCut: null,
     matchFormat: "Bo3",
-    timeLimit: 40,
+    roundLimitDays: 2,
     seats: 64,
     taken: 64,
     entry: { type: "free" },
     host: "Dueling Nexus",
+    engine: "dueling-nexus",
     signupUrl: "#",
   },
   {
@@ -367,11 +396,12 @@ export const events: readonly TournamentEvent[] = [
     rounds: 6,
     topCut: 8,
     matchFormat: "Bo3",
-    timeLimit: 40,
+    roundLimitDays: 2,
     seats: 128,
     taken: 128,
     entry: { type: "free" },
     host: "REDU Format Discord",
+    engine: "dueling-nexus",
     signupUrl: "#",
   },
   {
@@ -382,11 +412,12 @@ export const events: readonly TournamentEvent[] = [
     rounds: 4,
     topCut: null,
     matchFormat: "Bo1",
-    timeLimit: 30,
+    roundLimitDays: 2,
     seats: 16,
     taken: 16,
     entry: { type: "free" },
     host: "Dueling Nexus",
+    engine: "dueling-nexus",
     signupUrl: "#",
   },
   {
@@ -397,11 +428,12 @@ export const events: readonly TournamentEvent[] = [
     rounds: 5,
     topCut: null,
     matchFormat: "Bo3",
-    timeLimit: 40,
+    roundLimitDays: 2,
     seats: 64,
     taken: 57,
     entry: { type: "free" },
     host: "Dueling Nexus",
+    engine: "dueling-nexus",
     signupUrl: "#",
   },
   {
@@ -412,11 +444,12 @@ export const events: readonly TournamentEvent[] = [
     rounds: 5,
     topCut: 4,
     matchFormat: "Bo3",
-    timeLimit: 40,
+    roundLimitDays: 2,
     seats: 64,
     taken: 52,
     entry: { type: "free" },
     host: "REDU Format Discord",
+    engine: "dueling-nexus",
     signupUrl: "#",
   },
 ];
@@ -431,11 +464,12 @@ export const pastEvents: readonly TournamentEvent[] = [
     rounds: 4,
     topCut: null,
     matchFormat: "Bo3",
-    timeLimit: 40,
+    roundLimitDays: 2,
     seats: 64,
     taken: 8,
     entry: { type: "free" },
     host: "Dueling Nexus",
+    engine: "dueling-nexus",
     signupUrl: "#",
   },
   {
@@ -446,11 +480,12 @@ export const pastEvents: readonly TournamentEvent[] = [
     rounds: 5,
     topCut: null,
     matchFormat: "Bo3",
-    timeLimit: 40,
+    roundLimitDays: 2,
     seats: 64,
     taken: 39,
     entry: { type: "free" },
     host: "Dueling Nexus",
+    engine: "dueling-nexus",
     signupUrl: "#",
   },
   {
@@ -461,11 +496,12 @@ export const pastEvents: readonly TournamentEvent[] = [
     rounds: 6,
     topCut: null,
     matchFormat: "Bo3",
-    timeLimit: 40,
+    roundLimitDays: 2,
     seats: 96,
     taken: 88,
     entry: { type: "free" },
     host: "Dueling Nexus",
+    engine: "dueling-nexus",
     signupUrl: "#",
   },
   {
@@ -476,11 +512,12 @@ export const pastEvents: readonly TournamentEvent[] = [
     rounds: 4,
     topCut: null,
     matchFormat: "Bo3",
-    timeLimit: 45,
+    roundLimitDays: 2,
     seats: 32,
     taken: 14,
     entry: { type: "free" },
     host: "REDU Format Discord",
+    engine: "dueling-nexus",
     signupUrl: "#",
   },
   {
@@ -491,11 +528,12 @@ export const pastEvents: readonly TournamentEvent[] = [
     rounds: 6,
     topCut: null,
     matchFormat: "Bo3",
-    timeLimit: 40,
+    roundLimitDays: 2,
     seats: 96,
     taken: 71,
     entry: { type: "free" },
     host: "Dueling Nexus",
+    engine: "dueling-nexus",
     signupUrl: "#",
   },
   {
@@ -506,11 +544,12 @@ export const pastEvents: readonly TournamentEvent[] = [
     rounds: 7,
     topCut: 8,
     matchFormat: "Bo3",
-    timeLimit: 45,
+    roundLimitDays: 2,
     seats: 128,
     taken: 128,
     entry: { type: "free" },
     host: "REDU Format Discord",
+    engine: "dueling-nexus",
     signupUrl: "#",
   },
   {
@@ -521,11 +560,12 @@ export const pastEvents: readonly TournamentEvent[] = [
     rounds: 6,
     topCut: 4,
     matchFormat: "Bo3",
-    timeLimit: 40,
+    roundLimitDays: 2,
     seats: 128,
     taken: 63,
     entry: { type: "free" },
     host: "Dueling Nexus",
+    engine: "dueling-nexus",
     signupUrl: "#",
   },
   {
@@ -536,11 +576,12 @@ export const pastEvents: readonly TournamentEvent[] = [
     rounds: 4,
     topCut: null,
     matchFormat: "Bo1",
-    timeLimit: 30,
+    roundLimitDays: 2,
     seats: 16,
     taken: 16,
     entry: { type: "free" },
     host: "REDU Format Discord",
+    engine: "dueling-nexus",
     signupUrl: "#",
   },
   {
@@ -551,11 +592,12 @@ export const pastEvents: readonly TournamentEvent[] = [
     rounds: 5,
     topCut: null,
     matchFormat: "Bo3",
-    timeLimit: 45,
+    roundLimitDays: 2,
     seats: 32,
     taken: 31,
     entry: { type: "free" },
     host: "Dueling Nexus",
+    engine: "dueling-nexus",
     signupUrl: "#",
   },
   {
@@ -566,11 +608,12 @@ export const pastEvents: readonly TournamentEvent[] = [
     rounds: 9,
     topCut: 8,
     matchFormat: "Bo3",
-    timeLimit: 50,
+    roundLimitDays: 2,
     seats: 256,
     taken: 241,
     entry: { type: "free" },
     host: "REDU Format Discord",
+    engine: "dueling-nexus",
     signupUrl: "#",
   },
 ];
@@ -683,15 +726,4 @@ export function formatDate(iso: string) {
 
 export function formatTime(iso: string) {
   return `${timeFormat.format(new Date(iso))} UTC`;
-}
-
-/**
- * Deterministic mock placement, until there is a backend tracking real match
- * results. Same seed always gives the same standing, so it does not flicker
- * between renders.
- */
-export function mockPlacement(seed: string, of: number): number {
-  let hash = 0;
-  for (let i = 0; i < seed.length; i++) hash = (hash * 31 + seed.charCodeAt(i)) >>> 0;
-  return 1 + (hash % Math.max(1, of));
 }

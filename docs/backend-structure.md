@@ -17,7 +17,11 @@ Hoje o projeto é um site Next.js 16 com App Router, React 19 e TypeScript. A in
 - **Fase 4 (cache de perfil Nexus fora do processo) - concluída.** Tabela `nexus_profile_cache` no mesmo MariaDB, mesma decisão que o rate limit já tinha tomado (seção 0 acima) - sem Redis. `fetchProfile()` em `lib/auth.ts` virou um cache de duas camadas: o `Map` em memória continua como L1 (grátis numa instância já quente), a tabela é L2 (compartilhada entre instâncias). `invalidateProfile()` (usada pelo botão "Refresh") agora é assíncrona e limpa as duas camadas.
 - **Identidade Nexus (seção 14) - decidida.** Testado contra a API real: nenhum campo de ID estável existe (`success, name, contributor, avatar, ranking, deck`). Decisão do dono do produto: `sha256(token)` como `nexus_identity_key`, com reconciliação por `nexus_name` no login/registro/save quando o hash não bate com nenhum player existente - reduz o caso comum de token regenerado sem eliminar o risco por completo (nome também pode mudar). Isso desbloqueou a Fase 3.
 - **Fase 3 (inscrições públicas no banco) - núcleo concluído.** `players` e `saved_tournaments` são tabelas novas; `registrations` ganhou `player_id`/`source`/`deck_id` e o valor `not_required` em `payment_status`. `signups`/`savedTournaments` saíram do cookie `redu_session` de vez - `register()`, `cancel()`, `saveTournamentAction()`, `unsaveTournamentAction()` e as páginas que liam a sessão (`/events`, `/events/[slug]`, `/events/[slug]/signup`, `/dashboard`) leem e escrevem no banco agora. `tournaments.taken` deixou de ser um campo editável e virou `COUNT(*)` real sobre `registrations` (admin manual + inscrição pública juntos) - a coluna física foi dropada (`004_players_and_signups.sql`), não só ignorada. Participantes públicos e manuais já aparecem juntos em `/admin/tournaments/[slug]/participants`, rotulados por origem - isso saiu de graça, o dado já estava unificado desde a Fase 1. **Deferido desta fase**, ver seção 11: `deck_snapshot`/`deck_validation` persistidos (decks continuam revalidados ao vivo contra a Nexus a cada leitura, igual sempre foi), `entry_type_snapshot` como coluna própria (hoje o `payment_status` inicial já é calculado a partir do `entry_type` do momento do registro, só não fica congelado numa coluna separada), lock transacional de capacidade (`SELECT ... FOR UPDATE` - o gate de "sold out" preexistente já não tinha isso, então não é uma regressão nova).
-- Fases 5, 6 ainda não começaram.
+- **Fase 5 (resultados e leaderboard) - núcleo concluído.** Pareamento/resultados/bracket/leaderboard usam a lib `tournament-organizer` (Swiss + top cut de eliminação), não um schema normalizado de rounds/matches próprio - o estado exportado da lib (`Tournament.getValues()`) é persistido como um blob JSON por torneio (`tournament_brackets`), e `tournament_placings` é um read-model derivado, escrito uma vez quando o torneio é finalizado (`completeBracket()`), pra permitir `SUM`/`GROUP BY` real no leaderboard sem reprocessar JSON de cada torneio em JS. Pontuação 3/1/0 (vitória/empate/derrota) + bônus fixo de 5 pontos por partida vencida no top cut. BYE em campo ímpar já é tratado pela própria lib (vitória automática, sem necessidade de report) - coberto por teste (`lib/results.test.ts`).
+- **Fase 5.1 (prazo de round + auto-report) - núcleo concluído.** "Time limit (minutes)" nunca foi um relógio por duelo de verdade - virou `roundLimitDays` (dias, default 2): quanto tempo uma rodada fica aberta antes de ser fechada automaticamente. Jogadores reportam o próprio resultado (`match_reports`); a partida resolve quando os dois lados concordam, e fica "disputed" (sem resolver, bloqueando a próxima rodada) quando batem resultados conflitantes - só um mod resolve, via override no admin (que agora sempre pode mudar/entrar um resultado, mesmo já reportado, usando `clearResult()` da lib antes de reescrever pra não corromper o avanço do bracket de eliminação). Como não há timer persistente em serverless, o fechamento por prazo é um cron da Vercel (`vercel.json` + `/api/cron/round-deadlines`, protegido por `CRON_SECRET`) que varre torneios com bracket aberto; quando só um lado reportou, o report é honrado como está; quando nenhum lado reportou (ou os dois relataram algo que nunca se reconciliou), a simplificação deliberada é o jogador 1 vencer por padrão - decisão documentada no código (`resolveOverdueMatch`), rara na prática, sempre corrigível pelo mod. **Deferido desta fase**: drop de jogador (voluntário ou por 2 rodadas seguidas sem report - depende deste prazo, é o próximo item do backlog), tiebreaker oficial YGO (AABBBCCCDDD), hash de sala Dueling Nexus.
+- **Fase 5.2 (drops de jogador) - núcleo concluído.** Botão "Cancel registration"/"Drop from tournament" agora tem 3 estados de verdade em vez de sempre deletar: torneio não iniciado + grátis/pago-não-confirmado → deleta o registro, pode se inscrever de novo (`dropRegistration()` → `"left"`); não iniciado + pago-confirmado → bloqueado, mensagem pra falar com a Staff (`"blocked"`); torneio já iniciado → `<details>` com o aviso (derrota automática, prejudica tiebreaker de quem continua, sem reembolso se pago) antes de confirmar, e vira uma derrota de verdade no bracket (`dropFromStartedTournament()`, via `assignLoss`+`removePlayer` no Swiss, `removePlayer` sozinho já resolve certo na eliminação). Ausência em 2 rodadas seguidas sem report também dropa sozinho - `registrations.consecutive_absences` conta cada vez que `closeOverdueMatches` fecha uma partida por falta de report daquele jogador, e zera quando ele reporta ou joga a tempo; ao bater 2, o mesmo `removePlayer` roda automaticamente. `registrations.dropped_at` marca a saída pós-início pra exibição (aparece como "(dropped)" nos standings do admin) - o registro em si nunca é apagado depois que o bracket começou, porque ele ainda conta pra tiebreaker de quem ficou.
+- **Fase 5.3 (tiebreaker oficial + hash de sala Dueling Nexus) - núcleo concluído.** Duas features independentes, feitas juntas por serem as duas últimas do backlog de resultados. **Tiebreaker**: a `tournament-organizer` já calculava `oppMatchWinPct`/`oppOppMatchWinPct` internamente (AA/BBB/CCC prontos), mas não o DDD (soma dos quadrados das rodadas perdidas) nem ordenava standings pela fórmula oficial - `officialTiebreakScore()`/`rankByOfficialTiebreak()` em `results.service.ts` computam isso por fora (sem mudança de schema) e substituem a ordem padrão da lib tanto nos standings ao vivo quanto no `completeBracket()`. Detalhe fora do texto original que o dono do produto passou: empate conta como derrota só pra fins de win% dos oponentes (regra oficial), e o win% de cada jogador tem piso de 1/3 - o mesmo ajuste que Magic usa pro OMW%/GWP% quase idêntico, evita que um bye/drop cedo prejudique injustamente quem enfrentou aquele jogador depois. **Hash de sala**: campo novo `tournaments.engine` (enum de um valor só, `dueling-nexus`, propositalmente pronto pra crescer), e o algoritmo de bit-packing/base36 que a equipe da Dueling Nexus passou foi portado pra `lib/backend/services/nexus-room.ts` (testado batendo cada campo decodificado contra a config esperada - Master Rule 2, banlist 10, 240s, 8000 LP, 5 mão inicial, 1 carta/draw). Hash gerado uma vez por partida pareada de verdade (não bye), no mesmo gatilho que já criava o `active_since` do prazo de rodada - por isso vive na mesma tabela (`match_deadlines.room_hash`) em vez de uma tabela nova. Jogador vê o link (`duelingnexus.com/duel/NA-{hash}`) e o histórico de rodadas já jogadas na própria página do evento; admin vê o hash em cada partida no painel do bracket.
+- Fase 6 ainda não começou.
 
 ## 1. Estado Atual Encontrado no Projeto
 
@@ -853,6 +857,7 @@ Backend alvo:
 - Cache de 60s por hash do token. **(feito - duas camadas, memória + `nexus_profile_cache`, ver seção 5)**
 - Nunca logar token.
 - Persistir snapshot do deck no momento da inscricao para que alteracoes futuras no deck da Nexus nao mudem o registro historico do torneio (Fase 3).
+- Geração de sala de duelo. **(feito, Fase 5.3 - `lib/backend/services/nexus-room.ts`, porta do algoritmo de bit-packing/base36 que a Dueling Nexus forneceu, config fixa em Master Rule 2/banlist 10/240s/8000 LP. Hash gerado uma vez por partida pareada, guardado em `match_deadlines.room_hash`, link `duelingnexus.com/duel/NA-{hash}`)**
 
 ### Discord
 
@@ -906,6 +911,7 @@ Adicionadas nesta migracao:
 
 ```env
 DATABASE_URL=mysql://user:pass@host:3306/dbname
+CRON_SECRET=... # Fase 5.1: valida chamadas ao /api/cron/round-deadlines (header Authorization: Bearer). Sem ela configurada, o cron sempre responde 401.
 ```
 
 `db:migrate` e `db:seed` (scripts do `package.json`) e o script de testes (`pnpm test`) leem `.env.local` via `--env-file`. Testes usam um banco isolado por processo, derivado automaticamente de `DATABASE_URL` (ver `lib/backend/db/test-setup.ts`) - não precisa de uma segunda variável de ambiente pra isso.
@@ -1005,18 +1011,32 @@ Resultado alcançado:
 - Perfil Nexus cacheado fora do processo, correto pro modelo serverless multi-instância do Vercel.
 - Pool de conexão do banco dimensionado (`connectionLimit: 3`) pra não estourar `max_connections` com múltiplas instâncias concorrentes cada uma com seu próprio pool.
 
-### Fase 5 - Resultados e leaderboard
+### Fase 5 - Resultados e leaderboard — **núcleo concluído**
 
-1. Criar tabelas de rounds, matches e match players.
-2. Implementar registro de resultado.
-3. Calcular standings por evento.
-4. Substituir `mockPlacement()`.
-5. Substituir `lib/leaderboard.ts` por query real.
+1. ~~Criar tabelas de rounds, matches e match players.~~ **(desviado - ver seção 0: estado do motor `tournament-organizer` persistido como JSON, não schema normalizado)**
+2. Implementar registro de resultado. **(feito - `results.service.ts`, `enterMatchResult`/`submitMatchReport`)**
+3. Calcular standings por evento. **(feito - via `engine.getStandings()`, tiebreaker oficial YGO ainda pendente, ver seção 14)**
+4. Substituir `mockPlacement()`. **(feito - removido de `lib/events.ts`)**
+5. Substituir `lib/leaderboard.ts` por query real. **(feito)**
 
-Resultado esperado:
+Resultado alcançado:
 
 - Eventos passados exibem colocacao real.
 - Leaderboard deixa de ser mock.
+
+### Fase 5.1 - Prazo de round e auto-report — **núcleo concluído**
+
+Ver seção 0 para a descrição completa. Resumo do desvio: nada aqui estava no plano original (motor de torneio ainda nao previa fase de rodada aberta por dias, nem self-report) - foi escopo novo definido junto com o dono do produto.
+
+1. Renomear/reinterpretar `timeLimit` (minutos) para `roundLimitDays` (dias, default 2). **(feito - migration `007_round_deadlines_and_self_report.sql`)**
+2. Self-report de resultado por jogador, com reconciliação automática e estado "disputed". **(feito - `match_reports`)**
+3. Override do admin sempre disponível enquanto o torneio não estiver completo, mesmo sobre partida já resolvida. **(feito - `clearResult()` antes de reescrever)**
+4. Fechamento automático de rodada por prazo (cron). **(feito - `match_deadlines` + `/api/cron/round-deadlines`)**
+
+Resultado alcançado:
+
+- Torneio não fica travado esperando alguém puxar a rodada manualmente além do prazo combinado.
+- Divergência de report vira um estado visível e acionável pro admin, não um resultado silenciosamente errado.
 
 ### Fase 6 - Storage opcional
 
@@ -1148,7 +1168,11 @@ O formulario usa numero decimal. Banco deve armazenar inteiro em unidade menor (
 
 ### Motor de torneio
 
-Swiss, top cut e double elimination podem ficar complexos. Isolar isso em service proprio e preferir biblioteca confiavel quando possivel.
+Swiss, top cut e double elimination podem ficar complexos. Isolar isso em service proprio e preferir biblioteca confiavel quando possivel. **(feito - `tournament-organizer`, ver seção 0/Fase 5)**
+
+### Tiebreaker oficial YGO (feito, Fase 5.3)
+
+`engine.getStandings()` da `tournament-organizer` já calcula `matchWinPct`/`oppMatchWinPct`/`oppOppMatchWinPct` internamente (as parcelas AA/BBB/CCC do formato oficial `AABBBCCCDDD`), mas não expunha a soma dos quadrados das rodadas perdidas (DDD) nem ordenava standings por essa fórmula exata - usava sua própria lista de tiebreaks (`median buchholz` por padrão). `officialTiebreakScore()`/`rankByOfficialTiebreak()` em `results.service.ts` computam isso por fora e substituem a ordenação, tanto nos standings ao vivo quanto em `tournament_placings` (`completeBracket()`). Sem mudança de schema.
 
 ### Timezone do servidor de banco (novo, descoberto na Fase 1.5)
 

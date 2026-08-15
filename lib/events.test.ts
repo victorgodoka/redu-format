@@ -6,7 +6,6 @@ import {
   fillRatio,
   formatEntry,
   isPast,
-  mockPlacement,
   PAGE_SIZE,
   queryEvents,
   recommendedTopCut,
@@ -158,14 +157,6 @@ test("open, almost and sold out never double count", () => {
   assert.ok(q("almost") <= q("open"));
 });
 
-test("mockPlacement is stable and stays within the field", () => {
-  const seed = "wind-up-cup-x:Godoka";
-  const first = mockPlacement(seed, 64);
-  assert.equal(mockPlacement(seed, 64), first, "same seed, same result");
-  assert.ok(first >= 1 && first <= 64, "placement must be within the field");
-  assert.equal(mockPlacement(seed, 0), 1, "an empty field never divides by zero");
-});
-
 test("uncapped events are never sold out or almost full", () => {
   const event: TournamentEvent = {
     slug: "open-invite",
@@ -175,7 +166,8 @@ test("uncapped events are never sold out or almost full", () => {
     rounds: 5,
     topCut: null,
     matchFormat: "Bo3",
-    timeLimit: 40,
+    roundLimitDays: 2,
+    engine: "dueling-nexus",
     seats: null,
     taken: 5000,
     entry: { type: "free" },
