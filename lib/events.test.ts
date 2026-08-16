@@ -5,6 +5,7 @@ import {
   allEvents as events,
   fillRatio,
   formatEntry,
+  isFinished,
   isPast,
   PAGE_SIZE,
   queryEvents,
@@ -49,6 +50,31 @@ test("upcoming sorts soonest first, past sorts most recent first", () => {
 
   assert.deepEqual(times(upcoming), [...times(upcoming)].sort((a, b) => a - b));
   assert.deepEqual(times(past), [...times(past)].sort((a, b) => b - a));
+});
+
+test("isPast: a bracket started ahead of its advertised time is no longer upcoming", () => {
+  const scheduledForTomorrow: TournamentEvent = {
+    ...events[0],
+    startsAt: new Date(NOW.getTime() + 24 * 60 * 60 * 1000).toISOString(),
+    startedAt: new Date(NOW.getTime() - 60 * 1000).toISOString(), // started a minute ago
+  };
+
+  assert.equal(isPast(scheduledForTomorrow, NOW), true);
+  assert.ok(!queryEvents([scheduledForTomorrow], { when: "upcoming" }, NOW).items.length);
+  assert.equal(queryEvents([scheduledForTomorrow], { when: "past" }, NOW).items.length, 1);
+});
+
+test("isFinished: in-progress (started, not finished) is distinct from finished", () => {
+  const inProgress: TournamentEvent = {
+    ...events[0],
+    startedAt: new Date(NOW.getTime() - 60 * 1000).toISOString(),
+    finishedAt: null,
+  };
+  const finished: TournamentEvent = { ...inProgress, finishedAt: NOW.toISOString() };
+
+  assert.equal(isPast(inProgress, NOW), true, "in progress is no longer upcoming");
+  assert.equal(isFinished(inProgress), false, "but it isn't finished yet");
+  assert.equal(isFinished(finished), true);
 });
 
 test("seat filters split on availability", () => {

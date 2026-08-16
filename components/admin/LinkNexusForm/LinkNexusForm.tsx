@@ -1,7 +1,8 @@
 "use client";
 
 import { useActionState } from "react";
-import { linkNexusToken, type LinkNexusState } from "./actions";
+import Button from "@/components/ui/Button";
+import { linkNexusToken, type LinkNexusState } from "@/app/admin/(protected)/dashboard/actions";
 
 const initial: LinkNexusState = {};
 
@@ -30,9 +31,9 @@ export default function LinkNexusForm() {
           {state.error}
         </p>
       ) : null}
-      <button className="btn btn--solid" type="submit" disabled={pending}>
-        {pending ? "Checking..." : "Link account"}
-      </button>
+      <Button variant="solid" type="submit" pending={pending} pendingLabel="Checking...">
+        Link account
+      </Button>
     </form>
   );
 }

@@ -1,7 +1,11 @@
 "use client";
 
 import { useActionState } from "react";
-import { startBracketAction, type BracketFormState } from "./actions";
+import Button from "@/components/ui/Button";
+import {
+  startBracketAction,
+  type BracketFormState,
+} from "@/app/admin/(protected)/tournaments/[slug]/bracket/actions";
 
 const initial: BracketFormState = {};
 
@@ -16,9 +20,9 @@ export default function StartBracketForm({ slug }: { slug: string }) {
           {state.error}
         </p>
       ) : null}
-      <button className="btn btn--solid" type="submit" disabled={pending}>
-        {pending ? "Starting..." : "Start bracket"}
-      </button>
+      <Button variant="solid" type="submit" pending={pending} pendingLabel="Starting...">
+        Start bracket
+      </Button>
     </form>
   );
 }

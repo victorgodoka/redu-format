@@ -10,6 +10,7 @@ import {
   formatDate,
   formatEntry,
   formatTime,
+  isFinished,
   isPast,
   pastEvents,
   queryEvents,
@@ -225,6 +226,7 @@ export default async function EventsPage({
                 const left = seatsLeft(event);
                 const full = left === 0;
                 const past = isPast(event, now);
+                const finished = isFinished(event);
                 const almost = !full && fillRatio(event) >= ALMOST_FULL;
 
                 return (
@@ -239,8 +241,10 @@ export default async function EventsPage({
                       <span className="event__time">
                         {formatTime(event.startsAt)}
                       </span>
-                      {past ? (
+                      {finished ? (
                         <span className="event__done">Finished</span>
+                      ) : past ? (
+                        <span className="event__done">In progress</span>
                       ) : null}
                     </div>
 
@@ -263,7 +267,7 @@ export default async function EventsPage({
                     </div>
 
                     <div className="event__signup">
-                      {/* A finished event has an attendance, not seats left. */}
+                      {/* Once registration is closed there's an attendance, not seats left. */}
                       {past ? (
                         <span className="event__seats">
                           {event.seats === null
@@ -288,7 +292,7 @@ export default async function EventsPage({
                         </span>
                       )}
 
-                      {past ? (
+                      {finished ? (
                         <Link
                           className="btn btn--quiet"
                           href={`/events/${event.slug}`}
@@ -302,6 +306,10 @@ export default async function EventsPage({
                         >
                           You are in
                         </Link>
+                      ) : past ? (
+                        <span className="btn btn--quiet" aria-disabled="true">
+                          Registration closed
+                        </span>
                       ) : full ? (
                         <span className="btn btn--quiet" aria-disabled="true">
                           Sold out

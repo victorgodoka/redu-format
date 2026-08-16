@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
+import styles from "./AdminNav.module.css";
 
 const LINKS = [
   { href: "/admin/dashboard", label: "Dashboard" },
@@ -24,26 +25,26 @@ export default function AdminNav({
     <>
       <button
         type="button"
-        className="admin-nav__toggle"
+        className={styles.toggle}
         aria-expanded={open}
         aria-controls="admin-nav-panel"
         aria-label="Toggle admin menu"
         onClick={() => setOpen((v) => !v)}
       >
-        <span className="admin-nav__toggle-bar" />
-        <span className="admin-nav__toggle-bar" />
-        <span className="admin-nav__toggle-bar" />
+        <span className={styles.toggleBar} />
+        <span className={styles.toggleBar} />
+        <span className={styles.toggleBar} />
       </button>
 
-      <div className="admin-nav__panel" id="admin-nav-panel" data-open={open}>
-        <nav className="admin-nav__links" aria-label="Admin sections">
+      <div className={styles.panel} id="admin-nav-panel" data-open={open}>
+        <nav className={styles.links} aria-label="Admin sections">
           {LINKS.map(({ href, label }) => {
             const active = pathname === href || pathname.startsWith(`${href}/`);
             return (
               <Link
                 key={href}
                 href={href}
-                className="admin-nav__link"
+                className={styles.link}
                 aria-current={active ? "page" : undefined}
                 onClick={() => setOpen(false)}
               >
@@ -53,11 +54,11 @@ export default function AdminNav({
           })}
         </nav>
 
-        <div className="admin-nav__identity">
-          <p className="admin-nav__name">{displayName}</p>
-          <p className="admin-nav__handle">@{username}</p>
+        <div className={styles.identity}>
+          <p className={styles.name}>{displayName}</p>
+          <p className={styles.handle}>@{username}</p>
           <form action="/admin/logout" method="post">
-            <button className="admin-nav__signout" type="submit">
+            <button className={styles.signOut} type="submit">
               Sign out
             </button>
           </form>

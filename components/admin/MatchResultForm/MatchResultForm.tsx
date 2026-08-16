@@ -1,7 +1,11 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import { enterResultAction } from "./actions";
+import Button from "@/components/ui/Button";
+import FormGroup from "@/components/ui/FormGroup";
+import Label from "@/components/ui/Label";
+import Select from "@/components/ui/Select";
+import { enterResultAction } from "@/app/admin/(protected)/tournaments/[slug]/bracket/actions";
 
 type Result = "1" | "0" | "draw";
 type PlayerOption = { name: string; defaultValue: Result };
@@ -56,11 +60,11 @@ export default function MatchResultForm({
     >
       <input type="hidden" name="slug" value={slug} />
       <input type="hidden" name="matchId" value={matchId} />
-      <div className="form__group">
+      <FormGroup>
         <div className="form__field">
-          <label>
+          <Label>
             {player1.name}
-            <select
+            <Select
               name="player1Wins"
               value={p1Result}
               onChange={(e) => setP1Result(e.target.value as Result)}
@@ -70,13 +74,13 @@ export default function MatchResultForm({
               <option value="1">Win</option>
               <option value="draw">Draw</option>
               <option value="0">Loss</option>
-            </select>
-          </label>
+            </Select>
+          </Label>
         </div>
         <div className="form__field">
-          <label>
+          <Label>
             {player2.name}
-            <select
+            <Select
               name="player2Wins"
               value={p2Result}
               onChange={(e) => setP2Result(e.target.value as Result)}
@@ -86,18 +90,18 @@ export default function MatchResultForm({
               <option value="1">Win</option>
               <option value="draw">Draw</option>
               <option value="0">Loss</option>
-            </select>
-          </label>
+            </Select>
+          </Label>
         </div>
 
-        <button
-          className="btn btn--solid"
+        <Button
+          variant="solid"
           type={editing ? "submit" : "button"}
           onClick={editing ? undefined : () => setEditing(true)}
         >
           {editing ? "Report" : "Change result"}
-        </button>
-      </div>
+        </Button>
+      </FormGroup>
       {error ? (
         <p role="alert" className="form__error">
           {error}

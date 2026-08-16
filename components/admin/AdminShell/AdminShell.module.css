@@ -1,0 +1,53 @@
+.shell {
+  display: flex;
+  align-items: stretch;
+  min-height: 100dvh;
+}
+
+.rail {
+  flex: 0 0 216px;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  position: sticky;
+  top: 0;
+  height: 100dvh;
+  overflow-y: auto;
+  padding: 28px 20px;
+  border-right: 1px solid var(--c-line-soft);
+  background: var(--c-raise);
+}
+
+.brand {
+  font-family: var(--f-mono);
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--c-accent);
+}
+
+.main {
+  flex: 1;
+  min-width: 0;
+}
+
+.content {
+  padding-block: clamp(28px, 4vw, 48px);
+}
+
+@media (max-width: 860px) {
+  .shell {
+    flex-direction: column;
+  }
+
+  .rail {
+    position: relative;
+    height: auto;
+    flex-direction: row;
+    align-items: center;
+    gap: 16px;
+    border-right: 0;
+    flex: 0;
+    border-bottom: 1px solid var(--c-line-soft);
+  }
+}

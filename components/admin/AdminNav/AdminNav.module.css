@@ -1,0 +1,125 @@
+.toggle {
+  display: none;
+}
+
+.panel {
+  display: contents;
+}
+
+.links {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.link {
+  padding: 10px 12px;
+  border-radius: 4px;
+  font-family: var(--f-mono);
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--c-muted);
+  transition:
+    color 150ms ease,
+    background 150ms ease;
+}
+
+.link:hover {
+  color: var(--c-text);
+  background: var(--c-line-soft);
+}
+
+.link[aria-current="page"] {
+  background: color-mix(in srgb, var(--c-accent) 12%, transparent);
+  color: var(--c-accent);
+}
+
+.identity {
+  display: grid;
+  gap: 4px;
+  margin-top: auto;
+  padding-top: 20px;
+  border-top: 1px solid var(--c-line-soft);
+}
+
+.name {
+  font-size: 13px;
+  color: var(--c-text);
+}
+
+.handle {
+  font-family: var(--f-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: var(--c-muted);
+}
+
+.signOut {
+  justify-self: start;
+  margin-top: 8px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-family: var(--f-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--c-accent);
+  cursor: pointer;
+}
+
+.signOut:hover {
+  color: var(--c-accent-hi);
+}
+
+.toggleBar {
+  width: 16px;
+  height: 2px;
+  margin-inline: auto;
+  background: var(--c-text);
+}
+
+@media (max-width: 860px) {
+  .toggle {
+    display: inline-flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 4px;
+    width: 34px;
+    height: 34px;
+    margin-inline-start: auto;
+    padding: 0;
+    border: 1px solid var(--c-line);
+    border-radius: 4px;
+    background: transparent;
+    cursor: pointer;
+  }
+
+  .panel {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    flex-direction: column;
+    gap: 20px;
+    padding: 20px;
+    border-bottom: 1px solid var(--c-line-soft);
+    background: var(--c-raise);
+  }
+
+  .panel[data-open="true"] {
+    display: flex;
+  }
+
+  .links {
+    flex-direction: column;
+  }
+
+  .identity {
+    margin-top: 0;
+    padding-top: 20px;
+    border-top: 1px solid var(--c-line-soft);
+  }
+}

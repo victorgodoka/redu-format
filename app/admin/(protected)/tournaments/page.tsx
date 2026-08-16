@@ -1,8 +1,11 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import AdminPageHead from "@/components/admin/AdminPageHead";
+import DeleteButton from "@/components/admin/DeleteButton";
+import TournamentList from "@/components/admin/TournamentList";
+import Button from "@/components/ui/Button";
+import EmptyState from "@/components/ui/EmptyState";
 import { formatDate, formatTime, STRUCTURES } from "@/lib/events";
 import { listTournaments } from "@/lib/tournaments";
-import DeleteButton from "../delete-button";
 import { deleteTournamentAction } from "./actions";
 
 export const metadata: Metadata = {
@@ -15,51 +18,42 @@ export default async function AdminTournamentsPage() {
 
   return (
     <>
-      <div className="admin-page-head">
-        <h1 className="admin-heading">Tournaments</h1>
-        <Link className="btn btn--solid" href="/admin/tournaments/new">
-          New tournament
-        </Link>
-      </div>
+      <AdminPageHead
+        title="Tournaments"
+        action={
+          <Button variant="solid" href="/admin/tournaments/new">
+            New tournament
+          </Button>
+        }
+      />
 
       {tournaments.length === 0 ? (
-        <div className="empty panel">
-          <p className="lede">No tournaments yet. Create the first one.</p>
-          <Link className="btn" href="/admin/tournaments/new">
-            New tournament
-          </Link>
-        </div>
+        <EmptyState
+          message="No tournaments yet. Create the first one."
+          action={<Button href="/admin/tournaments/new">New tournament</Button>}
+        />
       ) : (
-        <ul className="admin-list">
-          {tournaments.map((t) => (
-            <li className="admin-row panel" key={t.slug}>
-              <div className="admin-row__main">
-                <span className="admin-row__title">{t.name}</span>
-                <span className="admin-row__meta">
-                  {formatDate(t.startsAt)} · {formatTime(t.startsAt)} ·{" "}
-                  {STRUCTURES[t.structure].label} · {t.taken}/
-                  {t.seats === null ? "unlimited" : t.seats} seats
-                </span>
-              </div>
-              <div className="admin-row__actions">
-                <Link className="btn" href={`/admin/tournaments/${t.slug}`}>
-                  Edit
-                </Link>
-                <Link className="btn" href={`/admin/tournaments/${t.slug}/participants`}>
-                  Participants
-                </Link>
-                <Link className="btn" href={`/admin/tournaments/new?copyFrom=${t.slug}`}>
-                  Copy
-                </Link>
-                <DeleteButton
-                  action={deleteTournamentAction}
-                  hidden={{ slug: t.slug }}
-                  confirmText={`Delete ${t.name}? This cannot be undone.`}
-                />
-              </div>
-            </li>
-          ))}
-        </ul>
+        <TournamentList
+          tournaments={tournaments}
+          meta={(t) => (
+            <>
+              {formatDate(t.startsAt)} · {formatTime(t.startsAt)} · {STRUCTURES[t.structure].label} ·{" "}
+              {t.taken}/{t.seats === null ? "unlimited" : t.seats} seats
+            </>
+          )}
+          actions={(t) => (
+            <>
+              <Button href={`/admin/tournaments/${t.slug}`}>Edit</Button>
+              <Button href={`/admin/tournaments/${t.slug}/participants`}>Participants</Button>
+              <Button href={`/admin/tournaments/new?copyFrom=${t.slug}`}>Copy</Button>
+              <DeleteButton
+                action={deleteTournamentAction}
+                hidden={{ slug: t.slug }}
+                confirmText={`Delete ${t.name}? This cannot be undone.`}
+              />
+            </>
+          )}
+        />
       )}
     </>
   );

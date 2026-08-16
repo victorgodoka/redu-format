@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import AdminPageHead from "@/components/admin/AdminPageHead";
+import TournamentForm from "@/components/admin/TournamentForm";
 import { getAdminSession } from "@/lib/auth/session";
 import { getTournament } from "@/lib/tournaments";
 import { createTournamentAction } from "../actions";
-import TournamentForm from "../tournament-form";
 
 export const metadata: Metadata = {
   title: "New tournament | REDU Format",
@@ -20,14 +20,10 @@ export default async function NewTournamentPage({
 
   return (
     <>
-      <div className="admin-page-head">
-        <h1 className="admin-heading">
-          {copySource ? `Copy of ${copySource.name}` : "New tournament"}
-        </h1>
-        <Link className="admin-back" href="/admin/tournaments">
-          ← Back to tournaments
-        </Link>
-      </div>
+      <AdminPageHead
+        title={copySource ? `Copy of ${copySource.name}` : "New tournament"}
+        back={{ href: "/admin/tournaments", label: "← Back to tournaments" }}
+      />
 
       <TournamentForm
         isEditing={false}

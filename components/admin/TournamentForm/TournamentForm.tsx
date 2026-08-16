@@ -1,6 +1,12 @@
 "use client";
 
 import { useActionState, useState, useSyncExternalStore } from "react";
+import Button from "@/components/ui/Button";
+import FormField from "@/components/ui/FormField";
+import FormGroup from "@/components/ui/FormGroup";
+import Input from "@/components/ui/Input";
+import Label from "@/components/ui/Label";
+import Select from "@/components/ui/Select";
 import {
   ENGINES,
   recommendedTopCut,
@@ -10,7 +16,7 @@ import {
   type Structure,
 } from "@/lib/events";
 import type { TournamentEvent } from "@/lib/tournaments";
-import type { TournamentFormState } from "./actions";
+import type { TournamentFormState } from "@/app/admin/(protected)/tournaments/actions";
 
 const MATCH_FORMATS = ["Bo1", "Bo3"] as const;
 
@@ -109,7 +115,7 @@ export default function TournamentForm({
   tournament?: TournamentEvent;
   /** Display name (fallback username) of the admin creating a new tournament - unused when editing, since the field already has a real value. */
   defaultHost?: string;
-  isEditing?: boolean
+  isEditing?: boolean;
 }) {
   const [state, formAction, pending] = useActionState(action, initial);
 
@@ -174,47 +180,33 @@ export default function TournamentForm({
         <input type="hidden" name="slug" value={tournament.slug} />
       ) : null}
 
-      <div className="form__field form__field--full">
-        <label htmlFor="name">Name</label>
-        <input
-          id="name"
-          name="name"
-          type="text"
-          defaultValue={tournament?.name}
-          required
-        />
-      </div>
+      <FormField label="Name" htmlFor="name" full>
+        <Input id="name" name="name" type="text" defaultValue={tournament?.name} required />
+      </FormField>
 
-      <div className="form__field">
-        <label htmlFor="startsAtDate">Starts on</label>
-        <input
+      <FormField label="Starts on" htmlFor="startsAtDate">
+        <Input
           id="startsAtDate"
           name="startsAtDate"
           type="date"
-          defaultValue={
-            tournament ? toLocalDate(tournament.startsAt) : undefined
-          }
+          defaultValue={tournament ? toLocalDate(tournament.startsAt) : undefined}
           required
         />
-      </div>
+      </FormField>
 
-      <div className="form__group">
-        <div className="form__field">
-          <label htmlFor="startsAtTime">Starts at</label>
-          <input
+      <FormGroup>
+        <FormField label="Starts at" htmlFor="startsAtTime">
+          <Input
             id="startsAtTime"
             name="startsAtTime"
             type="time"
-            defaultValue={
-              tournament ? toLocalTime(tournament.startsAt) : undefined
-            }
+            defaultValue={tournament ? toLocalTime(tournament.startsAt) : undefined}
             required
           />
-        </div>
+        </FormField>
 
-        <div className="form__field">
-          <label htmlFor="timezone">Timezone</label>
-          <select
+        <FormField label="Timezone" htmlFor="timezone">
+          <Select
             id="timezone"
             name="timezone"
             value={timezone}
@@ -228,13 +220,13 @@ export default function TournamentForm({
                 {tz}
               </option>
             ))}
-          </select>
-        </div>
-      </div>
+          </Select>
+        </FormField>
+      </FormGroup>
 
       <div className="form__field">
         <label htmlFor="structure">Structure</label>
-        <select
+        <Select
           id="structure"
           name="structure"
           value={structure}
@@ -245,10 +237,10 @@ export default function TournamentForm({
               {STRUCTURES[value].label}
             </option>
           ))}
-        </select>
+        </Select>
         {showTopCut ? (
           <div className="form__field">
-            <label className="topcut__toggle">
+            <Label className="topcut__toggle">
               <input
                 type="checkbox"
                 name="hasTopCut"
@@ -265,31 +257,24 @@ export default function TournamentForm({
                       : ""}
                 </p>
               ) : null}
-            </label>
+            </Label>
           </div>
         ) : null}
       </div>
 
-      <div className="form__field">
-        <label htmlFor="seats">Seats</label>
-        <select
-          id="seats"
-          name="seats"
-          value={seats}
-          onChange={(e) => setSeats(e.target.value)}
-        >
+      <FormField label="Seats" htmlFor="seats">
+        <Select id="seats" name="seats" value={seats} onChange={(e) => setSeats(e.target.value)}>
           <option value="unlimited">Unlimited</option>
           {SEAT_OPTIONS.map((n) => (
             <option disabled={(tournament?.taken || 0) > n} key={n} value={n}>
               {n}
             </option>
           ))}
-        </select>
-      </div>
+        </Select>
+      </FormField>
 
-      <div className="form__field">
-        <label htmlFor="rounds">Rounds</label>
-        <input
+      <FormField label="Rounds" htmlFor="rounds">
+        <Input
           id="rounds"
           name="rounds"
           type="number"
@@ -297,51 +282,40 @@ export default function TournamentForm({
           defaultValue={tournament?.rounds ?? 5}
           required
         />
-      </div>
+      </FormField>
 
-      <div className="form__field">
-        <label htmlFor="matchFormat">Match format</label>
-        {
-          isEditing && tournament
-          ? <input
+      <FormField label="Match format" htmlFor="matchFormat">
+        {isEditing && tournament ? (
+          <Input
             id="matchFormat"
             name="matchFormat"
             defaultValue={tournament.matchFormat}
             readOnly
             required
           />
-          : <select
-          id="matchFormat"
-          name="matchFormat"
-          defaultValue={tournament?.matchFormat ?? "Bo3"}
-        >
-          {MATCH_FORMATS.map((m) => (
-            <option key={m} value={m}>
-              {m}
-            </option>
-          ))}
-        </select>
-        }
-      </div>
+        ) : (
+          <Select id="matchFormat" name="matchFormat" defaultValue={tournament?.matchFormat ?? "Bo3"}>
+            {MATCH_FORMATS.map((m) => (
+              <option key={m} value={m}>
+                {m}
+              </option>
+            ))}
+          </Select>
+        )}
+      </FormField>
 
-      <div className="form__field">
-        <label htmlFor="engine">Engine</label>
-        <select
-          id="engine"
-          name="engine"
-          defaultValue={tournament?.engine ?? "dueling-nexus"}
-        >
+      <FormField label="Engine" htmlFor="engine">
+        <Select id="engine" name="engine" defaultValue={tournament?.engine ?? "dueling-nexus"}>
           {(Object.keys(ENGINES) as Engine[]).map((value) => (
             <option key={value} value={value}>
               {ENGINES[value].label}
             </option>
           ))}
-        </select>
-      </div>
+        </Select>
+      </FormField>
 
-      <div className="form__field">
-        <label htmlFor="roundLimitDays">Round deadline (days)</label>
-        <input
+      <FormField label="Round deadline (days)" htmlFor="roundLimitDays">
+        <Input
           id="roundLimitDays"
           name="roundLimitDays"
           type="number"
@@ -349,39 +323,31 @@ export default function TournamentForm({
           defaultValue={tournament?.roundLimitDays ?? 2}
           required
         />
-      </div>
+      </FormField>
 
-      <div className="form__field">
-        <label htmlFor="entryType">Entry</label>
-        {isEditing && tournament
-        ? <input
-          id="entryType"
-          name="entryType"
-          readOnly
-          defaultValue={tournament.entry.type}
-          required
-        />
-        : <select
-          id="entryType"
-          name="entryType"
-          value={entryType}
-          onChange={(e) => setEntryType(e.target.value as "free" | "paid")}
-        >
-          <option value="free">Free</option>
-          <option value="paid">Paid</option>
-        </select>
-}
-      </div>
+      <FormField label="Entry" htmlFor="entryType">
+        {isEditing && tournament ? (
+          <Input id="entryType" name="entryType" readOnly defaultValue={tournament.entry.type} required />
+        ) : (
+          <Select
+            id="entryType"
+            name="entryType"
+            value={entryType}
+            onChange={(e) => setEntryType(e.target.value as "free" | "paid")}
+          >
+            <option value="free">Free</option>
+            <option value="paid">Paid</option>
+          </Select>
+        )}
+      </FormField>
 
       {entryType === "paid" ? (
-        <>
+        <FormGroup>
           <div className="form__field">
             <label htmlFor="entryAmount">Amount</label>
             <div className="input-affix">
-              <span className="input-affix__symbol">
-                {currencySymbol(currency)}
-              </span>
-              <input
+              <span className="input-affix__symbol">{currencySymbol(currency)}</span>
+              <Input
                 id="entryAmount"
                 type="text"
                 inputMode="decimal"
@@ -397,9 +363,8 @@ export default function TournamentForm({
           </div>
 
           {!isEditing ? (
-            <div className="form__field form__field--compact">
-              <label htmlFor="entryCurrency">Currency</label>
-              <select
+            <FormField label="Currency" htmlFor="entryCurrency">
+              <Select
                 id="entryCurrency"
                 name="entryCurrency"
                 value={currency}
@@ -410,30 +375,22 @@ export default function TournamentForm({
                     {c}
                   </option>
                 ))}
-              </select>
-            </div>
+              </Select>
+            </FormField>
           ) : (
             <input type="hidden" name="entryCurrency" value={currency} />
           )}
-        </>
+        </FormGroup>
       ) : null}
 
       {isEditing && tournament ? (
-        <div className="form__field">
-          <label>Seats taken</label>
-          <input
-            id="seatsTaken"
-            name="seatsTaken"
-            type="number"
-            disabled
-            defaultValue={tournament.taken}
-          />
-        </div>
+        <FormField label="Seats taken" htmlFor="seatsTaken">
+          <Input id="seatsTaken" name="seatsTaken" type="number" disabled defaultValue={tournament.taken} />
+        </FormField>
       ) : null}
 
-      <div className="form__field">
-        <label htmlFor="host">Host</label>
-        <input
+      <FormField label="Host" htmlFor="host">
+        <Input
           id="host"
           name="host"
           type="text"
@@ -441,18 +398,17 @@ export default function TournamentForm({
           readOnly={isEditing}
           placeholder="Dueling Nexus"
         />
-      </div>
+      </FormField>
 
-      <div className="form__field">
-        <label htmlFor="signupUrl">Signup URL</label>
-        <input
+      <FormField label="Signup URL" htmlFor="signupUrl">
+        <Input
           id="signupUrl"
           name="signupUrl"
           type="text"
           defaultValue={tournament?.signupUrl}
           placeholder="Defaults to the tournament name, slugified"
         />
-      </div>
+      </FormField>
 
       {state.error ? (
         <p role="alert" className="form__error">
@@ -460,15 +416,14 @@ export default function TournamentForm({
         </p>
       ) : null}
 
-      <button className="btn btn--solid" type="submit" disabled={pending}>
-        {isEditing
-          ? pending
-            ? "Saving..."
-            : "Save changes"
-          : pending
-            ? "Creating..."
-            : "Create tournament"}
-      </button>
+      <Button
+        variant="solid"
+        type="submit"
+        pending={pending}
+        pendingLabel={isEditing ? "Saving..." : "Creating..."}
+      >
+        {isEditing ? "Save changes" : "Create tournament"}
+      </Button>
     </form>
   );
 }

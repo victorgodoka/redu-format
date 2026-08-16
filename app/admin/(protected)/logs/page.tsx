@@ -1,5 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import AdminPageHead from "@/components/admin/AdminPageHead";
+import LogTable from "@/components/admin/LogTable";
+import type { BadgeTone } from "@/components/ui/Badge";
+import Button from "@/components/ui/Button";
+import EmptyState from "@/components/ui/EmptyState";
+import Input from "@/components/ui/Input";
+import Label from "@/components/ui/Label";
+import Pager from "@/components/ui/Pager";
+import Select from "@/components/ui/Select";
 import {
   ADMIN_ACTIONS,
   listAuditActors,
@@ -18,9 +27,7 @@ export const metadata: Metadata = {
  * Colours the raw action key by what it did, not by which resource it
  * touched. "unlink" is checked before "link": it ends with "link" too.
  */
-function actionTone(
-  action: AdminAction,
-): "positive" | "neutral" | "negative" | "muted" {
+function actionTone(action: AdminAction): BadgeTone {
   if (action === "payment.confirm") return "positive";
   if (action === "payment.contest") return "negative";
   if (
@@ -77,40 +84,38 @@ export default async function AdminLogsPage({
 
   return (
     <>
-      <div className="admin-page-head">
-        <h1 className="admin-heading">Admin logs</h1>
-      </div>
+      <AdminPageHead title="Admin logs" />
 
       {/* GET form: filters live in the URL, so results are shareable and
           the page works with JavaScript disabled. */}
       <form className="filters panel" method="get">
         <div className="filters__field">
-          <label htmlFor="actor">Actor</label>
-          <select id="actor" name="actor" defaultValue={query.actor ?? ""}>
+          <Label htmlFor="actor">Actor</Label>
+          <Select id="actor" name="actor" defaultValue={query.actor ?? ""}>
             <option value="">All actors</option>
             {actors.map((a) => (
               <option key={a.id} value={a.id}>
                 {a.displayName} (@{a.username})
               </option>
             ))}
-          </select>
+          </Select>
         </div>
 
         <div className="filters__field">
-          <label htmlFor="action">Action</label>
-          <select id="action" name="action" defaultValue={query.action ?? ""}>
+          <Label htmlFor="action">Action</Label>
+          <Select id="action" name="action" defaultValue={query.action ?? ""}>
             <option value="">All actions</option>
             {ADMIN_ACTIONS.map((a) => (
               <option key={a} value={a}>
                 {a}
               </option>
             ))}
-          </select>
+          </Select>
         </div>
 
         <div className="filters__field">
-          <label htmlFor="target">Target</label>
-          <input
+          <Label htmlFor="target">Target</Label>
+          <Input
             id="target"
             name="target"
             type="text"
@@ -120,9 +125,9 @@ export default async function AdminLogsPage({
         </div>
 
         <div className="filters__actions">
-          <button className="btn btn--solid" type="submit">
+          <Button variant="solid" type="submit">
             Apply
-          </button>
+          </Button>
           <Link className="filters__reset" href="/admin/logs">
             Reset
           </Link>
@@ -136,83 +141,24 @@ export default async function AdminLogsPage({
       </p>
 
       {items.length === 0 ? (
-        <div className="empty panel">
-          <p className="lede">No admin actions recorded yet.</p>
-        </div>
+        <EmptyState message="No admin actions recorded yet." />
       ) : (
-        <div className="log panel">
-          <div className="log__line log__line--head">
-            <span>Time / Action</span>
-            <span>Actor</span>
-            <span>Target</span>
-            <span>Detail</span>
-          </div>
-          {items.map((entry) => {
-            const tone = actionTone(entry.action);
-            return (
-              <div className="log__line" key={entry.id}>
-                <div className="log__group">
-                  <span className="log__time">
-                    {formatDate(entry.at)} {formatTime(entry.at)}
-                  </span>
-                  <span
-                    className={`badge${tone === "muted" ? "" : ` badge--${tone}`}`}
-                  >
-                    {entry.action}
-                  </span>
-                </div>
-                <div className="log__actor">
-                  <span className="log__actor-displayName">
-                    {entry.actorDisplayName}
-                  </span>
-                  <span>(@{entry.actorUsername})</span>
-                  <span>ID: {entry.actorId}</span>
-                </div>
-                <span className="log__target">{entry.target ?? "-"}</span>
-                <span className="log__detail">{entry.detail}</span>
-              </div>
-            );
-          })}
-        </div>
+        <LogTable
+          entries={items.map((entry) => ({
+            id: entry.id,
+            time: `${formatDate(entry.at)} ${formatTime(entry.at)}`,
+            action: entry.action,
+            tone: actionTone(entry.action),
+            actorDisplayName: entry.actorDisplayName,
+            actorUsername: entry.actorUsername,
+            actorId: entry.actorId,
+            target: entry.target ?? "-",
+            detail: entry.detail,
+          }))}
+        />
       )}
 
-      {pages > 1 ? (
-        <nav className="pager" aria-label="Pagination">
-          {page > 1 ? (
-            <Link className="pager__step" href={pageHref(query, page - 1)}>
-              Previous
-            </Link>
-          ) : (
-            <span className="pager__step pager__step--off">Previous</span>
-          )}
-
-          <span className="pager__pages">
-            {Array.from({ length: pages }, (_, i) => i + 1).map((n) =>
-              n === page ? (
-                <span
-                  className="pager__num pager__num--on"
-                  key={n}
-                  aria-current="page"
-                >
-                  {n}
-                </span>
-              ) : (
-                <Link className="pager__num" key={n} href={pageHref(query, n)}>
-                  {n}
-                </Link>
-              ),
-            )}
-          </span>
-
-          {page < pages ? (
-            <Link className="pager__step" href={pageHref(query, page + 1)}>
-              Next
-            </Link>
-          ) : (
-            <span className="pager__step pager__step--off">Next</span>
-          )}
-        </nav>
-      ) : null}
+      <Pager page={page} pages={pages} hrefFor={(n) => pageHref(query, n)} />
     </>
   );
 }

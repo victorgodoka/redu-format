@@ -1,5 +1,7 @@
 "use client";
 
+import Button from "@/components/ui/Button";
+
 export default function DeleteButton({
   action,
   hidden,
@@ -21,9 +23,9 @@ export default function DeleteButton({
       {Object.entries(hidden).map(([name, value]) => (
         <input key={name} type="hidden" name={name} value={value} />
       ))}
-      <button className="btn btn--danger" type="submit">
+      <Button variant="danger" type="submit">
         {label}
-      </button>
+      </Button>
     </form>
   );
 }

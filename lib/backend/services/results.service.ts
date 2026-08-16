@@ -378,6 +378,10 @@ export async function startBracket(slug: string, event: TournamentEvent): Promis
   engine.startTournament();
   await persistEngine(tournamentId, engine);
   await syncMatchDeadlines(tournamentId, engine);
+  // Marks the tournament as actually started - separate from startsAt, since
+  // staff can (and did) start a bracket ahead of the advertised time. This is
+  // what the public site checks to stop calling it "upcoming".
+  await tournaments.markStarted(tournamentId, new Date().toISOString());
 }
 
 export async function generateNextRound(slug: string): Promise<void> {
@@ -623,6 +627,7 @@ export async function completeBracket(slug: string): Promise<void> {
 
   await repos().placings.replaceForTournament(tournamentId, placings);
   await persistEngine(tournamentId, engine);
+  await repos().tournaments.markFinished(tournamentId, new Date().toISOString());
 }
 
 export async function getPlacings(slug: string) {

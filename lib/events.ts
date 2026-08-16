@@ -28,6 +28,10 @@ export type TournamentEvent = {
   rounds: number;
   /** Size of the elimination bracket after Swiss, null when there is none. */
   topCut: number | null;
+  /** ISO instant the bracket was actually started, or null if it hasn't been yet. Separate from startsAt - staff can start early, and this is what actually closes registration. */
+  startedAt: string | null;
+  /** ISO instant completeBracket() froze final placings, or null while the tournament is still upcoming or in progress. */
+  finishedAt: string | null;
   matchFormat: "Bo1" | "Bo3";
   /**
    * How many days a round stays open before it's force-closed - not a per-duel
@@ -107,6 +111,8 @@ export const events: readonly TournamentEvent[] = [
     structure: "swiss",
     rounds: 5,
     topCut: null,
+    startedAt: null,
+    finishedAt: null,
     matchFormat: "Bo3",
     roundLimitDays: 2,
     seats: 64,
@@ -123,6 +129,8 @@ export const events: readonly TournamentEvent[] = [
     structure: "swiss",
     rounds: 6,
     topCut: 8,
+    startedAt: null,
+    finishedAt: null,
     matchFormat: "Bo3",
     roundLimitDays: 2,
     seats: 128,
@@ -139,6 +147,8 @@ export const events: readonly TournamentEvent[] = [
     structure: "single-elim",
     rounds: 5,
     topCut: null,
+    startedAt: null,
+    finishedAt: null,
     matchFormat: "Bo3",
     roundLimitDays: 2,
     seats: 32,
@@ -155,6 +165,8 @@ export const events: readonly TournamentEvent[] = [
     structure: "swiss",
     rounds: 8,
     topCut: 8,
+    startedAt: null,
+    finishedAt: null,
     matchFormat: "Bo3",
     roundLimitDays: 2,
     seats: 256,
@@ -171,6 +183,8 @@ export const events: readonly TournamentEvent[] = [
     structure: "swiss",
     rounds: 6,
     topCut: null,
+    startedAt: null,
+    finishedAt: null,
     matchFormat: "Bo3",
     roundLimitDays: 2,
     seats: 96,
@@ -187,6 +201,8 @@ export const events: readonly TournamentEvent[] = [
     structure: "single-elim",
     rounds: 4,
     topCut: null,
+    startedAt: null,
+    finishedAt: null,
     matchFormat: "Bo3",
     roundLimitDays: 2,
     seats: 16,
@@ -203,6 +219,8 @@ export const events: readonly TournamentEvent[] = [
     structure: "swiss",
     rounds: 7,
     topCut: null,
+    startedAt: null,
+    finishedAt: null,
     matchFormat: "Bo3",
     roundLimitDays: 2,
     seats: 64,
@@ -219,6 +237,8 @@ export const events: readonly TournamentEvent[] = [
     structure: "swiss",
     rounds: 6,
     topCut: 8,
+    startedAt: null,
+    finishedAt: null,
     matchFormat: "Bo3",
     roundLimitDays: 2,
     seats: 128,
@@ -235,6 +255,8 @@ export const events: readonly TournamentEvent[] = [
     structure: "single-elim",
     rounds: 5,
     topCut: null,
+    startedAt: null,
+    finishedAt: null,
     matchFormat: "Bo1",
     roundLimitDays: 2,
     seats: 32,
@@ -251,6 +273,8 @@ export const events: readonly TournamentEvent[] = [
     structure: "swiss",
     rounds: 5,
     topCut: null,
+    startedAt: null,
+    finishedAt: null,
     matchFormat: "Bo3",
     roundLimitDays: 2,
     seats: 64,
@@ -267,6 +291,8 @@ export const events: readonly TournamentEvent[] = [
     structure: "swiss",
     rounds: 7,
     topCut: 4,
+    startedAt: null,
+    finishedAt: null,
     matchFormat: "Bo3",
     roundLimitDays: 2,
     seats: 128,
@@ -283,6 +309,8 @@ export const events: readonly TournamentEvent[] = [
     structure: "single-elim",
     rounds: 4,
     topCut: null,
+    startedAt: null,
+    finishedAt: null,
     matchFormat: "Bo3",
     roundLimitDays: 2,
     seats: 16,
@@ -299,6 +327,8 @@ export const events: readonly TournamentEvent[] = [
     structure: "swiss",
     rounds: 5,
     topCut: null,
+    startedAt: null,
+    finishedAt: null,
     matchFormat: "Bo3",
     roundLimitDays: 2,
     seats: 64,
@@ -315,6 +345,8 @@ export const events: readonly TournamentEvent[] = [
     structure: "swiss",
     rounds: 9,
     topCut: 8,
+    startedAt: null,
+    finishedAt: null,
     matchFormat: "Bo3",
     roundLimitDays: 2,
     seats: 512,
@@ -331,6 +363,8 @@ export const events: readonly TournamentEvent[] = [
     structure: "single-elim",
     rounds: 5,
     topCut: null,
+    startedAt: null,
+    finishedAt: null,
     matchFormat: "Bo3",
     roundLimitDays: 2,
     seats: 32,
@@ -347,6 +381,8 @@ export const events: readonly TournamentEvent[] = [
     structure: "swiss",
     rounds: 6,
     topCut: null,
+    startedAt: null,
+    finishedAt: null,
     matchFormat: "Bo3",
     roundLimitDays: 2,
     seats: 96,
@@ -363,6 +399,8 @@ export const events: readonly TournamentEvent[] = [
     structure: "swiss",
     rounds: 6,
     topCut: 8,
+    startedAt: null,
+    finishedAt: null,
     matchFormat: "Bo3",
     roundLimitDays: 2,
     seats: 128,
@@ -379,6 +417,8 @@ export const events: readonly TournamentEvent[] = [
     structure: "swiss",
     rounds: 5,
     topCut: null,
+    startedAt: null,
+    finishedAt: null,
     matchFormat: "Bo3",
     roundLimitDays: 2,
     seats: 64,
@@ -395,6 +435,8 @@ export const events: readonly TournamentEvent[] = [
     structure: "swiss",
     rounds: 6,
     topCut: 8,
+    startedAt: null,
+    finishedAt: null,
     matchFormat: "Bo3",
     roundLimitDays: 2,
     seats: 128,
@@ -411,6 +453,8 @@ export const events: readonly TournamentEvent[] = [
     structure: "single-elim",
     rounds: 4,
     topCut: null,
+    startedAt: null,
+    finishedAt: null,
     matchFormat: "Bo1",
     roundLimitDays: 2,
     seats: 16,
@@ -427,6 +471,8 @@ export const events: readonly TournamentEvent[] = [
     structure: "swiss",
     rounds: 5,
     topCut: null,
+    startedAt: null,
+    finishedAt: null,
     matchFormat: "Bo3",
     roundLimitDays: 2,
     seats: 64,
@@ -443,6 +489,8 @@ export const events: readonly TournamentEvent[] = [
     structure: "swiss",
     rounds: 5,
     topCut: 4,
+    startedAt: null,
+    finishedAt: null,
     matchFormat: "Bo3",
     roundLimitDays: 2,
     seats: 64,
@@ -463,6 +511,8 @@ export const pastEvents: readonly TournamentEvent[] = [
     structure: "swiss",
     rounds: 4,
     topCut: null,
+    startedAt: "2026-07-22T23:00:00Z",
+    finishedAt: "2026-07-22T23:00:00Z",
     matchFormat: "Bo3",
     roundLimitDays: 2,
     seats: 64,
@@ -479,6 +529,8 @@ export const pastEvents: readonly TournamentEvent[] = [
     structure: "swiss",
     rounds: 5,
     topCut: null,
+    startedAt: "2026-07-15T23:00:00Z",
+    finishedAt: "2026-07-15T23:00:00Z",
     matchFormat: "Bo3",
     roundLimitDays: 2,
     seats: 64,
@@ -495,6 +547,8 @@ export const pastEvents: readonly TournamentEvent[] = [
     structure: "swiss",
     rounds: 6,
     topCut: null,
+    startedAt: "2026-07-11T19:00:00Z",
+    finishedAt: "2026-07-11T19:00:00Z",
     matchFormat: "Bo3",
     roundLimitDays: 2,
     seats: 96,
@@ -511,6 +565,8 @@ export const pastEvents: readonly TournamentEvent[] = [
     structure: "single-elim",
     rounds: 4,
     topCut: null,
+    startedAt: "2026-07-04T21:00:00Z",
+    finishedAt: "2026-07-04T21:00:00Z",
     matchFormat: "Bo3",
     roundLimitDays: 2,
     seats: 32,
@@ -527,6 +583,8 @@ export const pastEvents: readonly TournamentEvent[] = [
     structure: "swiss",
     rounds: 6,
     topCut: null,
+    startedAt: "2026-06-27T19:00:00Z",
+    finishedAt: "2026-06-27T19:00:00Z",
     matchFormat: "Bo3",
     roundLimitDays: 2,
     seats: 96,
@@ -543,6 +601,8 @@ export const pastEvents: readonly TournamentEvent[] = [
     structure: "swiss",
     rounds: 7,
     topCut: 8,
+    startedAt: "2026-06-20T18:00:00Z",
+    finishedAt: "2026-06-20T18:00:00Z",
     matchFormat: "Bo3",
     roundLimitDays: 2,
     seats: 128,
@@ -559,6 +619,8 @@ export const pastEvents: readonly TournamentEvent[] = [
     structure: "swiss",
     rounds: 6,
     topCut: 4,
+    startedAt: "2026-06-13T20:00:00Z",
+    finishedAt: "2026-06-13T20:00:00Z",
     matchFormat: "Bo3",
     roundLimitDays: 2,
     seats: 128,
@@ -575,6 +637,8 @@ export const pastEvents: readonly TournamentEvent[] = [
     structure: "single-elim",
     rounds: 4,
     topCut: null,
+    startedAt: "2026-05-30T22:00:00Z",
+    finishedAt: "2026-05-30T22:00:00Z",
     matchFormat: "Bo1",
     roundLimitDays: 2,
     seats: 16,
@@ -591,6 +655,8 @@ export const pastEvents: readonly TournamentEvent[] = [
     structure: "single-elim",
     rounds: 5,
     topCut: null,
+    startedAt: "2026-05-16T21:00:00Z",
+    finishedAt: "2026-05-16T21:00:00Z",
     matchFormat: "Bo3",
     roundLimitDays: 2,
     seats: 32,
@@ -607,6 +673,8 @@ export const pastEvents: readonly TournamentEvent[] = [
     structure: "swiss",
     rounds: 9,
     topCut: 8,
+    startedAt: "2025-10-20T17:00:00Z",
+    finishedAt: "2025-10-20T17:00:00Z",
     matchFormat: "Bo3",
     roundLimitDays: 2,
     seats: 256,
@@ -629,8 +697,25 @@ export function fillRatio(event: TournamentEvent): number {
   return Math.min(1, event.taken / event.seats);
 }
 
+/**
+ * True once the event is no longer open for new signups - either staff
+ * started the bracket (possibly before the advertised time), or the
+ * advertised time has simply passed with nobody starting it yet. Despite the
+ * name, this doesn't mean the tournament has *finished* - an event can be
+ * "past" for hours or days while its rounds are still being played.
+ */
 export function isPast(event: TournamentEvent, now: Date): boolean {
-  return new Date(event.startsAt).getTime() < now.getTime();
+  return event.startedAt !== null || new Date(event.startsAt).getTime() < now.getTime();
+}
+
+/**
+ * True once completeBracket() has frozen final placings for this event - the
+ * only correct signal for "Finished" labeling, a Results link, or showing
+ * placement. isPast() alone is not enough: a tournament can be `isPast`
+ * (registration closed) for days while still mid-bracket.
+ */
+export function isFinished(event: TournamentEvent): boolean {
+  return event.finishedAt !== null;
 }
 
 /**
@@ -688,14 +773,12 @@ export function queryEvents(
   query: EventQuery,
   now: Date = new Date(),
 ): EventResults {
-  const nowMs = now.getTime();
-
   let items = all.filter((event) => {
     if (query.structure && query.structure !== "all") {
       if (event.structure !== query.structure) return false;
     }
 
-    const started = new Date(event.startsAt).getTime() < nowMs;
+    const started = isPast(event, now);
     if (query.when === "upcoming" && started) return false;
     if (query.when === "past" && !started) return false;
 

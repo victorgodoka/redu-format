@@ -1,0 +1,68 @@
+.log {
+  margin: 24px 0 0;
+  padding: 4px 0;
+  overflow-x: auto;
+  font-family: var(--f-mono);
+  font-size: 12px;
+}
+
+/* .panel's actual visible fill is an inset pseudo-element (see globals.css);
+   recolouring the outer .panel background alone would not show. */
+.log:global(.panel)::before {
+  background: var(--c-raise);
+}
+
+.line {
+  display: grid;
+  grid-template-columns: 200px 200px 150px 1fr;
+  gap: 16px;
+  align-items: center;
+  padding: 9px 20px;
+  border-bottom: 1px solid var(--c-line-soft);
+  white-space: nowrap;
+}
+
+.line:last-child {
+  border-bottom: 0;
+}
+
+.lineHead {
+  color: var(--c-muted);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--c-line);
+}
+
+.time {
+  color: var(--c-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.actor {
+  color: var(--c-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: flex;
+  flex-direction: column;
+}
+
+.actorName {
+  font-size: large;
+}
+
+.target {
+  color: var(--c-muted);
+  white-space: break-spaces;
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.detail {
+  white-space: normal;
+  color: #c6c4d2;
+}

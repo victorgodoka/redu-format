@@ -7,7 +7,7 @@ import { findPlayerIdByToken } from "@/lib/backend/services/player.service";
 import { findMySignup } from "@/lib/backend/services/registration.service";
 import { hasBracket } from "@/lib/backend/services/results.service";
 import { Card } from "@/lib/cards";
-import { formatDate, formatEntry, formatTime, isPast, pastEvents, seatsLeft, STRUCTURES } from "@/lib/events";
+import { formatDate, formatEntry, formatTime, isFinished, isPast, pastEvents, seatsLeft, STRUCTURES } from "@/lib/events";
 import { DEFAULT_AVATAR } from "@/lib/nexus-parse";
 import { getTournament } from "@/lib/tournaments";
 import SiteHeader from "../../../site-header";
@@ -49,6 +49,7 @@ export default async function SignupPage({
 
   const now = new Date();
   const past = isPast(event, now);
+  const finished = isFinished(event);
   const left = seatsLeft(event);
   const playerId = await findPlayerIdByToken(session.token);
   const signup = playerId ? await findMySignup(slug, playerId) : null;
@@ -73,8 +74,9 @@ export default async function SignupPage({
               {past ? (
                 <div className="notice panel">
                   <p className="lede">
-                    This event finished on {formatDate(event.startsAt)}.
-                    Registration is closed.
+                    {finished
+                      ? `This event finished on ${formatDate(event.startsAt)}. Registration is closed.`
+                      : "This tournament has already started. Registration is closed."}
                   </p>
                   <Link className="btn" href="/events">
                     Back to events

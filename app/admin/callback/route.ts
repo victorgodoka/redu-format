@@ -85,13 +85,13 @@ export async function GET(request: Request) {
 
     if (nexusToken) await establishPublicSession(nexusToken);
 
-    await recordAction({
-      actorId: user.id,
-      actorUsername: user.username,
-      actorDisplayName: displayName,
-      action: "admin.login",
-      detail: "Signed in via Discord",
-    });
+    // await recordAction({
+    //   actorId: user.id,
+    //   actorUsername: user.username,
+    //   actorDisplayName: displayName,
+    //   action: "admin.login",
+    //   detail: "Signed in via Discord",
+    // });
 
     cookieStore.delete("discord_oauth_state");
 

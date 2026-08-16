@@ -83,6 +83,30 @@ test("starting a bracket requires enough registered participants", async () => {
   await assert.rejects(() => startBracket(tournament.slug, event));
 });
 
+test("startBracket records startedAt, even when the tournament's advertised startsAt is still in the future", async () => {
+  const tournament = await createTournament({
+    ...swissDraft,
+    startsAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+  });
+  await seatFourViaAdmin(tournament.slug);
+
+  const before = (await getTournament(tournament.slug))!;
+  assert.equal(before.startedAt, null);
+
+  await startBracket(tournament.slug, before);
+
+  const started = (await getTournament(tournament.slug))!;
+  assert.notEqual(started.startedAt, null);
+  assert.ok(new Date(started.startedAt!) < new Date(started.startsAt), "started before the advertised time");
+  assert.equal(started.finishedAt, null, "in progress, not finished yet");
+
+  await playOutTournament(tournament.slug);
+  await completeBracket(tournament.slug);
+
+  const finished = (await getTournament(tournament.slug))!;
+  assert.notEqual(finished.finishedAt, null);
+});
+
 test("full swiss + top cut lifecycle: start, play every round, complete, leaderboard", async () => {
   const tournament = await createTournament(swissDraft);
   await seatFourViaAdmin(tournament.slug);
@@ -359,6 +383,27 @@ test("official tiebreaker: identical points and opponents - the later loss (high
     lateLoserPlacing.place < earlyLoserPlacing.place,
     "losing round 2 (DDD 2^2=4) ranks ahead of losing round 1 (DDD 1^2=1), given identical points/opponents",
   );
+});
+
+test("enterMatchResult refuses to correct a match once the next round has started", async () => {
+  const tournament = await createTournament({ ...swissDraft, topCut: null });
+  await seatFourViaAdmin(tournament.slug);
+
+  const event = (await getTournament(tournament.slug))!;
+  await startBracket(tournament.slug, event);
+
+  const round1 = (await getBracketView(tournament.slug))!.matches.filter((m) => m.round === 1);
+  for (const match of round1) {
+    await enterMatchResult(tournament.slug, match.id, 1, 0);
+  }
+  await generateNextRound(tournament.slug);
+
+  // Round 1 is closed now that round 2 has been paired - no more corrections.
+  await assert.rejects(() => enterMatchResult(tournament.slug, round1[0].id, 0, 1));
+
+  // The round in progress is still correctable.
+  const round2 = (await getBracketView(tournament.slug))!.matches.filter((m) => m.round === 2);
+  await assert.doesNotReject(() => enterMatchResult(tournament.slug, round2[0].id, 1, 0));
 });
 
 test("leaderboard aggregates points across tournaments, only for real players", async () => {

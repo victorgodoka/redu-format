@@ -19,6 +19,7 @@ import {
   formatDate,
   formatEntry,
   formatTime,
+  isFinished,
   isPast,
   pastEvents,
   seatsLeft,
@@ -293,13 +294,14 @@ async function GenericEventPage({ slug }: { slug: string }) {
 
   const now = new Date();
   const past = isPast(event, now);
+  const finished = isFinished(event);
   const left = seatsLeft(event);
   const isSaved = savedSlugs.includes(slug);
 
   return (
     <main className="section" id="main">
       <div className="wrap">
-        <p className="tab">{past ? "Results" : "Tournament"}</p>
+        <p className="tab">{finished ? "Results" : "Tournament"}</p>
         <div className="admin-bar">
           <h1 className="section__title">{event.name}</h1>
           {session.token ? (
@@ -319,16 +321,18 @@ async function GenericEventPage({ slug }: { slug: string }) {
           <div className="signup__main">
             {registeredDeck ? (
               <div className="notice notice--done panel">
-                <p className="tab">{past ? "You played" : "Registered"}</p>
+                <p className="tab">{finished ? "You played" : "Registered"}</p>
                 <h2 className="notice__title">
                   {registeredDeck.name}
                 </h2>
-                {past ? (
+                {finished ? (
                   <p className="lede">
                     {placing
                       ? `Placed #${placing.place} of ${event.taken}, ${placing.points} pts.`
                       : "Results for this event have not been finalized yet."}
                   </p>
+                ) : past ? (
+                  <p className="lede">This tournament is underway - check your current match below.</p>
                 ) : (
                   <p className="lede">
                     {registeredDeck.main} main · {registeredDeck.extra} extra ·{" "}
@@ -336,7 +340,7 @@ async function GenericEventPage({ slug }: { slug: string }) {
                     {formatDate(event.startsAt)} at {formatTime(event.startsAt)}.
                   </p>
                 )}
-                {past ? null : (
+                {finished ? null : (
                   <Link className="btn" href={`/events/${slug}/signup`}>
                     Manage registration
                   </Link>
@@ -345,11 +349,13 @@ async function GenericEventPage({ slug }: { slug: string }) {
             ) : (
               <div className="notice panel">
                 <p className="lede">
-                  {past
+                  {finished
                     ? "This event has finished."
-                    : left === 0
-                      ? "Every seat is taken."
-                      : "You are not registered for this event yet."}
+                    : past
+                      ? "Registration is closed - this tournament has already started."
+                      : left === 0
+                        ? "Every seat is taken."
+                        : "You are not registered for this event yet."}
                 </p>
                 {past || left === 0 ? null : (
                   <Link className="btn btn--solid" href={`/events/${slug}/signup`}>

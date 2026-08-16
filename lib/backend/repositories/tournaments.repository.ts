@@ -1,13 +1,15 @@
 import type { Pool, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import type { EntryFee, Engine, Structure, TournamentEvent } from "../../events.ts";
-import { fromMysqlDatetime, toMysqlDatetime } from "../db/datetime.ts";
+import { fromMysqlDatetime, fromMysqlDatetimeMs, toMysqlDatetime, toMysqlDatetimeMs } from "../db/datetime.ts";
 
-export type TournamentDraft = Omit<TournamentEvent, "slug" | "taken">;
+export type TournamentDraft = Omit<TournamentEvent, "slug" | "taken" | "startedAt" | "finishedAt">;
 
 type TournamentRow = RowDataPacket & {
   slug: string;
   name: string;
   starts_at: string;
+  started_at: string | null;
+  finished_at: string | null;
   structure: Structure;
   rounds: number;
   top_cut: number | null;
@@ -38,6 +40,8 @@ function rowToTournament(row: TournamentRow): TournamentEvent {
     slug: row.slug,
     name: row.name,
     startsAt: fromMysqlDatetime(row.starts_at),
+    startedAt: fromMysqlDatetimeMs(row.started_at),
+    finishedAt: fromMysqlDatetimeMs(row.finished_at),
     structure: row.structure,
     rounds: row.rounds,
     topCut: row.top_cut,
@@ -67,7 +71,7 @@ export class TournamentsRepository {
 
   async findAll(): Promise<TournamentEvent[]> {
     const [rows] = await this.pool.query<TournamentRow[]>(
-      `SELECT t.slug, t.name, t.starts_at, t.structure, t.rounds, t.top_cut, t.match_format,
+      `SELECT t.slug, t.name, t.starts_at, t.started_at, t.finished_at, t.structure, t.rounds, t.top_cut, t.match_format,
               t.round_limit_days, t.engine, t.seat_cap, t.entry_type, t.entry_amount_minor, t.entry_currency,
               t.host, t.signup_url, ${TAKEN_SUBQUERY}
        FROM tournaments t
@@ -79,7 +83,7 @@ export class TournamentsRepository {
 
   async findBySlug(slug: string): Promise<TournamentEvent | null> {
     const [rows] = await this.pool.query<TournamentRow[]>(
-      `SELECT t.slug, t.name, t.starts_at, t.structure, t.rounds, t.top_cut, t.match_format,
+      `SELECT t.slug, t.name, t.starts_at, t.started_at, t.finished_at, t.structure, t.rounds, t.top_cut, t.match_format,
               t.round_limit_days, t.engine, t.seat_cap, t.entry_type, t.entry_amount_minor, t.entry_currency,
               t.host, t.signup_url, ${TAKEN_SUBQUERY}
        FROM tournaments t
@@ -105,6 +109,22 @@ export class TournamentsRepository {
       [slug],
     );
     return rows[0]?.id ?? null;
+  }
+
+  /** Records when the bracket was actually started. A no-op past the first call - once set, started_at never moves. */
+  async markStarted(id: string, at: string): Promise<void> {
+    await this.pool.query(
+      "UPDATE tournaments SET started_at = ? WHERE id = ? AND started_at IS NULL",
+      [toMysqlDatetimeMs(at), id],
+    );
+  }
+
+  /** Records when the bracket was actually completed. A no-op past the first call - once set, finished_at never moves. */
+  async markFinished(id: string, at: string): Promise<void> {
+    await this.pool.query(
+      "UPDATE tournaments SET finished_at = ? WHERE id = ? AND finished_at IS NULL",
+      [toMysqlDatetimeMs(at), id],
+    );
   }
 
   async insert(id: string, slug: string, draft: TournamentDraft): Promise<void> {

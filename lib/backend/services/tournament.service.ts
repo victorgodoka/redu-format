@@ -59,7 +59,7 @@ export async function createTournament(draft: TournamentDraft): Promise<Tourname
   const { tournaments } = repos();
   const slug = await uniqueSlug(slugify(draft.name));
   await tournaments.insert(crypto.randomUUID(), slug, draft);
-  return { ...draft, slug, taken: 0 };
+  return { ...draft, slug, taken: 0, startedAt: null, finishedAt: null };
 }
 
 export async function updateTournament(

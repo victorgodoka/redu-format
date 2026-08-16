@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
+import AdminPageHead from "@/components/admin/AdminPageHead";
+import DeleteButton from "@/components/admin/DeleteButton";
+import StatBar from "@/components/admin/StatBar";
+import TournamentForm from "@/components/admin/TournamentForm";
+import Button from "@/components/ui/Button";
 import { getTournament } from "@/lib/tournaments";
-import DeleteButton from "../../delete-button";
 import { deleteTournamentAction, updateTournamentAction } from "../actions";
-import TournamentForm from "../tournament-form";
 
 export const metadata: Metadata = {
   title: "Edit tournament | REDU Format",
@@ -22,28 +24,28 @@ export default async function EditTournamentPage({
 
   return (
     <>
-      <div className="admin-page-head">
-        <h1 className="admin-heading">{tournament.name}</h1>
-        <Link className="admin-back" href="/admin/tournaments">
-          ← Back to tournaments
-        </Link>
-      </div>
+      <AdminPageHead
+        title={tournament.name}
+        back={{ href: "/admin/tournaments", label: "← Back to tournaments" }}
+      />
 
       <TournamentForm isEditing={true} action={updateTournamentAction} tournament={tournament} />
 
-      <div className="dash-actions">
-        <Link className="btn" href={`/admin/tournaments/${tournament.slug}/participants`}>
-          Manage participants
-        </Link>
-        <Link className="btn" href={`/admin/tournaments/${tournament.slug}/bracket`}>
-          Manage bracket
-        </Link>
-        <DeleteButton
-          action={deleteTournamentAction}
-          hidden={{ slug: tournament.slug }}
-          confirmText={`Delete ${tournament.name}? This cannot be undone.`}
-        />
-      </div>
+      <StatBar
+        actions={
+          <>
+            <Button href={`/admin/tournaments/${tournament.slug}/participants`}>
+              Manage participants
+            </Button>
+            <Button href={`/admin/tournaments/${tournament.slug}/bracket`}>Manage bracket</Button>
+            <DeleteButton
+              action={deleteTournamentAction}
+              hidden={{ slug: tournament.slug }}
+              confirmText={`Delete ${tournament.name}? This cannot be undone.`}
+            />
+          </>
+        }
+      />
     </>
   );
 }
