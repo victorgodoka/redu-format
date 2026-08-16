@@ -17,7 +17,7 @@ import { listSavedSlugsForPlayer, listSignupsForPlayer } from "@/lib/backend/ser
 import { getPlacingsForPlayer } from "@/lib/backend/services/results.service";
 import { Card } from "@/lib/cards";
 import { DEFAULT_AVATAR } from "@/lib/nexus-parse";
-import { formatDate, formatTime, isPast, pastEvents } from "@/lib/events";
+import { formatDate, formatTime, isPast } from "@/lib/events";
 import { listTournaments } from "@/lib/tournaments";
 import { validateDecks } from "@/lib/validateDecks";
 import { unsaveTournamentAction } from "../events/saved-actions";
@@ -59,7 +59,7 @@ export default async function DashboardPage() {
     .sort((a, b) => Number(b.legal) - Number(a.legal));
   const legalDeckCount = deckRows.filter((row) => row.legal).length;
 
-  const allEvents = [...tournaments, ...pastEvents];
+  const allEvents = tournaments;
   const now = new Date();
 
   const playerId = await findPlayerIdByToken(session.token);

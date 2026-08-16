@@ -16,7 +16,7 @@ import { findPlayerIdByToken } from "@/lib/backend/services/player.service";
 import { findMySignup } from "@/lib/backend/services/registration.service";
 import { hasBracket } from "@/lib/backend/services/results.service";
 import { Card } from "@/lib/cards";
-import { formatDate, formatEntry, formatTime, isFinished, isPast, pastEvents, seatsLeft, STRUCTURES } from "@/lib/events";
+import { formatDate, formatEntry, formatTime, isFinished, isPast, seatsLeft, STRUCTURES } from "@/lib/events";
 import { DEFAULT_AVATAR } from "@/lib/nexus-parse";
 import { getTournament } from "@/lib/tournaments";
 import { validateDecks } from "@/lib/validateDecks";
@@ -33,7 +33,7 @@ export default async function SignupPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const event = (await getTournament(slug)) ?? pastEvents.find((e) => e.slug === slug);
+  const event = await getTournament(slug);
   if (!event) notFound();
 
   const session = await getSession();

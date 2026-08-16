@@ -467,6 +467,30 @@ test("enterMatchResult refuses to correct a match once the next round has starte
   await assert.doesNotReject(() => enterMatchResult(tournament.slug, round2[0].id, 1, 0));
 });
 
+test("enterMatchResult: pairing a later round early doesn't block fresh entries for the current round's other matches", async () => {
+  const tournament = await createTournament({ ...swissDraft, structure: "single-elim", topCut: null });
+  // 8 players so round 1 has 4 independent matches - enough to pair off a
+  // semifinal (round 2) after only 2 of the 4 quarterfinals are entered.
+  for (let i = 1; i <= 8; i++) {
+    await addParticipant(tournament.slug, { name: `P${i}`, deckName: "Wind-Up" });
+  }
+
+  const event = (await getTournament(tournament.slug))!;
+  await startBracket(tournament.slug, event);
+
+  const round1 = (await getBracketView(tournament.slug))!.matches.filter((m) => m.round === 1);
+  assert.equal(round1.length, 4);
+
+  // These two pair off a round-2 semifinal as a side effect.
+  await enterMatchResult(tournament.slug, round1[0].id, 1, 0);
+  await enterMatchResult(tournament.slug, round1[1].id, 1, 0);
+
+  // The other two quarterfinals are still fresh, first-time entries for their
+  // own round - the round-2 pairing side effect above must not block them.
+  await assert.doesNotReject(() => enterMatchResult(tournament.slug, round1[2].id, 1, 0));
+  await assert.doesNotReject(() => enterMatchResult(tournament.slug, round1[3].id, 1, 0));
+});
+
 test("completeBracket assigns ranking points by finishing place, separate from match points", async () => {
   const tournament = await createTournament({ ...swissDraft, structure: "single-elim", topCut: null });
   await seatFourViaAdmin(tournament.slug);

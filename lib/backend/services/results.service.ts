@@ -433,11 +433,14 @@ export async function generateNextRound(slug: string): Promise<void> {
  * reports afterward so a stale disagreement doesn't linger once a mod has
  * settled it. This is also how a disputed match gets resolved.
  *
- * Only reachable for the match's own round: once any match in a later round
- * has been paired, that round has "started" and everything before it is
- * locked - no retroactive correction once play has moved on. A round can't
- * advance while one of its own matches is still disputed, so this never
- * blocks a genuine first-time resolution, only a correction attempted too late.
+ * The round-lock only applies to *correcting* a match that already has a
+ * result - once any match in a later round has been paired off the back of
+ * it, that correction is refused. A first-time entry is always allowed
+ * regardless: in an elimination bracket, entering one quarterfinal's result
+ * can pair up the semifinal before its sibling quarterfinals have been
+ * entered at all - those siblings are still fresh, first-time entries for
+ * their own round, not late corrections, and must not be blocked by that
+ * pairing side effect.
  */
 export async function enterMatchResult(
   slug: string,
@@ -452,18 +455,18 @@ export async function enterMatchResult(
   if (!engine) throw new Error(`Tournament "${slug}" has no bracket yet`);
 
   const match = engine.getMatch(matchId);
-  const nextRoundStarted = engine
-    .getMatches()
-    .some((m) => m.getRoundNumber() > match.getRoundNumber() && m.isPaired());
-  if (nextRoundStarted) {
-    throw new Error("This match's round has already closed - the next round has started, so its result can no longer be changed.");
-  }
 
   // Rewriting an already-decided match (a self-report resolution or an earlier
   // override) has to go through clearResult() first - it's what unwinds any
   // elimination-bracket progression the old result already caused, so the
   // correction propagates forward cleanly instead of double-advancing anyone.
   if (match.hasEnded()) {
+    const nextRoundStarted = engine
+      .getMatches()
+      .some((m) => m.getRoundNumber() > match.getRoundNumber() && m.isPaired());
+    if (nextRoundStarted) {
+      throw new Error("This match's round has already closed - the next round has started, so its result can no longer be changed.");
+    }
     engine.clearResult(matchId);
   }
   const { id: matchP1Id } = engine.getMatch(matchId).getPlayer1();

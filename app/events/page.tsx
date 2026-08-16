@@ -14,7 +14,8 @@ import Wrap from "@/components/ui/Wrap";
 import { getSession } from "@/lib/auth";
 import { findPlayerIdByToken } from "@/lib/backend/services/player.service";
 import { listSavedSlugsForPlayer, listSignupsForPlayer } from "@/lib/backend/services/registration.service";
-import { pastEvents, queryEvents, type EventQuery } from "@/lib/events";
+import { getPlacings } from "@/lib/backend/services/results.service";
+import { isFinished, queryEvents, type EventQuery } from "@/lib/events";
 import { listTournaments } from "@/lib/tournaments";
 import { saveTournamentAction, unsaveTournamentAction } from "./saved-actions";
 
@@ -89,7 +90,17 @@ export default async function EventsPage({
     listTournaments(),
     getSession(),
   ]);
-  const allEvents = [...tournaments, ...pastEvents];
+
+  // Pinned above the filtered list: whichever tournament finished most
+  // recently, so the highlight always reflects a real result, not mock data.
+  const featured = tournaments
+    .filter(isFinished)
+    .sort((a, b) => new Date(b.finishedAt!).getTime() - new Date(a.finishedAt!).getTime())[0] ?? null;
+  const featuredWinner = featured
+    ? ((await getPlacings(featured.slug)).find((p) => p.place === 1)?.displayName ?? null)
+    : null;
+
+  const allEvents = tournaments.filter((t) => t.slug !== featured?.slug);
   const { items, page, pages, total } = queryEvents(allEvents, query, now);
 
   const playerId = session.token ? await findPlayerIdByToken(session.token) : null;
@@ -109,7 +120,7 @@ export default async function EventsPage({
 
           {/* Pinned outside the filtered/paginated list, so it is always the
               first thing on the page regardless of query params. */}
-          <FeaturedEventCard />
+          {featured ? <FeaturedEventCard event={featured} winnerName={featuredWinner} /> : null}
 
           {/* GET form: filters live in the URL, so results are shareable and
               the page works with JavaScript disabled. */}

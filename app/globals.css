@@ -919,9 +919,12 @@ input[type="number"]::-webkit-inner-spin-button {
 
 .dash-actions {
   display: flex;
-  flex-wrap: wrap;
   gap: 12px;
-  margin: 24px 0 0;
+  margin: 24px 0;
+}
+
+.dash-actions .payment-controls__confirm {
+  flex-direction: row;
 }
 
 .deck__name {
@@ -1132,8 +1135,6 @@ input[type="number"]::-webkit-inner-spin-button {
   color: var(--c-accent);
   font-variant-numeric: tabular-nums;
 }
-
-/* .bracket* moved to components/site/Bracket/Bracket.module.css */
 
 /* .mrules/.mrule* moved to components/site/MasterRuleHistory/MasterRuleHistory.module.css
    .rulings/.ruling* moved to components/site/FormatRulingsList/FormatRulingsList.module.css */

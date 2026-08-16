@@ -4,7 +4,6 @@ import { revalidatePath } from "next/cache";
 import { getSession } from "@/lib/auth";
 import { findPlayerIdByToken } from "@/lib/backend/services/player.service";
 import { saveTournament, unsaveTournament } from "@/lib/backend/services/registration.service";
-import { FEATURED_EVENT, pastEvents } from "@/lib/events";
 import { getTournament } from "@/lib/tournaments";
 
 function readSlug(form: FormData): string | null {
@@ -20,8 +19,6 @@ function revalidateSavedSurfaces(slug: string) {
 }
 
 async function isKnownTournament(slug: string): Promise<boolean> {
-  if (slug === FEATURED_EVENT.slug) return true;
-  if (pastEvents.some((event) => event.slug === slug)) return true;
   return (await getTournament(slug)) !== null;
 }
 
