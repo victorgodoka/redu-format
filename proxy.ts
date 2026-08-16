@@ -8,7 +8,7 @@ import { SESSION_COOKIE, verifyAdminToken } from "@/lib/auth/session";
  * checks the session for its own render, but middleware rejects unauthorized
  * requests before any page code runs.
  */
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const token = request.cookies.get(SESSION_COOKIE)?.value;
   const session = token ? await verifyAdminToken(token) : null;
 
