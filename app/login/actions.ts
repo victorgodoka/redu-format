@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import {
+  establishPublicSession,
   fetchProfile,
   getSession,
   invalidateProfile,
@@ -27,23 +28,9 @@ export async function login(
     return { error: "Too many attempts. Wait a minute and try again." };
   }
 
-  const profile = await fetchProfile(token);
-  if (!profile) return { error: "That token was rejected by Dueling Nexus." };
-
-  await resolvePlayerId(token, {
-    name: profile.name,
-    avatar: profile.avatar,
-    contributor: profile.contributor,
-    contributorTime: profile.contributorTime,
-  });
-
-  const session = await getSession();
-  session.token = token;
-  session.name = profile.name;
-  session.avatar = profile.avatar;
-  session.contributor = profile.contributor;
-  session.contributorTime = profile.contributorTime;
-  await session.save();
+  if (!(await establishPublicSession(token))) {
+    return { error: "That token was rejected by Dueling Nexus." };
+  }
 
   redirect(next);
 }

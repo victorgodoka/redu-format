@@ -82,6 +82,17 @@ export class RegistrationsRepository {
     return result.affectedRows > 0;
   }
 
+  async updateDeck(slug: string, id: string, deckName: string): Promise<boolean> {
+    const [result] = await this.pool.query<ResultSetHeader>(
+      `UPDATE registrations r
+       JOIN tournaments t ON t.id = r.tournament_id
+       SET r.deck_name = ?
+       WHERE t.slug = ? AND r.id = ?`,
+      [deckName, slug, id],
+    );
+    return result.affectedRows > 0;
+  }
+
   async updatePayment(
     slug: string,
     id: string,

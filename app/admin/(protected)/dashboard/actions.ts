@@ -3,15 +3,18 @@
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { recordAction } from "@/lib/audit-log";
-import { fetchProfile, rateLimit } from "@/lib/auth";
+import { establishPublicSession, fetchProfile, rateLimit } from "@/lib/auth";
 import { createAdminSession, getAdminSession } from "@/lib/auth/session";
+import { setAdminNexusToken } from "@/lib/backend/services/admins.service";
 
 export type LinkNexusState = { error?: string };
 
 /**
- * Re-signs the admin JWT with the token attached, so the link survives page
- * reloads for the rest of the 8-hour admin session. The Discord identity
- * (userId/username) is carried over unchanged.
+ * Persists the token to the admins table (survives past this admin session,
+ * picked back up on the next Discord login) and re-signs the admin JWT with
+ * it too (cheap reads for the rest of this session). Also establishes a
+ * public/player session with the same token - see establishPublicSession.
+ * The Discord identity (userId/username) is carried over unchanged.
  */
 export async function linkNexusToken(
   _prev: LinkNexusState,
@@ -31,12 +34,22 @@ export async function linkNexusToken(
   const profile = await fetchProfile(token);
   if (!profile) return { error: "That token was rejected by Dueling Nexus." };
 
+  // Persisted so it survives past this 8-hour admin session (picked back up
+  // on the next Discord login), not just carried in the JWT below.
+  await setAdminNexusToken(session.userId, token);
+
   await createAdminSession({
     userId: session.userId,
     username: session.username,
     displayName: session.displayName,
     nexusToken: token,
   });
+
+  // Also signs this admin in on the public/player side with the same
+  // account, so they're not asked to paste the token again at /login. Purely
+  // a convenience at link time - the two sessions stay independent after
+  // this (signing out of either one doesn't touch the other).
+  await establishPublicSession(token);
 
   // Never log the raw token: the linked profile's name is enough context.
   await recordAction({
@@ -54,6 +67,8 @@ export async function linkNexusToken(
 export async function unlinkNexusToken() {
   const session = await getAdminSession();
   if (!session) return;
+
+  await setAdminNexusToken(session.userId, null);
 
   await createAdminSession({
     userId: session.userId,

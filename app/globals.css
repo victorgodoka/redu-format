@@ -128,6 +128,20 @@ a {
   outline-offset: 3px;
 }
 
+/* number fields read as data here, not steppable counters - the spinner
+   arrows add nothing and take space from the value itself */
+input[type="number"] {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  appearance: none;
+  -webkit-appearance: none;
+  margin: 0;
+}
+
 .skip-link {
   position: absolute;
   left: -9999px;
@@ -203,8 +217,7 @@ a {
   align-items: center;
   justify-content: center;
   gap: 10px;
-  min-width: 200px;
-  padding: 15px 32px;
+  padding: 12px 16px;
   border: 1px solid var(--c-line);
   border-radius: 999px;
   background: transparent;
@@ -645,7 +658,8 @@ a {
   color: var(--c-muted);
 }
 
-.filters__field select {
+.filters__field select,
+.filters__field input {
   padding: 12px 14px;
   border: 1px solid var(--c-line);
   border-radius: 2px;
@@ -653,6 +667,10 @@ a {
   color: var(--c-text);
   font-family: var(--f-mono);
   font-size: 13px;
+}
+
+.filters__field input::placeholder {
+  color: var(--c-muted);
 }
 
 .filters__actions {
@@ -2128,6 +2146,32 @@ a {
 
 /* --- login --- */
 
+/* the pre-auth gateway has no shell nav to sit inside (there's no session
+   yet to show identity for), so it's centered as its own full-height screen
+   rather than laid out as a normal content page */
+.admin-gate {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 32px;
+  min-height: 100dvh;
+  padding: var(--gutter);
+}
+
+.admin-gate__mark {
+  font-family: var(--f-display);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--c-muted);
+}
+
+.admin-gate__panel {
+  width: 100%;
+}
+
 .auth {
   max-width: 560px;
   padding: clamp(28px, 4vw, 48px);
@@ -2177,46 +2221,263 @@ a {
   margin-top: 10px;
 }
 
-/* --- admin --- */
+/* --- admin shell: persistent rail, so identity + section nav stop being
+   copy-pasted markup on every admin page --- */
 
-.admin-bar {
+.admin-shell {
+  display: flex;
+  align-items: stretch;
+  min-height: 100dvh;
+}
+
+.admin-nav {
+  flex: 0 0 216px;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  position: sticky;
+  top: 0;
+  height: 100dvh;
+  overflow-y: auto;
+  padding: 28px 20px;
+  border-right: 1px solid var(--c-line-soft);
+  background: var(--c-raise);
+}
+
+.admin-nav__brand {
+  font-family: var(--f-mono);
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--c-accent);
+}
+
+/* hamburger trigger: hidden on desktop, where the rail is always open */
+.admin-nav__toggle {
+  display: none;
+}
+
+/* on desktop the panel is just a layout pass-through so .admin-nav's own
+   flex column (brand, links, identity pinned to the bottom) is unaffected */
+.admin-nav__panel {
+  display: contents;
+}
+
+.admin-nav__links {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.admin-nav__link {
+  padding: 10px 12px;
+  border-radius: 4px;
+  font-family: var(--f-mono);
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--c-muted);
+  transition:
+    color 150ms ease,
+    background 150ms ease;
+}
+
+.admin-nav__link:hover {
+  color: var(--c-text);
+  background: var(--c-line-soft);
+}
+
+.admin-nav__link[aria-current="page"] {
+  background: color-mix(in srgb, var(--c-accent) 12%, transparent);
+  color: var(--c-accent);
+}
+
+.admin-nav__identity {
+  display: grid;
+  gap: 4px;
+  margin-top: auto;
+  padding-top: 20px;
+  border-top: 1px solid var(--c-line-soft);
+}
+
+.admin-nav__name {
+  font-size: 13px;
+  color: var(--c-text);
+}
+
+.admin-nav__handle {
+  font-family: var(--f-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: var(--c-muted);
+}
+
+.admin-nav__signout {
+  justify-self: start;
+  margin-top: 8px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-family: var(--f-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--c-accent);
+  cursor: pointer;
+}
+
+.admin-nav__signout:hover {
+  color: var(--c-accent-hi);
+}
+
+.admin-shell__main {
+  flex: 1;
+  min-width: 0;
+}
+
+.admin-shell__content {
+  padding-block: clamp(28px, 4vw, 48px);
+}
+
+@media (max-width: 860px) {
+  .admin-shell {
+    flex-direction: column;
+  }
+
+  .admin-nav {
+    position: relative;
+    height: auto;
+    flex-direction: row;
+    align-items: center;
+    gap: 16px;
+    border-right: 0;
+    flex: 0;
+    border-bottom: 1px solid var(--c-line-soft);
+  }
+
+  .admin-nav__toggle {
+    display: inline-flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 4px;
+    width: 34px;
+    height: 34px;
+    margin-inline-start: auto;
+    padding: 0;
+    border: 1px solid var(--c-line);
+    border-radius: 4px;
+    background: transparent;
+    cursor: pointer;
+  }
+
+  .admin-nav__toggle-bar {
+    width: 16px;
+    height: 2px;
+    margin-inline: auto;
+    background: var(--c-text);
+  }
+
+  /* overrides the desktop display:contents to become a real dropdown panel,
+     hidden unless the toggle button sets data-open="true" */
+  .admin-nav__panel {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    flex-direction: column;
+    gap: 20px;
+    padding: 20px;
+    border-bottom: 1px solid var(--c-line-soft);
+    background: var(--c-raise);
+  }
+
+  .admin-nav__panel[data-open="true"] {
+    display: flex;
+  }
+
+  .admin-nav__links {
+    flex-direction: column;
+  }
+
+  .admin-nav__identity {
+    margin-top: 0;
+    padding-top: 20px;
+    border-top: 1px solid var(--c-line-soft);
+  }
+}
+
+/* --- admin page head: heading + primary action, replaces the old
+   .admin-bar which mixed this with identity chrome now owned by the rail --- */
+
+.admin-page-head {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  margin-top: 32px;
+  margin-bottom: 28px;
 }
 
-.admin-identity {
+.admin-heading {
+  margin: 0;
+  font-family: var(--f-display);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  text-transform: uppercase;
+  font-size: clamp(24px, 3vw, 34px);
+}
+
+.admin-page-head__actions {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
-  gap: 4px 18px;
-  font-family: var(--f-mono);
-  font-size: 11px;
-  letter-spacing: 0.08em;
-  color: var(--c-muted);
+  gap: 10px;
 }
 
-.admin-identity__link,
-.admin-identity__signout {
-  color: var(--c-accent);
+.admin-back {
+  font-family: var(--f-mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--c-muted);
   transition: color 200ms ease;
 }
 
-.admin-identity__signout {
-  background: none;
-  border: 0;
-  padding: 0;
-  font: inherit;
-  letter-spacing: inherit;
-  cursor: pointer;
+.admin-back:hover {
+  color: var(--c-accent);
 }
 
-.admin-identity__link:hover,
-.admin-identity__signout:hover {
+/* --- badges: one tone system for admin status pills (audit log actions,
+   payment status), instead of two separately-invented color mappings --- */
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 9px;
+  border-radius: 3px;
+  background: var(--c-line);
+  font-family: var(--f-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--c-muted);
+}
+
+.badge--positive {
+  background: color-mix(in srgb, var(--c-accent-hi) 18%, transparent);
   color: var(--c-accent-hi);
+}
+
+.badge--neutral {
+  background: color-mix(in srgb, var(--c-accent) 16%, transparent);
+  color: var(--c-accent);
+}
+
+.badge--negative {
+  background: color-mix(in srgb, var(--c-danger) 16%, transparent);
+  color: var(--c-danger);
 }
 
 .admin-list {
@@ -2231,6 +2492,13 @@ a {
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
+  gap: 16px;
+  padding: 18px 24px;
+}
+
+.admin-row.panel.bracket {
+  flex-direction: column;
+  align-items: flex-start;
   gap: 16px;
   padding: 18px 24px;
 }
@@ -2252,6 +2520,21 @@ a {
   text-transform: uppercase;
   color: var(--c-muted);
   font-variant-numeric: tabular-nums;
+}
+
+/* deck uuid, shown inline next to the duelist's name - link to the Nexus editor */
+.admin-row__uuid {
+  font-family: var(--f-mono);
+  font-size: 12px;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--c-muted);
+  transition: color 200ms ease;
+}
+
+.admin-row__uuid:hover {
+  color: var(--c-accent);
 }
 
 .admin-row__actions {
@@ -2300,12 +2583,8 @@ a {
   text-decoration: underline;
 }
 
-.payment-status--confirmed {
-  color: var(--c-accent);
-}
-
-.payment-status--contested {
-  color: var(--c-danger);
+.payment-status .badge {
+  margin-right: 6px;
 }
 
 .payment-controls {
@@ -2314,7 +2593,10 @@ a {
 
 .payment-controls__confirm {
   display: flex;
+  flex-direction: column;
+  justify-content: center;
   gap: 8px;
+  width: 100%;
 }
 
 .payment-controls__confirm input {
@@ -2346,9 +2628,9 @@ a {
 
 .log__line {
   display: grid;
-  grid-template-columns: 190px 170px 340px 150px 1fr;
+  grid-template-columns: 200px 200px 150px 1fr;
   gap: 16px;
-  align-items: baseline;
+  align-items: center;
   padding: 9px 20px;
   border-bottom: 1px solid var(--c-line-soft);
   white-space: nowrap;
@@ -2371,36 +2653,27 @@ a {
   font-variant-numeric: tabular-nums;
 }
 
-.log__action {
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
-  font-weight: 600;
-}
-
-.log__action--create {
-  color: var(--c-accent-hi);
-}
-
-.log__action--update {
-  color: var(--c-accent);
-}
-
-.log__action--delete {
-  color: var(--c-danger);
-}
-
-.log__action--system {
-  color: var(--c-muted);
-}
-
 .log__actor {
   color: var(--c-text);
   overflow: hidden;
   text-overflow: ellipsis;
+  display: flex;
+  flex-direction: column;
+}
+
+.log__actor-displayName {
+  font-size: large;
 }
 
 .log__target {
   color: var(--c-muted);
+  white-space: break-spaces;
+}
+
+.log__group {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
 .log__detail {
@@ -2417,6 +2690,16 @@ a {
   background: color-mix(in srgb, var(--c-danger) 14%, transparent);
 }
 
+.form--flex {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.form--flex .form__field {
+  flex: 1;
+}
+
 .form--grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2424,14 +2707,46 @@ a {
   margin-top: 28px;
 }
 
-.form__field {
+.form--grid-3 {
   display: grid;
-  gap: 7px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px 20px;
+  margin-top: 28px;
+}
+
+.form__group {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px 20px;
+}
+
+.form-group * {
+  flex: 1
+}
+
+.payment-controls__confirm .form__group {
+  width: 100%;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.payment-controls__confirm .form__group .form__field {
+  width: 100%;
+}
+
+.form__field {
   min-width: 0;
 }
 
 .form__field--full {
   grid-column: 1 / -1;
+}
+
+/* short enum selects (Entry, Currency) don't need to stretch across the
+   whole grid column - a full-width box for "Free / Paid" reads as empty space */
+.form__field--compact select {
+  width: auto;
+  min-width: 140px;
+  max-width: 220px;
 }
 
 .form__field label {
@@ -2483,6 +2798,7 @@ a {
   color: var(--c-muted);
   font-family: var(--f-mono);
   font-size: 14px;
+  min-width: 56px;
 }
 
 .input-affix input {
@@ -2578,6 +2894,10 @@ a {
   .deck__view-panel--text {
     grid-template-columns: auto auto;
   }
+
+  .form--grid-3 {
+    grid-template-columns: 1fr 1fr;
+  }
 }
 
 @media (max-width: 719px) {
@@ -2643,7 +2963,7 @@ a {
     min-width: 100%;
   }
 
-  .form--grid {
+  .form--grid, .form--grid-3 {
     grid-template-columns: 1fr;
   }
 
@@ -2674,4 +2994,9 @@ a {
   *::after {
     transition-duration: 0.01ms !important;
   }
+}
+
+input:disabled, select:disabled {
+  opacity: .355;
+  cursor: not-allowed;
 }

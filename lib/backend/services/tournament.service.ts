@@ -103,6 +103,18 @@ export async function removeParticipant(slug: string, id: string): Promise<boole
   return repos().registrations.remove(slug, id);
 }
 
+/** Re-points a registration at a different (already-validated) deck UUID. */
+export async function setParticipantDeck(
+  slug: string,
+  id: string,
+  deckName: string,
+): Promise<Participant | null> {
+  const { registrations } = repos();
+  const ok = await registrations.updateDeck(slug, id, deckName);
+  if (!ok) return null;
+  return registrations.findOne(slug, id);
+}
+
 /** status stays "pending" until confirmed at least once; contest never clears proofUrl. */
 export async function setParticipantPayment(
   slug: string,

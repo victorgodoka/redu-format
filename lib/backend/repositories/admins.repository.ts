@@ -36,6 +36,21 @@ export class AdminsRepository {
     return rows[0]?.id ?? null;
   }
 
+  async findNexusToken(discordUserId: string): Promise<string | null> {
+    const [rows] = await this.pool.query<RowDataPacket[]>(
+      "SELECT nexus_token FROM admins WHERE discord_user_id = ?",
+      [discordUserId],
+    );
+    return rows[0]?.nexus_token ?? null;
+  }
+
+  async setNexusToken(discordUserId: string, token: string | null): Promise<void> {
+    await this.pool.query("UPDATE admins SET nexus_token = ? WHERE discord_user_id = ?", [
+      token,
+      discordUserId,
+    ]);
+  }
+
   /** Test seam. */
   async clear(): Promise<void> {
     await this.pool.query("DELETE FROM admins");

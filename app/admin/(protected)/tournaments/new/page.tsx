@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { getAdminSession } from "@/lib/auth/session";
 import { createTournamentAction } from "../actions";
 import TournamentForm from "../tournament-form";
 
@@ -8,23 +9,23 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-export default function NewTournamentPage() {
+export default async function NewTournamentPage() {
+  const session = await getAdminSession();
+
   return (
     <>
-      <main className="section" id="main">
-        <div className="wrap">
-          <p className="tab">Admin</p>
+      <div className="admin-page-head">
+        <h1 className="admin-heading">New tournament</h1>
+        <Link className="admin-back" href="/admin/tournaments">
+          ← Back to tournaments
+        </Link>
+      </div>
 
-          <div className="admin-bar">
-            <h1 className="section__title">New tournament</h1>
-            <Link className="filters__reset" href="/admin/tournaments">
-              ← Back to tournaments
-            </Link>
-          </div>
-
-          <TournamentForm action={createTournamentAction} />
-        </div>
-      </main>
+      <TournamentForm
+        isEditing={false}
+        action={createTournamentAction}
+        defaultHost={session?.displayName ?? session?.username}
+      />
     </>
   );
 }

@@ -9,3 +9,13 @@ export async function upsertAdmin(input: {
 }): Promise<void> {
   await new AdminsRepository(getPool()).upsert(input);
 }
+
+/** The durably-linked Dueling Nexus token for this admin, or null if none is linked. */
+export async function getAdminNexusToken(discordUserId: string): Promise<string | null> {
+  return new AdminsRepository(getPool()).findNexusToken(discordUserId);
+}
+
+/** Persists (or, with `null`, clears) the admin's linked Dueling Nexus token. */
+export async function setAdminNexusToken(discordUserId: string, token: string | null): Promise<void> {
+  await new AdminsRepository(getPool()).setNexusToken(discordUserId, token);
+}

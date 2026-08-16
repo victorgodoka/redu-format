@@ -4,7 +4,14 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { recordAction } from "@/lib/audit-log";
 import { getAdminSession } from "@/lib/auth/session";
-import { ENGINES, recommendedTopCut, SEAT_OPTIONS, type Engine, type Structure } from "@/lib/events";
+import {
+  ENGINES,
+  recommendedTopCut,
+  SEAT_OPTIONS,
+  zonedDateTimeToUtc,
+  type Engine,
+  type Structure,
+} from "@/lib/events";
 import {
   createTournament,
   deleteTournament,
@@ -25,9 +32,10 @@ function readDraft(form: FormData): TournamentDraft | { error: string } {
 
   const date = String(form.get("startsAtDate") ?? "");
   const time = String(form.get("startsAtTime") ?? "");
-  const startsAtMs = new Date(`${date}T${time}`).getTime();
-  if (!date || !time || Number.isNaN(startsAtMs)) {
-    return { error: "Pick a valid start date and time." };
+  const timeZone = String(form.get("timezone") ?? "").trim() || "UTC";
+  const startsAt = date && time ? zonedDateTimeToUtc(date, time, timeZone) : null;
+  if (!startsAt) {
+    return { error: "Pick a valid start date, time, and timezone." };
   }
 
   const structure = String(form.get("structure") ?? "") as Structure;
@@ -87,7 +95,7 @@ function readDraft(form: FormData): TournamentDraft | { error: string } {
 
   return {
     name,
-    startsAt: new Date(startsAtMs).toISOString(),
+    startsAt: startsAt.toISOString(),
     structure,
     rounds,
     topCut,

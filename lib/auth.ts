@@ -17,6 +17,7 @@ import {
   invalidateCachedProfile,
   setCachedProfile,
 } from "./backend/services/nexus-cache.service";
+import { resolvePlayerId } from "./backend/services/player.service";
 
 const NEXUS_INFO = "https://duelingnexus.com/api/get-info.php";
 
@@ -175,5 +176,35 @@ export const fetchProfile = cache(async function fetchProfile(
 
   return profile;
 });
+
+/**
+ * Populates the public player session (the same one /login's form sets) from
+ * a Nexus token that's already known-good elsewhere - the admin dashboard's
+ * link flow, so linking a token there also signs the admin in as a player,
+ * without asking them to paste it again at /login. Best-effort: a revoked
+ * token just means no public session gets created, not an error the caller
+ * needs to handle.
+ */
+export async function establishPublicSession(token: string): Promise<boolean> {
+  const profile = await fetchProfile(token);
+  if (!profile) return false;
+
+  await resolvePlayerId(token, {
+    name: profile.name,
+    avatar: profile.avatar,
+    contributor: profile.contributor,
+    contributorTime: profile.contributorTime,
+  });
+
+  const session = await getSession();
+  session.token = token;
+  session.name = profile.name;
+  session.avatar = profile.avatar;
+  session.contributor = profile.contributor;
+  session.contributorTime = profile.contributorTime;
+  await session.save();
+
+  return true;
+}
 
 export { rateLimit } from "./rate-limit";

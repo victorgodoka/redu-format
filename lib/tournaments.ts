@@ -6,6 +6,7 @@ export {
   listParticipants,
   listTournaments,
   removeParticipant,
+  setParticipantDeck,
   setParticipantPayment,
   slugify,
   updateTournament,

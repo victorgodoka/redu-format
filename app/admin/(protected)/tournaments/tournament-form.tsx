@@ -30,18 +30,9 @@ function subscribeNever() {
 // getSnapshot must return a referentially stable value when nothing changed,
 // or useSyncExternalStore re-renders forever; the list never changes at
 // runtime, so computing it once and caching the same array is correct.
-let cachedCurrencyOptions: string[] | null = null;
+// TEMPORARY WE WILL SUPPORT ONLY YHE PINNED_CURRENCIES
 function fullCurrencyOptions(): string[] {
-  if (!cachedCurrencyOptions) {
-    cachedCurrencyOptions =
-      typeof Intl.supportedValuesOf === "function"
-        ? [
-            ...PINNED_CURRENCIES,
-            ...Intl.supportedValuesOf("currency").filter((c) => !PINNED_CURRENCIES.includes(c)),
-          ]
-        : PINNED_CURRENCIES;
-  }
-  return cachedCurrencyOptions;
+  return PINNED_CURRENCIES;
 }
 
 /** The actual glyph for a currency (R$, $, €, ...), read off Intl instead of hand-mapped. */
@@ -50,6 +41,43 @@ function currencySymbol(currency: string): string {
     .formatToParts(0)
     .find((p) => p.type === "currency");
   return part?.value ?? currency;
+}
+
+/**
+ * IANA zone names, same SSR-safe pattern as fullCurrencyOptions above. The
+ * server-snapshot fallback must be this exact same array reference every
+ * call - a fresh `["UTC"]` literal each render is what threw "getServerSnapshot
+ * should be cached" below.
+ */
+const UTC_ONLY = ["UTC"];
+
+let cachedTimeZoneOptions: string[] | null = null;
+function timeZoneOptions(): string[] {
+  if (!cachedTimeZoneOptions) {
+    cachedTimeZoneOptions =
+      typeof Intl.supportedValuesOf === "function"
+        ? Intl.supportedValuesOf("timeZone")
+        : UTC_ONLY;
+  }
+  return cachedTimeZoneOptions;
+}
+
+function detectedTimeZone(): string {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+  } catch {
+    return "UTC";
+  }
+}
+
+/** Keeps only digits, for the calculator-style amount mask below. */
+function digitsOnly(value: string): string {
+  return value.replace(/\D/g, "");
+}
+
+/** Cents (as typed digits) to a "12.34" decimal string. */
+function centsToAmount(cents: string): string {
+  return cents ? (Number(cents) / 100).toFixed(2) : "";
 }
 
 /** "2026-08-12" for a date input, from a UTC ISO string. */
@@ -71,39 +99,90 @@ const initial: TournamentFormState = {};
 export default function TournamentForm({
   action,
   tournament,
+  defaultHost,
+  isEditing,
 }: {
-  action: (state: TournamentFormState, form: FormData) => Promise<TournamentFormState>;
+  action: (
+    state: TournamentFormState,
+    form: FormData,
+  ) => Promise<TournamentFormState>;
   tournament?: TournamentEvent;
+  /** Display name (fallback username) of the admin creating a new tournament - unused when editing, since the field already has a real value. */
+  defaultHost?: string;
+  isEditing?: boolean
 }) {
   const [state, formAction, pending] = useActionState(action, initial);
 
-  const [structure, setStructure] = useState<Structure>(tournament?.structure ?? "swiss");
-  const [seats, setSeats] = useState(
-    tournament ? (tournament.seats === null ? "unlimited" : String(tournament.seats)) : "64",
+  const [structure, setStructure] = useState<Structure>(
+    tournament?.structure ?? "swiss",
   );
-  const [hasTopCut, setHasTopCut] = useState(tournament ? tournament.topCut !== null : false);
-  const [entryType, setEntryType] = useState<"free" | "paid">(tournament?.entry.type ?? "free");
+  const [seats, setSeats] = useState(
+    tournament
+      ? tournament.seats === null
+        ? "unlimited"
+        : String(tournament.seats)
+      : "64",
+  );
+  const [hasTopCut, setHasTopCut] = useState(
+    tournament ? tournament.topCut !== null : false,
+  );
+  const [entryType, setEntryType] = useState<"free" | "paid">(
+    tournament?.entry.type ?? "free",
+  );
   const [currency, setCurrency] = useState(
     tournament?.entry.type === "paid" ? tournament.entry.currency : "USD",
   );
+  const [amountCents, setAmountCents] = useState(() =>
+    tournament?.entry.type === "paid"
+      ? String(Math.round(tournament.entry.amount * 100))
+      : "",
+  );
+  const amountValue = centsToAmount(amountCents);
 
   const currencyOptions = useSyncExternalStore(
     subscribeNever,
     fullCurrencyOptions,
     () => PINNED_CURRENCIES,
   );
+  const timezoneOptions = useSyncExternalStore(
+    subscribeNever,
+    timeZoneOptions,
+    () => UTC_ONLY,
+  );
+
+  // "UTC" for a stable server/first-paint snapshot, the browser's real zone
+  // once the client snapshot is available - same useSyncExternalStore
+  // pattern as the currency and timezone option lists above, so this needs
+  // no effect (and can't desync from what those lists resolve to).
+  const detectedTimezone = useSyncExternalStore(
+    subscribeNever,
+    detectedTimeZone,
+    () => "UTC",
+  );
+  const [manualTimezone, setManualTimezone] = useState<string | null>(null);
+  const timezone = manualTimezone ?? detectedTimezone;
 
   const seatsNumber = seats === "unlimited" ? null : Number(seats);
-  const showTopCut = structure === "swiss" && (seatsNumber === null || seatsNumber > 8);
-  const topCutSize = seatsNumber !== null ? recommendedTopCut(seatsNumber) : null;
+  const showTopCut =
+    structure === "swiss" && (seatsNumber === null || seatsNumber > 8);
+  const topCutSize =
+    seatsNumber !== null ? recommendedTopCut(seatsNumber) : null;
 
   return (
     <form action={formAction} className="form form--grid">
-      {tournament ? <input type="hidden" name="slug" value={tournament.slug} /> : null}
+      {tournament ? (
+        <input type="hidden" name="slug" value={tournament.slug} />
+      ) : null}
 
       <div className="form__field form__field--full">
         <label htmlFor="name">Name</label>
-        <input id="name" name="name" type="text" defaultValue={tournament?.name} required />
+        <input
+          id="name"
+          name="name"
+          type="text"
+          defaultValue={tournament?.name}
+          required
+        />
       </div>
 
       <div className="form__field">
@@ -112,20 +191,45 @@ export default function TournamentForm({
           id="startsAtDate"
           name="startsAtDate"
           type="date"
-          defaultValue={tournament ? toLocalDate(tournament.startsAt) : undefined}
+          defaultValue={
+            tournament ? toLocalDate(tournament.startsAt) : undefined
+          }
           required
         />
       </div>
 
-      <div className="form__field">
-        <label htmlFor="startsAtTime">Starts at</label>
-        <input
-          id="startsAtTime"
-          name="startsAtTime"
-          type="time"
-          defaultValue={tournament ? toLocalTime(tournament.startsAt) : undefined}
-          required
-        />
+      <div className="form__group">
+        <div className="form__field">
+          <label htmlFor="startsAtTime">Starts at</label>
+          <input
+            id="startsAtTime"
+            name="startsAtTime"
+            type="time"
+            defaultValue={
+              tournament ? toLocalTime(tournament.startsAt) : undefined
+            }
+            required
+          />
+        </div>
+
+        <div className="form__field">
+          <label htmlFor="timezone">Timezone</label>
+          <select
+            id="timezone"
+            name="timezone"
+            value={timezone}
+            onChange={(e) => setManualTimezone(e.target.value)}
+          >
+            {timezoneOptions.includes(timezone) ? null : (
+              <option value={timezone}>{timezone}</option>
+            )}
+            {timezoneOptions.map((tz) => (
+              <option key={tz} value={tz}>
+                {tz}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
       <div className="form__field">
@@ -142,6 +246,28 @@ export default function TournamentForm({
             </option>
           ))}
         </select>
+        {showTopCut ? (
+          <div className="form__field">
+            <label className="topcut__toggle">
+              <input
+                type="checkbox"
+                name="hasTopCut"
+                checked={hasTopCut}
+                onChange={(e) => setHasTopCut(e.target.checked)}
+              />
+              <span>This tournament cuts to a bracket after Swiss</span>
+              {hasTopCut ? (
+                <p className="form__hint">
+                  {seatsNumber === null
+                    ? "Unlimited seats: the top cut will be calculated from the number of valid signups once the tournament starts."
+                    : topCutSize
+                      ? `(Top ${topCutSize})`
+                      : ""}
+                </p>
+              ) : null}
+            </label>
+          </div>
+        ) : null}
       </div>
 
       <div className="form__field">
@@ -163,36 +289,23 @@ export default function TournamentForm({
 
       <div className="form__field">
         <label htmlFor="rounds">Rounds</label>
-        <input id="rounds" name="rounds" type="number" min={1} defaultValue={tournament?.rounds ?? 5} required />
+        <input
+          id="rounds"
+          name="rounds"
+          type="number"
+          min={1}
+          defaultValue={tournament?.rounds ?? 5}
+          required
+        />
       </div>
-
-      {showTopCut ? (
-        <div className="form__field form__field--full">
-          <label>Top cut</label>
-          <label className="topcut__toggle">
-            <input
-              type="checkbox"
-              name="hasTopCut"
-              checked={hasTopCut}
-              onChange={(e) => setHasTopCut(e.target.checked)}
-            />
-            This tournament cuts to a bracket after Swiss
-          </label>
-          {hasTopCut ? (
-            <p className="form__hint">
-              {seatsNumber === null
-                ? "Unlimited seats: the top cut will be calculated from the number of valid signups once the tournament starts."
-                : topCutSize
-                  ? `Top ${topCutSize}, based on ${seatsNumber} seats.`
-                  : "No top cut at this seat count."}
-            </p>
-          ) : null}
-        </div>
-      ) : null}
 
       <div className="form__field">
         <label htmlFor="matchFormat">Match format</label>
-        <select id="matchFormat" name="matchFormat" defaultValue={tournament?.matchFormat ?? "Bo3"}>
+        <select
+          id="matchFormat"
+          name="matchFormat"
+          defaultValue={tournament?.matchFormat ?? "Bo3"}
+        >
           {MATCH_FORMATS.map((m) => (
             <option key={m} value={m}>
               {m}
@@ -203,7 +316,11 @@ export default function TournamentForm({
 
       <div className="form__field">
         <label htmlFor="engine">Engine</label>
-        <select id="engine" name="engine" defaultValue={tournament?.engine ?? "dueling-nexus"}>
+        <select
+          id="engine"
+          name="engine"
+          defaultValue={tournament?.engine ?? "dueling-nexus"}
+        >
           {(Object.keys(ENGINES) as Engine[]).map((value) => (
             <option key={value} value={value}>
               {ENGINES[value].label}
@@ -222,20 +339,7 @@ export default function TournamentForm({
           defaultValue={tournament?.roundLimitDays ?? 2}
           required
         />
-        <p className="form__hint">
-          How long a round stays open for players to duel before it&apos;s force-closed and
-          anyone missing a result auto-loses.
-        </p>
       </div>
-
-      {tournament ? (
-        <div className="form__field">
-          <label>Seats taken</label>
-          <p className="form__hint">
-            {tournament.taken} - counted from real registrations, not editable here
-          </p>
-        </div>
-      ) : null}
 
       <div className="form__field">
         <label htmlFor="entryType">Entry</label>
@@ -255,22 +359,26 @@ export default function TournamentForm({
           <div className="form__field">
             <label htmlFor="entryAmount">Amount</label>
             <div className="input-affix">
-              <span className="input-affix__symbol">{currencySymbol(currency)}</span>
+              <span className="input-affix__symbol">
+                {currencySymbol(currency)}
+              </span>
               <input
                 id="entryAmount"
-                name="entryAmount"
-                type="number"
-                min="0.01"
-                step="0.01"
-                defaultValue={
-                  tournament?.entry.type === "paid" ? tournament.entry.amount : undefined
-                }
+                type="text"
+                inputMode="decimal"
+                autoComplete="off"
+                value={amountValue}
+                onChange={(e) => setAmountCents(digitsOnly(e.target.value))}
+                placeholder="0.00"
                 required
+                readOnly={isEditing}
+                disabled={isEditing}
               />
             </div>
+            <input readOnly={isEditing} disabled={isEditing} type="hidden" name="entryAmount" value={amountValue} />
           </div>
 
-          <div className="form__field">
+          {!isEditing && <div className="form__field form__field--compact">
             <label htmlFor="entryCurrency">Currency</label>
             <select
               id="entryCurrency"
@@ -284,8 +392,23 @@ export default function TournamentForm({
                 </option>
               ))}
             </select>
-          </div>
+          </div>}
         </>
+      ) : null}
+
+      {tournament ? (
+        <div className="form__field">
+          <label>Seats taken</label>
+          <input
+            id="seatsTaken"
+            name="seatsTaken"
+            type="number"
+            disabled={isEditing}
+            readOnly={isEditing}
+            defaultValue={tournament.taken}
+            required
+          />
+        </div>
       ) : null}
 
       <div className="form__field">
@@ -294,7 +417,9 @@ export default function TournamentForm({
           id="host"
           name="host"
           type="text"
-          defaultValue={tournament?.host}
+          defaultValue={tournament?.host ?? defaultHost}
+          disabled={isEditing}
+          readOnly={isEditing}
           placeholder="Dueling Nexus"
         />
       </div>
@@ -317,7 +442,11 @@ export default function TournamentForm({
       ) : null}
 
       <button className="btn btn--solid" type="submit" disabled={pending}>
-        {pending ? "Saving..." : tournament ? "Save changes" : "Create tournament"}
+        {pending
+          ? "Saving..."
+          : tournament
+            ? "Save changes"
+            : "Create tournament"}
       </button>
     </form>
   );

@@ -67,7 +67,7 @@ export function formatEntry(entry: EntryFee): string {
  * can never drift apart.
  */
 export function recommendedTopCut(seats: number): number | null {
-  if (seats <= 8) return null;
+  // if (seats <= 8) return null;
   if (seats <= 16) return 4;
   if (seats <= 128) return 8;
   if (seats <= 256) return 16;
@@ -631,6 +631,29 @@ export function fillRatio(event: TournamentEvent): number {
 
 export function isPast(event: TournamentEvent, now: Date): boolean {
   return new Date(event.startsAt).getTime() < now.getTime();
+}
+
+/**
+ * Combines a date input value, a time input value, and an IANA zone name into
+ * the UTC instant the admin meant - `new Date(`${date}T${time}`)` alone
+ * parses in whatever timezone the Node process happens to run in, which
+ * silently disagrees with the admin's own wall-clock reading unless the two
+ * happen to match. No timezone-database dependency needed: rendering the same
+ * instant through the target zone and through UTC reveals the offset between
+ * them, which is the standard trick for this without a library.
+ */
+export function zonedDateTimeToUtc(date: string, time: string, timeZone: string): Date | null {
+  const naive = new Date(`${date}T${time}:00Z`);
+  if (Number.isNaN(naive.getTime())) return null;
+
+  try {
+    const asZoned = new Date(naive.toLocaleString("en-US", { timeZone }));
+    const asUtc = new Date(naive.toLocaleString("en-US", { timeZone: "UTC" }));
+    const offsetMs = asUtc.getTime() - asZoned.getTime();
+    return new Date(naive.getTime() + offsetMs);
+  } catch {
+    return null;
+  }
 }
 
 /** 80% is the point where a room reads as "about to sell out". */

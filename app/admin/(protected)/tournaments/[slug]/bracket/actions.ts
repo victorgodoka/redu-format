@@ -48,29 +48,40 @@ export async function startBracketAction(
   return {};
 }
 
+/**
+ * player1Wins/player2Wins each come in as "1" (win), "0" (loss), or "draw" -
+ * the three <option>s the select in the page offers. Only a win/loss split or
+ * a matching pair of draws is a coherent match result; anything else (both
+ * "Win", one "Draw" paired with the other's "Win", ...) is a no-op rather
+ * than a guess at what the admin meant.
+ */
 export async function enterResultAction(form: FormData) {
   const slug = String(form.get("slug") ?? "");
   const matchId = String(form.get("matchId") ?? "");
-  const player1Wins = Number(form.get("player1Wins"));
-  const player2Wins = Number(form.get("player2Wins"));
-  const draws = Number(form.get("draws") ?? "0");
+  const p1 = String(form.get("player1Wins") ?? "");
+  const p2 = String(form.get("player2Wins") ?? "");
   if (!slug || !matchId) return;
-  if (
-    !Number.isInteger(player1Wins) ||
-    !Number.isInteger(player2Wins) ||
-    player1Wins < 0 ||
-    player2Wins < 0
-  ) {
+
+  let player1Wins: number;
+  let player2Wins: number;
+  let draws: number;
+  if (p1 === "draw" && p2 === "draw") {
+    [player1Wins, player2Wins, draws] = [0, 0, 1];
+  } else if (p1 === "1" && p2 === "0") {
+    [player1Wins, player2Wins, draws] = [1, 0, 0];
+  } else if (p1 === "0" && p2 === "1") {
+    [player1Wins, player2Wins, draws] = [0, 1, 0];
+  } else {
     return;
   }
 
-  await enterMatchResult(slug, matchId, player1Wins, player2Wins, Number.isInteger(draws) ? draws : 0);
+  await enterMatchResult(slug, matchId, player1Wins, player2Wins, draws);
 
   await recordAction({
     ...(await actor()),
     action: "bracket.result",
     target: slug,
-    detail: `Reported a match result in "${slug}" (${player1Wins}-${player2Wins}${draws ? `-${draws} draws` : ""})`,
+    detail: `Reported a match result in "${slug}" (${draws ? "draw" : `${player1Wins}-${player2Wins}`})`,
   });
 
   revalidatePath(`/admin/tournaments/${slug}/bracket`);

@@ -22,34 +22,28 @@ export default async function EditTournamentPage({
 
   return (
     <>
-      <main className="section" id="main">
-        <div className="wrap">
-          <p className="tab">Admin</p>
+      <div className="admin-page-head">
+        <h1 className="admin-heading">{tournament.name}</h1>
+        <Link className="admin-back" href="/admin/tournaments">
+          ← Back to tournaments
+        </Link>
+      </div>
 
-          <div className="admin-bar">
-            <h1 className="section__title">{tournament.name}</h1>
-            <Link className="filters__reset" href="/admin/tournaments">
-              ← Back to tournaments
-            </Link>
-          </div>
+      <TournamentForm isEditing={true} action={updateTournamentAction} tournament={tournament} />
 
-          <TournamentForm action={updateTournamentAction} tournament={tournament} />
-
-          <div className="admin-bar">
-            <Link className="btn" href={`/admin/tournaments/${tournament.slug}/participants`}>
-              Manage participants
-            </Link>
-            <Link className="btn" href={`/admin/tournaments/${tournament.slug}/bracket`}>
-              Manage bracket
-            </Link>
-            <DeleteButton
-              action={deleteTournamentAction}
-              hidden={{ slug: tournament.slug }}
-              confirmText={`Delete ${tournament.name}? This cannot be undone.`}
-            />
-          </div>
-        </div>
-      </main>
+      <div className="dash-actions">
+        <Link className="btn" href={`/admin/tournaments/${tournament.slug}/participants`}>
+          Manage participants
+        </Link>
+        <Link className="btn" href={`/admin/tournaments/${tournament.slug}/bracket`}>
+          Manage bracket
+        </Link>
+        <DeleteButton
+          action={deleteTournamentAction}
+          hidden={{ slug: tournament.slug }}
+          confirmText={`Delete ${tournament.name}? This cannot be undone.`}
+        />
+      </div>
     </>
   );
 }

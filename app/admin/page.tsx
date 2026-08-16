@@ -12,21 +12,19 @@ export default async function AdminPage() {
   if (session) redirect("/admin/dashboard");
 
   return (
-      <main className="section" id="main">
-        <div className="wrap">
-          <div className="auth panel">
-            <p className="tab">Admin</p>
-            <h1 className="auth__title">Sign in with Discord</h1>
-            <p className="lede">
-              Tournament administration is restricted to REDU Format
-              moderators. Sign in with the Discord account that holds that
-              role.
-            </p>
-            <a className="btn btn--solid" href="/admin/login">
-              Continue with Discord
-            </a>
-          </div>
-        </div>
-      </main>
+    <main className="admin-gate" id="main">
+      <p className="admin-gate__mark">REDU Format</p>
+      <div className="auth panel admin-gate__panel">
+        <p className="tab">Admin</p>
+        <h1 className="auth__title">Sign in with Discord</h1>
+        <p className="lede">
+          Tournament administration is restricted to REDU Format moderators.
+          Sign in with the Discord account that holds that role.
+        </p>
+        <a className="btn btn--solid" href="/admin/login">
+          Continue with Discord
+        </a>
+      </div>
+    </main>
   );
 }

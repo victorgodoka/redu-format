@@ -9,6 +9,8 @@ export type AdminAction =
   | "tournament.delete"
   | "participant.add"
   | "participant.remove"
+  | "participant.drop"
+  | "participant.deck_update"
   | "payment.confirm"
   | "payment.contest"
   | "nexus.link"
@@ -26,6 +28,8 @@ export const ADMIN_ACTIONS: readonly AdminAction[] = [
   "tournament.delete",
   "participant.add",
   "participant.remove",
+  "participant.drop",
+  "participant.deck_update",
   "payment.confirm",
   "payment.contest",
   "nexus.link",

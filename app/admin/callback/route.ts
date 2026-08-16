@@ -9,8 +9,9 @@ import {
 
 import { discordConfig } from "@/lib/discord/config";
 import { createAdminSession } from "@/lib/auth/session";
+import { establishPublicSession } from "@/lib/auth";
 import { recordAction } from "@/lib/audit-log";
-import { upsertAdmin } from "@/lib/backend/services/admins.service";
+import { getAdminNexusToken, upsertAdmin } from "@/lib/backend/services/admins.service";
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
@@ -59,19 +60,30 @@ export async function GET(request: Request) {
 
     const displayName = user.global_name ?? user.username;
 
-    await createAdminSession({
-      userId: user.id,
-      username: user.username,
-      displayName,
-    });
-
-    // Upsert before recordAction so this very login's own audit entry can
-    // already resolve actor_admin_id, not just the next one.
+    // Upsert before reading the nexus token (first login has no row yet) and
+    // before recordAction, so this very login's own audit entry can already
+    // resolve actor_admin_id, not just the next one.
     await upsertAdmin({
       discordUserId: user.id,
       username: user.username,
       displayName,
     });
+
+    // Durably-linked from a previous session (see the admin dashboard's link
+    // flow) - carried into the fresh admin session, and used to also sign
+    // this admin in on the public/player side, so both logins stay in step
+    // without asking for the token twice. The two sessions otherwise remain
+    // independent: neither one's logout touches the other.
+    const nexusToken = await getAdminNexusToken(user.id);
+
+    await createAdminSession({
+      userId: user.id,
+      username: user.username,
+      displayName,
+      ...(nexusToken ? { nexusToken } : {}),
+    });
+
+    if (nexusToken) await establishPublicSession(nexusToken);
 
     await recordAction({
       actorId: user.id,
