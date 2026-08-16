@@ -48,6 +48,9 @@ export default async function AdminTournamentsPage() {
                 <Link className="btn" href={`/admin/tournaments/${t.slug}/participants`}>
                   Participants
                 </Link>
+                <Link className="btn" href={`/admin/tournaments/new?copyFrom=${t.slug}`}>
+                  Copy
+                </Link>
                 <DeleteButton
                   action={deleteTournamentAction}
                   hidden={{ slug: t.slug }}

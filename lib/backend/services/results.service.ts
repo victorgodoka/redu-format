@@ -347,6 +347,18 @@ export async function startBracket(slug: string, event: TournamentEvent): Promis
       draw: 1,
       loss: 0,
       bye: 3,
+      // Approximates the official Konami tiebreak order (opponents' match-win %,
+      // then opponents' opponents' match-win %) for the engine's *internal*
+      // seeding of the stage-two (Top Cut) bracket, which always calls
+      // getStandings() itself - see Tournament.nextRound() in tournament-organizer.
+      // Without this the engine had no tiebreaks configured, so ties fell back to
+      // player ID order when seeding Top Cut. This is an approximation, not the
+      // real formula: the engine's own OMW%/OOMW% skip the 1/3 floor and there's
+      // no DDD (rounds-lost) tiebreak here. The exact official formula - floor
+      // included - already lives in officialTiebreakScore() below and drives the
+      // actual displayed standings and final placings; it just can't reach into
+      // the engine's own bracket-seeding step.
+      tiebreaks: ["opponent match win percentage", "opponent opponent match win percentage"],
     },
     stageOne: {
       format: toStageOneFormat(event.structure),
@@ -384,6 +396,12 @@ export async function generateNextRound(slug: string): Promise<void> {
  * (if anything) players have self-reported for this match - clearing those
  * reports afterward so a stale disagreement doesn't linger once a mod has
  * settled it. This is also how a disputed match gets resolved.
+ *
+ * Only reachable for the match's own round: once any match in a later round
+ * has been paired, that round has "started" and everything before it is
+ * locked - no retroactive correction once play has moved on. A round can't
+ * advance while one of its own matches is still disputed, so this never
+ * blocks a genuine first-time resolution, only a correction attempted too late.
  */
 export async function enterMatchResult(
   slug: string,
@@ -397,11 +415,19 @@ export async function enterMatchResult(
   const engine = await loadEngine(tournamentId);
   if (!engine) throw new Error(`Tournament "${slug}" has no bracket yet`);
 
+  const match = engine.getMatch(matchId);
+  const nextRoundStarted = engine
+    .getMatches()
+    .some((m) => m.getRoundNumber() > match.getRoundNumber() && m.isPaired());
+  if (nextRoundStarted) {
+    throw new Error("This match's round has already closed - the next round has started, so its result can no longer be changed.");
+  }
+
   // Rewriting an already-decided match (a self-report resolution or an earlier
   // override) has to go through clearResult() first - it's what unwinds any
   // elimination-bracket progression the old result already caused, so the
   // correction propagates forward cleanly instead of double-advancing anyone.
-  if (engine.getMatch(matchId).hasEnded()) {
+  if (match.hasEnded()) {
     engine.clearResult(matchId);
   }
   const { id: matchP1Id } = engine.getMatch(matchId).getPlayer1();

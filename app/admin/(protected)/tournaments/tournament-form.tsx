@@ -170,7 +170,7 @@ export default function TournamentForm({
 
   return (
     <form action={formAction} className="form form--grid">
-      {tournament ? (
+      {isEditing && tournament ? (
         <input type="hidden" name="slug" value={tournament.slug} />
       ) : null}
 
@@ -280,7 +280,7 @@ export default function TournamentForm({
         >
           <option value="unlimited">Unlimited</option>
           {SEAT_OPTIONS.map((n) => (
-            <option key={n} value={n}>
+            <option disabled={(tournament?.taken || 0) > n} key={n} value={n}>
               {n}
             </option>
           ))}
@@ -301,7 +301,16 @@ export default function TournamentForm({
 
       <div className="form__field">
         <label htmlFor="matchFormat">Match format</label>
-        <select
+        {
+          isEditing && tournament
+          ? <input
+            id="matchFormat"
+            name="matchFormat"
+            defaultValue={tournament.matchFormat}
+            readOnly
+            required
+          />
+          : <select
           id="matchFormat"
           name="matchFormat"
           defaultValue={tournament?.matchFormat ?? "Bo3"}
@@ -312,6 +321,7 @@ export default function TournamentForm({
             </option>
           ))}
         </select>
+        }
       </div>
 
       <div className="form__field">
@@ -343,7 +353,15 @@ export default function TournamentForm({
 
       <div className="form__field">
         <label htmlFor="entryType">Entry</label>
-        <select
+        {isEditing && tournament
+        ? <input
+          id="entryType"
+          name="entryType"
+          readOnly
+          defaultValue={tournament.entry.type}
+          required
+        />
+        : <select
           id="entryType"
           name="entryType"
           value={entryType}
@@ -352,6 +370,7 @@ export default function TournamentForm({
           <option value="free">Free</option>
           <option value="paid">Paid</option>
         </select>
+}
       </div>
 
       {entryType === "paid" ? (
@@ -372,41 +391,42 @@ export default function TournamentForm({
                 placeholder="0.00"
                 required
                 readOnly={isEditing}
-                disabled={isEditing}
               />
             </div>
-            <input readOnly={isEditing} disabled={isEditing} type="hidden" name="entryAmount" value={amountValue} />
+            <input type="hidden" name="entryAmount" value={amountValue} />
           </div>
 
-          {!isEditing && <div className="form__field form__field--compact">
-            <label htmlFor="entryCurrency">Currency</label>
-            <select
-              id="entryCurrency"
-              name="entryCurrency"
-              value={currency}
-              onChange={(e) => setCurrency(e.target.value)}
-            >
-              {currencyOptions.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
-          </div>}
+          {!isEditing ? (
+            <div className="form__field form__field--compact">
+              <label htmlFor="entryCurrency">Currency</label>
+              <select
+                id="entryCurrency"
+                name="entryCurrency"
+                value={currency}
+                onChange={(e) => setCurrency(e.target.value)}
+              >
+                {currencyOptions.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : (
+            <input type="hidden" name="entryCurrency" value={currency} />
+          )}
         </>
       ) : null}
 
-      {tournament ? (
+      {isEditing && tournament ? (
         <div className="form__field">
           <label>Seats taken</label>
           <input
             id="seatsTaken"
             name="seatsTaken"
             type="number"
-            disabled={isEditing}
-            readOnly={isEditing}
+            disabled
             defaultValue={tournament.taken}
-            required
           />
         </div>
       ) : null}
@@ -418,7 +438,6 @@ export default function TournamentForm({
           name="host"
           type="text"
           defaultValue={tournament?.host ?? defaultHost}
-          disabled={isEditing}
           readOnly={isEditing}
           placeholder="Dueling Nexus"
         />
@@ -442,10 +461,12 @@ export default function TournamentForm({
       ) : null}
 
       <button className="btn btn--solid" type="submit" disabled={pending}>
-        {pending
-          ? "Saving..."
-          : tournament
-            ? "Save changes"
+        {isEditing
+          ? pending
+            ? "Saving..."
+            : "Save changes"
+          : pending
+            ? "Creating..."
             : "Create tournament"}
       </button>
     </form>
