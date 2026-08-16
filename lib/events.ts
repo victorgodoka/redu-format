@@ -19,6 +19,15 @@ export const ENGINES: Record<Engine, { label: string }> = {
  */
 export type EntryFee = { type: "free" } | { type: "paid"; amount: number; currency: string };
 
+/**
+ * Explicit lifecycle state - the source of truth for what a tournament is
+ * doing right now. `scheduled` -> `running` -> `finished` is the normal path
+ * (via startBracket()/completeBracket()); `cancelled` can happen from either
+ * `scheduled` or `running`, but never from `finished` - a tournament with a
+ * frozen official result can't retroactively un-happen.
+ */
+export type TournamentStatus = "scheduled" | "running" | "finished" | "cancelled";
+
 export type TournamentEvent = {
   slug: string;
   name: string;
@@ -28,10 +37,13 @@ export type TournamentEvent = {
   rounds: number;
   /** Size of the elimination bracket after Swiss, null when there is none. */
   topCut: number | null;
+  status: TournamentStatus;
   /** ISO instant the bracket was actually started, or null if it hasn't been yet. Separate from startsAt - staff can start early, and this is what actually closes registration. */
   startedAt: string | null;
   /** ISO instant completeBracket() froze final placings, or null while the tournament is still upcoming or in progress. */
   finishedAt: string | null;
+  /** ISO instant the tournament was cancelled, or null. */
+  cancelledAt: string | null;
   matchFormat: "Bo1" | "Bo3";
   /**
    * How many days a round stays open before it's force-closed - not a per-duel
@@ -113,6 +125,8 @@ export const events: readonly TournamentEvent[] = [
     topCut: null,
     startedAt: null,
     finishedAt: null,
+    status: "scheduled",
+    cancelledAt: null,
     matchFormat: "Bo3",
     roundLimitDays: 2,
     seats: 64,
@@ -131,6 +145,8 @@ export const events: readonly TournamentEvent[] = [
     topCut: 8,
     startedAt: null,
     finishedAt: null,
+    status: "scheduled",
+    cancelledAt: null,
     matchFormat: "Bo3",
     roundLimitDays: 2,
     seats: 128,
@@ -149,6 +165,8 @@ export const events: readonly TournamentEvent[] = [
     topCut: null,
     startedAt: null,
     finishedAt: null,
+    status: "scheduled",
+    cancelledAt: null,
     matchFormat: "Bo3",
     roundLimitDays: 2,
     seats: 32,
@@ -167,6 +185,8 @@ export const events: readonly TournamentEvent[] = [
     topCut: 8,
     startedAt: null,
     finishedAt: null,
+    status: "scheduled",
+    cancelledAt: null,
     matchFormat: "Bo3",
     roundLimitDays: 2,
     seats: 256,
@@ -185,6 +205,8 @@ export const events: readonly TournamentEvent[] = [
     topCut: null,
     startedAt: null,
     finishedAt: null,
+    status: "scheduled",
+    cancelledAt: null,
     matchFormat: "Bo3",
     roundLimitDays: 2,
     seats: 96,
@@ -203,6 +225,8 @@ export const events: readonly TournamentEvent[] = [
     topCut: null,
     startedAt: null,
     finishedAt: null,
+    status: "scheduled",
+    cancelledAt: null,
     matchFormat: "Bo3",
     roundLimitDays: 2,
     seats: 16,
@@ -221,6 +245,8 @@ export const events: readonly TournamentEvent[] = [
     topCut: null,
     startedAt: null,
     finishedAt: null,
+    status: "scheduled",
+    cancelledAt: null,
     matchFormat: "Bo3",
     roundLimitDays: 2,
     seats: 64,
@@ -239,6 +265,8 @@ export const events: readonly TournamentEvent[] = [
     topCut: 8,
     startedAt: null,
     finishedAt: null,
+    status: "scheduled",
+    cancelledAt: null,
     matchFormat: "Bo3",
     roundLimitDays: 2,
     seats: 128,
@@ -257,6 +285,8 @@ export const events: readonly TournamentEvent[] = [
     topCut: null,
     startedAt: null,
     finishedAt: null,
+    status: "scheduled",
+    cancelledAt: null,
     matchFormat: "Bo1",
     roundLimitDays: 2,
     seats: 32,
@@ -275,6 +305,8 @@ export const events: readonly TournamentEvent[] = [
     topCut: null,
     startedAt: null,
     finishedAt: null,
+    status: "scheduled",
+    cancelledAt: null,
     matchFormat: "Bo3",
     roundLimitDays: 2,
     seats: 64,
@@ -293,6 +325,8 @@ export const events: readonly TournamentEvent[] = [
     topCut: 4,
     startedAt: null,
     finishedAt: null,
+    status: "scheduled",
+    cancelledAt: null,
     matchFormat: "Bo3",
     roundLimitDays: 2,
     seats: 128,
@@ -311,6 +345,8 @@ export const events: readonly TournamentEvent[] = [
     topCut: null,
     startedAt: null,
     finishedAt: null,
+    status: "scheduled",
+    cancelledAt: null,
     matchFormat: "Bo3",
     roundLimitDays: 2,
     seats: 16,
@@ -329,6 +365,8 @@ export const events: readonly TournamentEvent[] = [
     topCut: null,
     startedAt: null,
     finishedAt: null,
+    status: "scheduled",
+    cancelledAt: null,
     matchFormat: "Bo3",
     roundLimitDays: 2,
     seats: 64,
@@ -347,6 +385,8 @@ export const events: readonly TournamentEvent[] = [
     topCut: 8,
     startedAt: null,
     finishedAt: null,
+    status: "scheduled",
+    cancelledAt: null,
     matchFormat: "Bo3",
     roundLimitDays: 2,
     seats: 512,
@@ -365,6 +405,8 @@ export const events: readonly TournamentEvent[] = [
     topCut: null,
     startedAt: null,
     finishedAt: null,
+    status: "scheduled",
+    cancelledAt: null,
     matchFormat: "Bo3",
     roundLimitDays: 2,
     seats: 32,
@@ -383,6 +425,8 @@ export const events: readonly TournamentEvent[] = [
     topCut: null,
     startedAt: null,
     finishedAt: null,
+    status: "scheduled",
+    cancelledAt: null,
     matchFormat: "Bo3",
     roundLimitDays: 2,
     seats: 96,
@@ -401,6 +445,8 @@ export const events: readonly TournamentEvent[] = [
     topCut: 8,
     startedAt: null,
     finishedAt: null,
+    status: "scheduled",
+    cancelledAt: null,
     matchFormat: "Bo3",
     roundLimitDays: 2,
     seats: 128,
@@ -419,6 +465,8 @@ export const events: readonly TournamentEvent[] = [
     topCut: null,
     startedAt: null,
     finishedAt: null,
+    status: "scheduled",
+    cancelledAt: null,
     matchFormat: "Bo3",
     roundLimitDays: 2,
     seats: 64,
@@ -437,6 +485,8 @@ export const events: readonly TournamentEvent[] = [
     topCut: 8,
     startedAt: null,
     finishedAt: null,
+    status: "scheduled",
+    cancelledAt: null,
     matchFormat: "Bo3",
     roundLimitDays: 2,
     seats: 128,
@@ -455,6 +505,8 @@ export const events: readonly TournamentEvent[] = [
     topCut: null,
     startedAt: null,
     finishedAt: null,
+    status: "scheduled",
+    cancelledAt: null,
     matchFormat: "Bo1",
     roundLimitDays: 2,
     seats: 16,
@@ -473,6 +525,8 @@ export const events: readonly TournamentEvent[] = [
     topCut: null,
     startedAt: null,
     finishedAt: null,
+    status: "scheduled",
+    cancelledAt: null,
     matchFormat: "Bo3",
     roundLimitDays: 2,
     seats: 64,
@@ -491,6 +545,8 @@ export const events: readonly TournamentEvent[] = [
     topCut: 4,
     startedAt: null,
     finishedAt: null,
+    status: "scheduled",
+    cancelledAt: null,
     matchFormat: "Bo3",
     roundLimitDays: 2,
     seats: 64,
@@ -513,6 +569,8 @@ export const pastEvents: readonly TournamentEvent[] = [
     topCut: null,
     startedAt: "2026-07-22T23:00:00Z",
     finishedAt: "2026-07-22T23:00:00Z",
+    status: "finished",
+    cancelledAt: null,
     matchFormat: "Bo3",
     roundLimitDays: 2,
     seats: 64,
@@ -531,6 +589,8 @@ export const pastEvents: readonly TournamentEvent[] = [
     topCut: null,
     startedAt: "2026-07-15T23:00:00Z",
     finishedAt: "2026-07-15T23:00:00Z",
+    status: "finished",
+    cancelledAt: null,
     matchFormat: "Bo3",
     roundLimitDays: 2,
     seats: 64,
@@ -549,6 +609,8 @@ export const pastEvents: readonly TournamentEvent[] = [
     topCut: null,
     startedAt: "2026-07-11T19:00:00Z",
     finishedAt: "2026-07-11T19:00:00Z",
+    status: "finished",
+    cancelledAt: null,
     matchFormat: "Bo3",
     roundLimitDays: 2,
     seats: 96,
@@ -567,6 +629,8 @@ export const pastEvents: readonly TournamentEvent[] = [
     topCut: null,
     startedAt: "2026-07-04T21:00:00Z",
     finishedAt: "2026-07-04T21:00:00Z",
+    status: "finished",
+    cancelledAt: null,
     matchFormat: "Bo3",
     roundLimitDays: 2,
     seats: 32,
@@ -585,6 +649,8 @@ export const pastEvents: readonly TournamentEvent[] = [
     topCut: null,
     startedAt: "2026-06-27T19:00:00Z",
     finishedAt: "2026-06-27T19:00:00Z",
+    status: "finished",
+    cancelledAt: null,
     matchFormat: "Bo3",
     roundLimitDays: 2,
     seats: 96,
@@ -603,6 +669,8 @@ export const pastEvents: readonly TournamentEvent[] = [
     topCut: 8,
     startedAt: "2026-06-20T18:00:00Z",
     finishedAt: "2026-06-20T18:00:00Z",
+    status: "finished",
+    cancelledAt: null,
     matchFormat: "Bo3",
     roundLimitDays: 2,
     seats: 128,
@@ -621,6 +689,8 @@ export const pastEvents: readonly TournamentEvent[] = [
     topCut: 4,
     startedAt: "2026-06-13T20:00:00Z",
     finishedAt: "2026-06-13T20:00:00Z",
+    status: "finished",
+    cancelledAt: null,
     matchFormat: "Bo3",
     roundLimitDays: 2,
     seats: 128,
@@ -639,6 +709,8 @@ export const pastEvents: readonly TournamentEvent[] = [
     topCut: null,
     startedAt: "2026-05-30T22:00:00Z",
     finishedAt: "2026-05-30T22:00:00Z",
+    status: "finished",
+    cancelledAt: null,
     matchFormat: "Bo1",
     roundLimitDays: 2,
     seats: 16,
@@ -657,6 +729,8 @@ export const pastEvents: readonly TournamentEvent[] = [
     topCut: null,
     startedAt: "2026-05-16T21:00:00Z",
     finishedAt: "2026-05-16T21:00:00Z",
+    status: "finished",
+    cancelledAt: null,
     matchFormat: "Bo3",
     roundLimitDays: 2,
     seats: 32,
@@ -675,6 +749,8 @@ export const pastEvents: readonly TournamentEvent[] = [
     topCut: 8,
     startedAt: "2025-10-20T17:00:00Z",
     finishedAt: "2025-10-20T17:00:00Z",
+    status: "finished",
+    cancelledAt: null,
     matchFormat: "Bo3",
     roundLimitDays: 2,
     seats: 256,
@@ -698,14 +774,15 @@ export function fillRatio(event: TournamentEvent): number {
 }
 
 /**
- * True once the event is no longer open for new signups - either staff
- * started the bracket (possibly before the advertised time), or the
- * advertised time has simply passed with nobody starting it yet. Despite the
- * name, this doesn't mean the tournament has *finished* - an event can be
- * "past" for hours or days while its rounds are still being played.
+ * True once the event is no longer open for new signups - status is
+ * anything but `scheduled` (staff started the bracket, possibly ahead of the
+ * advertised time, or the tournament was cancelled), or the advertised time
+ * has simply passed with nobody starting it yet. Despite the name, this
+ * doesn't mean the tournament has *finished* - an event can be "past" for
+ * hours or days while its rounds are still being played.
  */
 export function isPast(event: TournamentEvent, now: Date): boolean {
-  return event.startedAt !== null || new Date(event.startsAt).getTime() < now.getTime();
+  return event.status !== "scheduled" || new Date(event.startsAt).getTime() < now.getTime();
 }
 
 /**
@@ -715,7 +792,12 @@ export function isPast(event: TournamentEvent, now: Date): boolean {
  * (registration closed) for days while still mid-bracket.
  */
 export function isFinished(event: TournamentEvent): boolean {
-  return event.finishedAt !== null;
+  return event.status === "finished";
+}
+
+/** True once the tournament has been cancelled - no placings, doesn't count for ranking. */
+export function isCancelled(event: TournamentEvent): boolean {
+  return event.status === "cancelled";
 }
 
 /**

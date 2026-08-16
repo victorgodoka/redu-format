@@ -102,11 +102,17 @@ function enterFromReport(engine: EngineTournament, matchId: string, reporterId: 
  * Force-resolves a match whose round deadline has passed. Exactly one side
  * reported: that report is honored as-is, since the silent side had their
  * chance. Otherwise (nobody reported, or both did but never reconciled into
- * an agreed result) there's no honest signal to go on - ponytail: default to
- * player1 winning rather than modeling a genuine double-loss, which the
- * engine has no slot for. Rare in practice; a mod can always fix it
- * afterwards with the admin override. Returns who showed up and who didn't,
- * for the caller to feed into each player's consecutive-absence streak.
+ * an agreed result) there's no honest signal to go on.
+ *
+ * Elimination formats need a real winner to advance the bracket - the engine
+ * refuses a 0-0 "draw" mid-elimination - so this defaults to player1; rare in
+ * practice and always fixable by a mod afterward. Swiss has no such
+ * constraint, so this is recorded as a genuine double loss: both players get
+ * 0 points, not the 1-point draw the engine's own (0,0,0) entry would
+ * otherwise silently credit (see doubleLossPenalty).
+ *
+ * Returns who showed up and who didn't, for the caller to feed into each
+ * player's consecutive-absence streak.
  */
 function resolveOverdueMatch(
   engine: EngineTournament,
@@ -126,10 +132,28 @@ function resolveOverdueMatch(
     enterFromReport(engine, match.getId(), p2Id, p2Report.result);
     return { absentIds: [p1Id], presentIds: [p2Id] };
   }
-  engine.enterResult(match.getId(), 1, 0, 0);
+  if (engine.isElimination()) {
+    engine.enterResult(match.getId(), 1, 0, 0);
+  } else {
+    engine.enterResult(match.getId(), 0, 0, 0);
+    match.set({ meta: { doubleLoss: true } });
+  }
   // Both reported (but disputed, never reconciled) - both showed up, neither is "absent".
   // Neither reported - nobody showed up, both are.
   return p1Report && p2Report ? { absentIds: [], presentIds: [p1Id, p2Id] } : { absentIds: [p1Id, p2Id], presentIds: [] };
+}
+
+/**
+ * Points the engine wrongly credits for a double-loss match: it has no native
+ * double-loss concept, so resolveOverdueMatch's (0,0,0) entry falls into its
+ * "draw" scoring branch and both sides get scoring.draw points instead of
+ * zero. Subtracted wherever a player's match points are read.
+ */
+function doubleLossPenalty(engine: EngineTournament, registrationId: string): number {
+  const player = engine.getPlayers().find((p) => p.getId() === registrationId);
+  if (!player) return 0;
+  const count = player.getMatches().filter((m) => engine.getMatch(m.id).getMeta().doubleLoss === true).length;
+  return count * engine.getScoring().draw;
 }
 
 function toStageOneFormat(structure: Structure): "swiss" | "single-elimination" | "double-elimination" {
@@ -177,7 +201,9 @@ function toView(
       round: m.getRoundNumber(),
       active: m.isActive(),
       bye: m.isBye(),
-      hasResult: Boolean(m.hasEnded()),
+      // A double loss (see resolveOverdueMatch) leaves every win/loss/draw field
+      // at 0, which is indistinguishable from "not played yet" to hasEnded().
+      hasResult: Boolean(m.hasEnded()) || m.getMeta().doubleLoss === true,
       player1: toBracketPlayer(p1),
       player2: toBracketPlayer(p2),
       deadlineAt: matchTracking ? new Date(matchTracking.activeSince.getTime() + cutoffMs).toISOString() : null,
@@ -192,7 +218,7 @@ function toView(
     engine.getStandings().map((s) => ({
       registrationId: s.player.getId(),
       name: s.player.getName(),
-      points: s.matchPoints,
+      points: s.matchPoints - doubleLossPenalty(engine, s.player.getId()),
       matchesPlayed: s.matches,
       dropped: !s.player.isActive(),
     })),
@@ -330,6 +356,7 @@ export async function startBracket(slug: string, event: TournamentEvent): Promis
   const { tournaments, brackets, registrations } = repos();
   const tournamentId = await tournaments.findIdBySlug(slug);
   if (!tournamentId) throw new Error(`Tournament "${slug}" does not exist`);
+  if (event.status !== "scheduled") throw new Error(`Tournament "${slug}" can't be started from its current status`);
   if (await brackets.exists(tournamentId)) throw new Error(`Tournament "${slug}" already has a bracket`);
 
   const participants = await registrations.findByTournamentSlug(slug);
@@ -602,8 +629,12 @@ export async function closeAllOverdueMatches(): Promise<{ slug: string; resolved
 
 /** Ends the bracket (if not already ended by the library itself) and freezes final placings for the leaderboard. */
 export async function completeBracket(slug: string): Promise<void> {
-  const tournamentId = await repos().tournaments.findIdBySlug(slug);
-  if (!tournamentId) throw new Error(`Tournament "${slug}" does not exist`);
+  const { tournaments } = repos();
+  const [tournamentId, event] = await Promise.all([tournaments.findIdBySlug(slug), tournaments.findBySlug(slug)]);
+  if (!tournamentId || !event) throw new Error(`Tournament "${slug}" does not exist`);
+  if (event.status === "cancelled") {
+    throw new Error(`Tournament "${slug}" was cancelled - it can't generate placings`);
+  }
   const engine = await loadEngine(tournamentId);
   if (!engine) throw new Error(`Tournament "${slug}" has no bracket yet`);
 
@@ -616,7 +647,7 @@ export async function completeBracket(slug: string): Promise<void> {
     engine.getStandings().map((s) => ({
       registrationId: s.player.getId(),
       name: s.player.getName(),
-      points: s.matchPoints + topCutBonus(engine, s.player.getId()),
+      points: s.matchPoints + topCutBonus(engine, s.player.getId()) - doubleLossPenalty(engine, s.player.getId()),
     })),
   );
   const placings: Placing[] = ranked.map((r, index) => ({

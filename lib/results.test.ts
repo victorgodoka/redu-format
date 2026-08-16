@@ -242,9 +242,43 @@ test("closeOverdueMatches force-resolves a match past its round deadline, honori
 
   const resolvedSilent = after.matches.find((m) => m.id === silentMatch.id)!;
   assert.equal(resolvedSilent.hasResult, true, "a fully silent match still gets force-resolved, not left stuck");
+  // Swiss has no elimination constraint, so a fully silent match is a genuine
+  // double loss: 0-0, not an arbitrary winner and not the engine's native
+  // "draw" (which would otherwise silently score 1 point for both sides).
+  assert.equal(resolvedSilent.player1!.win, 0);
+  assert.equal(resolvedSilent.player1!.loss, 0);
+  assert.equal(resolvedSilent.player2!.win, 0);
+  assert.equal(resolvedSilent.player2!.loss, 0);
+  const silentP1Standing = after.standings.find((s) => s.registrationId === resolvedSilent.player1!.registrationId)!;
+  const silentP2Standing = after.standings.find((s) => s.registrationId === resolvedSilent.player2!.registrationId)!;
+  assert.equal(silentP1Standing.points, 0, "double loss awards no points, not the engine's default 1-point draw");
+  assert.equal(silentP2Standing.points, 0);
 
   // Both round-1 matches settled, so the swiss round itself should have advanced.
   assert.equal(after.round, 2);
+});
+
+test("closeOverdueMatches: a fully silent elimination match still needs a winner to advance the bracket", async () => {
+  const tournament = await createTournament({ ...swissDraft, structure: "single-elim", topCut: null });
+  await seatFourViaAdmin(tournament.slug);
+
+  const event = (await getTournament(tournament.slug))!;
+  await startBracket(tournament.slug, event);
+
+  const [matchA] = (await getBracketView(tournament.slug))!.matches;
+
+  const pool = getPool();
+  const backdated = toMysqlDatetimeMs(new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString());
+  await pool.query("UPDATE match_deadlines SET active_since = ? WHERE match_id = ?", [backdated, matchA.id]);
+
+  await closeOverdueMatches(tournament.slug);
+
+  const resolved = (await getBracketView(tournament.slug))!.matches.find((m) => m.id === matchA.id)!;
+  assert.equal(resolved.hasResult, true);
+  // A 0-0 double loss can't advance anyone in an elimination bracket, so this
+  // format falls back to an arbitrary winner (player1) instead.
+  assert.equal(resolved.player1!.win, 1);
+  assert.equal(resolved.player2!.win, 0);
 });
 
 test("dropFromStartedTournament: current round becomes a loss for them and an automatic win for their opponent, future rounds skip them", async () => {

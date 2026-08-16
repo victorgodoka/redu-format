@@ -1,4 +1,4 @@
-import type { Structure, TournamentEvent } from "../../events.ts";
+import type { Structure, TournamentEvent, TournamentStatus } from "../../events.ts";
 import { getPool } from "../db/client.ts";
 import { RegistrationsRepository } from "../repositories/registrations.repository.ts";
 import { TournamentsRepository, type TournamentDraft } from "../repositories/tournaments.repository.ts";
@@ -59,7 +59,7 @@ export async function createTournament(draft: TournamentDraft): Promise<Tourname
   const { tournaments } = repos();
   const slug = await uniqueSlug(slugify(draft.name));
   await tournaments.insert(crypto.randomUUID(), slug, draft);
-  return { ...draft, slug, taken: 0, startedAt: null, finishedAt: null };
+  return { ...draft, slug, taken: 0, status: "scheduled", startedAt: null, finishedAt: null, cancelledAt: null };
 }
 
 export async function updateTournament(
@@ -75,6 +75,23 @@ export async function updateTournament(
 
 export async function deleteTournament(slug: string): Promise<boolean> {
   return repos().tournaments.delete(slug);
+}
+
+/**
+ * Cancels a tournament, whether it's still scheduled or already running.
+ * Throws if it doesn't exist or can't be cancelled from its current status
+ * (already finished - a frozen official result can't retroactively
+ * un-happen - or already cancelled). Placings, if any existed, are left
+ * alone (finished tournaments can't reach here), and no ranking/placement
+ * math ever runs for a cancelled tournament since completeBracket() is what
+ * generates placings and a cancelled tournament never gets there.
+ */
+export async function cancelTournament(slug: string): Promise<void> {
+  const { tournaments } = repos();
+  const id = await tournaments.findIdBySlug(slug);
+  if (!id) throw new Error(`Tournament "${slug}" does not exist`);
+  const ok = await tournaments.cancel(id, new Date().toISOString());
+  if (!ok) throw new Error(`Tournament "${slug}" can't be cancelled from its current status`);
 }
 
 export async function listParticipants(slug: string): Promise<Participant[]> {
@@ -127,4 +144,4 @@ export async function setParticipantPayment(
   return registrations.findOne(slug, id);
 }
 
-export type { Structure, TournamentEvent };
+export type { Structure, TournamentEvent, TournamentStatus };

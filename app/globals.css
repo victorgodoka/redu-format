@@ -361,6 +361,47 @@ input[type="number"]::-webkit-inner-spin-button {
   color: var(--c-accent);
 }
 
+/* Below --wrap (1240px) the 8-item nav plus the account chip no longer fit
+   on one row - the row wraps to two lines and then, once the account chip
+   collapses to a bare sign-in link, the row is still too wide and forces a
+   page-level horizontal scrollbar. This range covers phones through small
+   laptops; scoped by content width (--wrap), not a device-name guess. */
+@media (max-width: 1240px) {
+  .topbar {
+    flex-wrap: wrap;
+    gap: 14px;
+    padding-block: 18px;
+  }
+
+  .topbar__auth {
+    margin-inline-start: auto;
+  }
+
+  .topbar__nav {
+    order: 3;
+    flex: 1 0 100%;
+    gap: 20px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    overscroll-behavior-inline: contain;
+    /* bleed to the viewport edge so the strip reads as scrollable */
+    margin-inline: calc(var(--gutter) * -1);
+    padding-inline: var(--gutter);
+    scroll-padding-inline: var(--gutter);
+    /* fade the trailing edge as the affordance for "there is more" */
+    mask-image: linear-gradient(to right, #000 88%, transparent 100%);
+  }
+
+  .topbar__nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .topbar__link {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+}
+
 /* --- account chip --- */
 
 .account {
@@ -2247,6 +2288,12 @@ input[type="number"]::-webkit-inner-spin-button {
   grid-template-columns: 1fr 1fr;
 }
 
+@media (max-width: 860px) {
+  .admin-list.participants {
+    grid-template-columns: 1fr;
+  }
+}
+
 .admin-row {
   display: flex;
   flex-wrap: wrap;
@@ -2598,40 +2645,6 @@ input[type="number"]::-webkit-inner-spin-button {
 @media (max-width: 719px) {
   .deck__view-panel--text {
     grid-template-columns: auto;
-  }
-
-  .topbar {
-    flex-wrap: wrap;
-    gap: 14px;
-    padding-block: 18px;
-  }
-
-  .topbar__auth {
-    margin-inline-start: auto;
-  }
-
-  .topbar__nav {
-    order: 3;
-    flex: 1 0 100%;
-    gap: 20px;
-    overflow-x: auto;
-    scrollbar-width: none;
-    overscroll-behavior-inline: contain;
-    /* bleed to the viewport edge so the strip reads as scrollable */
-    margin-inline: calc(var(--gutter) * -1);
-    padding-inline: var(--gutter);
-    scroll-padding-inline: var(--gutter);
-    /* fade the trailing edge as the affordance for "there is more" */
-    mask-image: linear-gradient(to right, #000 88%, transparent 100%);
-  }
-
-  .topbar__nav::-webkit-scrollbar {
-    display: none;
-  }
-
-  .topbar__link {
-    flex: 0 0 auto;
-    white-space: nowrap;
   }
 }
 

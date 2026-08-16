@@ -1,5 +1,6 @@
 export {
   addParticipant,
+  cancelTournament,
   createTournament,
   deleteTournament,
   getTournament,
@@ -18,4 +19,5 @@ export type {
   Structure,
   TournamentDraft,
   TournamentEvent,
+  TournamentStatus,
 } from "./backend/services/tournament.service.ts";

@@ -1,8 +1,11 @@
 import type { Pool, ResultSetHeader, RowDataPacket } from "mysql2/promise";
-import type { EntryFee, Engine, Structure, TournamentEvent } from "../../events.ts";
+import type { EntryFee, Engine, Structure, TournamentEvent, TournamentStatus } from "../../events.ts";
 import { fromMysqlDatetime, fromMysqlDatetimeMs, toMysqlDatetime, toMysqlDatetimeMs } from "../db/datetime.ts";
 
-export type TournamentDraft = Omit<TournamentEvent, "slug" | "taken" | "startedAt" | "finishedAt">;
+export type TournamentDraft = Omit<
+  TournamentEvent,
+  "slug" | "taken" | "status" | "startedAt" | "finishedAt" | "cancelledAt"
+>;
 
 type TournamentRow = RowDataPacket & {
   slug: string;
@@ -10,6 +13,8 @@ type TournamentRow = RowDataPacket & {
   starts_at: string;
   started_at: string | null;
   finished_at: string | null;
+  status: TournamentStatus;
+  cancelled_at: string | null;
   structure: Structure;
   rounds: number;
   top_cut: number | null;
@@ -42,6 +47,8 @@ function rowToTournament(row: TournamentRow): TournamentEvent {
     startsAt: fromMysqlDatetime(row.starts_at),
     startedAt: fromMysqlDatetimeMs(row.started_at),
     finishedAt: fromMysqlDatetimeMs(row.finished_at),
+    status: row.status,
+    cancelledAt: fromMysqlDatetimeMs(row.cancelled_at),
     structure: row.structure,
     rounds: row.rounds,
     topCut: row.top_cut,
@@ -71,7 +78,8 @@ export class TournamentsRepository {
 
   async findAll(): Promise<TournamentEvent[]> {
     const [rows] = await this.pool.query<TournamentRow[]>(
-      `SELECT t.slug, t.name, t.starts_at, t.started_at, t.finished_at, t.structure, t.rounds, t.top_cut, t.match_format,
+      `SELECT t.slug, t.name, t.starts_at, t.started_at, t.finished_at, t.status, t.cancelled_at,
+              t.structure, t.rounds, t.top_cut, t.match_format,
               t.round_limit_days, t.engine, t.seat_cap, t.entry_type, t.entry_amount_minor, t.entry_currency,
               t.host, t.signup_url, ${TAKEN_SUBQUERY}
        FROM tournaments t
@@ -83,7 +91,8 @@ export class TournamentsRepository {
 
   async findBySlug(slug: string): Promise<TournamentEvent | null> {
     const [rows] = await this.pool.query<TournamentRow[]>(
-      `SELECT t.slug, t.name, t.starts_at, t.started_at, t.finished_at, t.structure, t.rounds, t.top_cut, t.match_format,
+      `SELECT t.slug, t.name, t.starts_at, t.started_at, t.finished_at, t.status, t.cancelled_at,
+              t.structure, t.rounds, t.top_cut, t.match_format,
               t.round_limit_days, t.engine, t.seat_cap, t.entry_type, t.entry_amount_minor, t.entry_currency,
               t.host, t.signup_url, ${TAKEN_SUBQUERY}
        FROM tournaments t
@@ -111,20 +120,35 @@ export class TournamentsRepository {
     return rows[0]?.id ?? null;
   }
 
-  /** Records when the bracket was actually started. A no-op past the first call - once set, started_at never moves. */
+  /** Moves status to `running` and records when. Only valid from `scheduled` - a no-op otherwise (already started, or cancelled). */
   async markStarted(id: string, at: string): Promise<void> {
     await this.pool.query(
-      "UPDATE tournaments SET started_at = ? WHERE id = ? AND started_at IS NULL",
+      "UPDATE tournaments SET started_at = ?, status = 'running' WHERE id = ? AND status = 'scheduled'",
       [toMysqlDatetimeMs(at), id],
     );
   }
 
-  /** Records when the bracket was actually completed. A no-op past the first call - once set, finished_at never moves. */
+  /** Moves status to `finished` and records when. Only valid from `running` - a no-op otherwise. */
   async markFinished(id: string, at: string): Promise<void> {
     await this.pool.query(
-      "UPDATE tournaments SET finished_at = ? WHERE id = ? AND finished_at IS NULL",
+      "UPDATE tournaments SET finished_at = ?, status = 'finished' WHERE id = ? AND status = 'running'",
       [toMysqlDatetimeMs(at), id],
     );
+  }
+
+  /**
+   * Moves status to `cancelled` and records when. Valid from `scheduled` or
+   * `running` - never from `finished` (a frozen official result can't
+   * retroactively un-happen) or an already-`cancelled` tournament.
+   * Returns whether the cancellation actually happened, so the caller can
+   * tell "cancelled" apart from "couldn't be cancelled" (e.g. already finished).
+   */
+  async cancel(id: string, at: string): Promise<boolean> {
+    const [result] = await this.pool.query<ResultSetHeader>(
+      "UPDATE tournaments SET cancelled_at = ?, status = 'cancelled' WHERE id = ? AND status IN ('scheduled', 'running')",
+      [toMysqlDatetimeMs(at), id],
+    );
+    return result.affectedRows > 0;
   }
 
   async insert(id: string, slug: string, draft: TournamentDraft): Promise<void> {
