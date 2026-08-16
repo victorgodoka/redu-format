@@ -1,9 +1,14 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
+import LoginForm from "@/components/site/LoginForm";
+import Footer from "@/components/site/Footer";
+import SiteHeader from "@/components/site/SiteHeader";
+import Lede from "@/components/ui/Lede";
+import Panel from "@/components/ui/Panel";
+import Tab from "@/components/ui/Tab";
+import Wrap from "@/components/ui/Wrap";
 import { getSession } from "@/lib/auth";
 import { safeNext } from "@/lib/safe-next";
-import SiteHeader from "../site-header";
-import LoginForm from "./form";
 
 export const metadata: Metadata = {
   title: "Sign in | REDU Format",
@@ -23,26 +28,20 @@ export default async function LoginPage({
 
   return (
     <>
-      <a className="skip-link" href="#main">
-        Skip to content
-      </a>
-
       <SiteHeader />
 
       <main className="section" id="main">
-        <div className="wrap">
-          <div className="auth panel">
-            <p className="tab">Account</p>
+        <Wrap>
+          <Panel className="auth">
+            <Tab>Account</Tab>
             <h1 className="auth__title">Sign in with Dueling Nexus</h1>
-            {next !== "/dashboard" ? (
-              <p className="lede">
-                Sign in to finish signing up for the event.
-              </p>
-            ) : null}
+            {next !== "/dashboard" ? <Lede>Sign in to finish signing up for the event.</Lede> : null}
             <LoginForm next={next} />
-          </div>
-        </div>
+          </Panel>
+        </Wrap>
       </main>
+
+      <Footer />
     </>
   );
 }

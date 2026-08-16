@@ -1,6 +1,11 @@
 import type { Metadata } from "next";
+import AdminList, { AdminRow } from "@/components/admin/AdminList";
+import Footer from "@/components/site/Footer";
+import SiteHeader from "@/components/site/SiteHeader";
+import EmptyState from "@/components/ui/EmptyState";
+import PageHeading from "@/components/ui/PageHeading";
+import Wrap from "@/components/ui/Wrap";
 import { getLeaderboard } from "@/lib/leaderboard";
-import SiteHeader from "../site-header";
 
 export const metadata: Metadata = {
   title: "REDU Format leaderboard | Duelist rankings",
@@ -23,56 +28,46 @@ export default async function LeaderboardPage() {
 
   return (
     <>
-      <a className="skip-link" href="#main">
-        Skip to content
-      </a>
-
       <SiteHeader />
 
       <main className="section" id="main">
-        <div className="wrap">
-          <p className="tab">Standings</p>
-          <h1 className="section__title">Leaderboard</h1>
-          <p className="lede">
-            Ranked by tournament points across completed REDU Format events - 3 per
-            match win, 1 per draw, plus 5 for every top cut match won.
-          </p>
+        <Wrap>
+          <PageHeading
+            tab="Standings"
+            title="Leaderboard"
+            lede="Ranked by tournament points across completed REDU Format events - 3 per match win, 1 per draw, plus 5 for every top cut match won."
+          />
 
           {rows.length === 0 ? (
-            <div className="empty panel">
-              <p className="lede">
-                No completed tournaments yet. Rankings appear here once an admin
-                finishes running one.
-              </p>
-            </div>
+            <EmptyState message="No completed tournaments yet. Rankings appear here once an admin finishes running one." />
           ) : (
-            <ul className="admin-list leaderboard">
+            <AdminList className="leaderboard">
               {rows.map((row, i) => {
                 const rank = i + 1;
                 return (
-                  <li className="admin-row leaderboard-row panel" key={row.playerId}>
+                  <AdminRow className="leaderboard-row" key={row.playerId}>
                     <span
-                      className={`leaderboard-row__rank${
-                        rank <= 3 ? " leaderboard-row__rank--top" : ""
-                      }`}
+                      className={`leaderboard-row__rank${rank <= 3 ? " leaderboard-row__rank--top" : ""}`}
                     >
                       {TOP_BADGE[rank] ?? `#${rank}`}
                     </span>
 
-                    <div className="admin-row__main">
+                    <AdminRow.Main>
                       <span className="admin-row__title">{row.playerName}</span>
                       <span className="admin-row__meta">
                         {row.totalPoints} pts · {row.eventsPlayed}{" "}
                         {row.eventsPlayed === 1 ? "event" : "events"}
                       </span>
-                    </div>
-                  </li>
+                    </AdminRow.Main>
+                  </AdminRow>
                 );
               })}
-            </ul>
+            </AdminList>
           )}
-        </div>
+        </Wrap>
       </main>
+
+      <Footer />
     </>
   );
 }

@@ -1,7 +1,16 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import FallbackImage from "../../../fallback-image";
+import DeckPicker from "@/components/site/DeckPicker";
+import Footer from "@/components/site/Footer";
+import SiteHeader from "@/components/site/SiteHeader";
+import Button from "@/components/ui/Button";
+import FactsList from "@/components/ui/FactsList";
+import FallbackImage from "@/components/ui/FallbackImage";
+import Lede from "@/components/ui/Lede";
+import Notice from "@/components/ui/Notice";
+import PageHeading from "@/components/ui/PageHeading";
+import Tab from "@/components/ui/Tab";
+import Wrap from "@/components/ui/Wrap";
 import { fetchProfile, getSession } from "@/lib/auth";
 import { findPlayerIdByToken } from "@/lib/backend/services/player.service";
 import { findMySignup } from "@/lib/backend/services/registration.service";
@@ -10,10 +19,8 @@ import { Card } from "@/lib/cards";
 import { formatDate, formatEntry, formatTime, isFinished, isPast, pastEvents, seatsLeft, STRUCTURES } from "@/lib/events";
 import { DEFAULT_AVATAR } from "@/lib/nexus-parse";
 import { getTournament } from "@/lib/tournaments";
-import SiteHeader from "../../../site-header";
-import { cancel } from "./actions";
-import DeckPicker from "./deck-picker";
 import { validateDecks } from "@/lib/validateDecks";
+import { cancel } from "./actions";
 
 export const metadata: Metadata = {
   title: "Event sign up | REDU Format",
@@ -58,93 +65,80 @@ export default async function SignupPage({
 
   return (
     <>
-      <a className="skip-link" href="#main">
-        Skip to content
-      </a>
-
       <SiteHeader />
 
       <main className="section" id="main">
-        <div className="wrap">
-          <p className="tab">Sign up</p>
-          <h1 className="section__title">{event.name}</h1>
+        <Wrap>
+          <PageHeading tab="Sign up" title={event.name} />
 
           <div className="signup">
             <div className="signup__main">
               {past ? (
-                <div className="notice panel">
-                  <p className="lede">
+                <Notice>
+                  <Lede>
                     {finished
                       ? `This event finished on ${formatDate(event.startsAt)}. Registration is closed.`
                       : "This tournament has already started. Registration is closed."}
-                  </p>
-                  <Link className="btn" href="/events">
-                    Back to events
-                  </Link>
-                </div>
+                  </Lede>
+                  <Button href="/events">Back to events</Button>
+                </Notice>
               ) : left === 0 && !registeredDeck ? (
-                <div className="notice panel">
-                  <p className="lede">
+                <Notice>
+                  <Lede>
                     Every seat is taken. Keep an eye on the event page in case
                     one opens up.
-                  </p>
-                  <Link className="btn" href="/events">
-                    Back to events
-                  </Link>
-                </div>
+                  </Lede>
+                  <Button href="/events">Back to events</Button>
+                </Notice>
               ) : registeredDeck ? (
-                <div className="notice notice--done panel">
-                  <p className="tab">Registered</p>
-                  <h2 className="notice__title">
-                    You are in with {registeredDeck.name}
-                  </h2>
-                  <p className="lede">
+                <Notice variant="done">
+                  <Tab>Registered</Tab>
+                  <h2 className="notice__title">You are in with {registeredDeck.name}</h2>
+                  <Lede>
                     {registeredDeck.main} main · {registeredDeck.extra} extra ·{" "}
                     {registeredDeck.side} side. Bring it to{" "}
                     {formatDate(event.startsAt)} at {formatTime(event.startsAt)}.
-                  </p>
+                  </Lede>
                   {started ? (
                     <details className="notice__drop">
                       <summary className="btn">Drop from tournament</summary>
                       <div className="notice__drop-body">
-                        <p className="lede">
+                        <Lede>
                           Dropping counts as a loss and negatively affects the tiebreakers of
                           the players still in it.
                           {event.entry.type === "paid" ? " There is no refund." : ""}
-                        </p>
+                        </Lede>
                         <form action={cancel}>
                           <input type="hidden" name="slug" value={slug} />
-                          <button className="btn btn--solid" type="submit">
+                          <Button variant="solid" type="submit">
                             Yes, drop me
-                          </button>
+                          </Button>
                         </form>
                       </div>
                     </details>
                   ) : signup?.paymentStatus === "confirmed" ? (
-                    <p className="lede">
+                    <Lede>
                       Your payment is already confirmed. Contact a Staff member if you need to
                       drop before the event starts.
-                    </p>
+                    </Lede>
                   ) : (
                     <div className="notice__actions">
                       <form action={cancel}>
                         <input type="hidden" name="slug" value={slug} />
-                        <button className="btn" type="submit">
-                          Cancel registration
-                        </button>
+                        <Button type="submit">Cancel registration</Button>
                       </form>
-                      <Link className="btn btn--quiet" href="/events">
+                      <Button variant="quiet" href="/events">
                         Back to events
-                      </Link>
+                      </Button>
                     </div>
                   )}
-                </div>
+                </Notice>
               ) : profile.decks.length === 0 ? (
-                <div className="notice panel">
-                  <p className="lede">
+                <Notice>
+                  <Lede>
                     You have no decks on Dueling Nexus yet. Build one in the
                     editor, then come back to register.
-                  </p>
+                  </Lede>
                   <a
                     className="btn"
                     href="https://duelingnexus.com/editor"
@@ -153,7 +147,7 @@ export default async function SignupPage({
                   >
                     Open the editor
                   </a>
-                </div>
+                </Notice>
               ) : (
                 <DeckPicker
                   slug={slug}
@@ -166,7 +160,7 @@ export default async function SignupPage({
 
             <aside className="signup__side">
               <div className="profile-card panel">
-                <p className="tab">Duelist</p>
+                <Tab>Duelist</Tab>
                 <div className="profile-card__who">
                   {profile.avatar ? (
                     <FallbackImage
@@ -190,46 +184,34 @@ export default async function SignupPage({
                 </div>
               </div>
 
-              <dl className="facts panel">
-                <div className="facts__row">
-                  <dt>Starts</dt>
-                  <dd>
-                    {formatDate(event.startsAt)}, {formatTime(event.startsAt)}
-                  </dd>
-                </div>
-                <div className="facts__row">
-                  <dt>Structure</dt>
-                  <dd>{STRUCTURES[event.structure].label}</dd>
-                </div>
-                <div className="facts__row">
-                  <dt>Rounds</dt>
-                  <dd>
-                    {event.rounds} · {event.matchFormat} ·{" "}
-                    {event.roundLimitDays}-day round deadline
-                    {event.topCut ? ` · Top ${event.topCut}` : ""}
-                  </dd>
-                </div>
-                <div className="facts__row">
-                  <dt>Seats</dt>
-                  <dd>
-                    {event.seats === null
-                      ? `${event.taken} registered (unlimited)`
-                      : past
-                        ? `${event.taken} of ${event.seats} duelists`
-                        : `${left} of ${event.seats} left`}
-                  </dd>
-                </div>
-                <div className="facts__row">
-                  <dt>Host</dt>
-                  <dd>
-                    {event.host} · {formatEntry(event.entry)}
-                  </dd>
-                </div>
-              </dl>
+              <FactsList
+                rows={[
+                  { label: "Starts", value: `${formatDate(event.startsAt)}, ${formatTime(event.startsAt)}` },
+                  { label: "Structure", value: STRUCTURES[event.structure].label },
+                  {
+                    label: "Rounds",
+                    value: `${event.rounds} · ${event.matchFormat} · ${event.roundLimitDays}-day round deadline${
+                      event.topCut ? ` · Top ${event.topCut}` : ""
+                    }`,
+                  },
+                  {
+                    label: "Seats",
+                    value:
+                      event.seats === null
+                        ? `${event.taken} registered (unlimited)`
+                        : past
+                          ? `${event.taken} of ${event.seats} duelists`
+                          : `${left} of ${event.seats} left`,
+                  },
+                  { label: "Host", value: `${event.host} · ${formatEntry(event.entry)}` },
+                ]}
+              />
             </aside>
           </div>
-        </div>
+        </Wrap>
       </main>
+
+      <Footer />
     </>
   );
 }

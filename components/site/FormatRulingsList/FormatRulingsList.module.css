@@ -1,0 +1,60 @@
+.rulings {
+  display: grid;
+  gap: clamp(16px, 2vw, 24px);
+  margin: 32px 0 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: none;
+}
+
+.ruling {
+  padding: clamp(22px, 3vw, 32px);
+}
+
+.n {
+  font-family: var(--f-mono);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--c-accent);
+}
+
+.title {
+  margin-top: 10px;
+  font-size: clamp(19px, 2.2vw, 24px);
+}
+
+.body {
+  margin-top: 14px;
+  max-width: 68ch;
+  color: #c6c4d2;
+  text-wrap: pretty;
+}
+
+.note {
+  margin-top: 12px;
+  max-width: 68ch;
+  font-size: 14px;
+  color: var(--c-muted);
+}
+
+/* worked examples: monospaced and rules-off, so they read as transcripts
+   rather than as more prose */
+.example {
+  margin-top: 16px;
+  padding: 14px 18px;
+  border-left: 2px solid var(--c-accent);
+  background: var(--c-raise);
+  font-family: var(--f-mono);
+  font-size: 13px;
+  line-height: 1.6;
+  color: #c6c4d2;
+}
+
+.exampleLabel {
+  margin-bottom: 6px;
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--c-accent);
+}

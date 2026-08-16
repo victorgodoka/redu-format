@@ -2,6 +2,8 @@ import { teardownTestDb } from "./backend/db/test-setup.ts";
 
 import assert from "node:assert/strict";
 import test from "node:test";
+import type { RowDataPacket } from "mysql2/promise";
+import { getPool } from "./backend/db/client.ts";
 import {
   cancelSignup,
   dropRegistration,
@@ -13,8 +15,8 @@ import {
   saveTournament,
   unsaveTournament,
 } from "./backend/services/registration.service.ts";
-import { resolvePlayerId } from "./backend/services/player.service.ts";
-import { createTournament, listParticipants, setParticipantPayment } from "./tournaments.ts";
+import { identityKey, resolvePlayerId } from "./backend/services/player.service.ts";
+import { addParticipant, createTournament, listParticipants, setParticipantPayment } from "./tournaments.ts";
 
 test.after(teardownTestDb);
 
@@ -50,6 +52,7 @@ test("registering creates a signup, findSignupDeckId reflects it", async () => {
 
   await registerSignup(tournament.slug, {
     playerId,
+    nexusIdentityKey: "test-identity-key",
     displayName: "Reg1",
     deckId: "deck-1",
     deckName: "Wind-Up",
@@ -65,6 +68,7 @@ test("registering again with a different deck replaces it instead of duplicating
 
   await registerSignup(tournament.slug, {
     playerId,
+    nexusIdentityKey: "test-identity-key",
     displayName: "Reg2",
     deckId: "deck-a",
     deckName: "Wind-Up",
@@ -72,6 +76,7 @@ test("registering again with a different deck replaces it instead of duplicating
   });
   await registerSignup(tournament.slug, {
     playerId,
+    nexusIdentityKey: "test-identity-key",
     displayName: "Reg2",
     deckId: "deck-b",
     deckName: "Geargia",
@@ -88,6 +93,7 @@ test("a free tournament's signup needs no payment", async () => {
 
   await registerSignup(tournament.slug, {
     playerId,
+    nexusIdentityKey: "test-identity-key",
     displayName: "Reg3",
     deckId: "deck-1",
     deckName: "Wind-Up",
@@ -105,6 +111,7 @@ test("a paid tournament's signup starts pending", async () => {
 
   await registerSignup(tournament.slug, {
     playerId,
+    nexusIdentityKey: "test-identity-key",
     displayName: "Reg4",
     deckId: "deck-1",
     deckName: "Wind-Up",
@@ -121,6 +128,7 @@ test("cancel removes the signup", async () => {
 
   await registerSignup(tournament.slug, {
     playerId,
+    nexusIdentityKey: "test-identity-key",
     displayName: "Reg5",
     deckId: "deck-1",
     deckName: "Wind-Up",
@@ -143,6 +151,7 @@ test("dropRegistration before the bracket starts deletes the signup, whether fre
   const playerId = await player("Drop1");
   await registerSignup(tournament.slug, {
     playerId,
+    nexusIdentityKey: "test-identity-key",
     displayName: "Drop1",
     deckId: "deck-1",
     deckName: "Wind-Up",
@@ -156,6 +165,7 @@ test("dropRegistration before the bracket starts deletes the signup, whether fre
   const paidPlayerId = await player("Drop2");
   await registerSignup(paid.slug, {
     playerId: paidPlayerId,
+    nexusIdentityKey: "test-identity-key",
     displayName: "Drop2",
     deckId: "deck-1",
     deckName: "Wind-Up",
@@ -171,6 +181,7 @@ test("dropRegistration is blocked once a paid signup's payment is confirmed, pre
   const playerId = await player("Drop3");
   await registerSignup(tournament.slug, {
     playerId,
+    nexusIdentityKey: "test-identity-key",
     displayName: "Drop3",
     deckId: "deck-1",
     deckName: "Wind-Up",
@@ -199,12 +210,58 @@ test("listSignupsForPlayer maps every registered slug to its deck", async () => 
   const b = await createTournament({ ...draft, name: "Cup B" });
   const playerId = await player("Reg7");
 
-  await registerSignup(a.slug, { playerId, displayName: "Reg7", deckId: "deck-a", deckName: "A", entry: a.entry });
-  await registerSignup(b.slug, { playerId, displayName: "Reg7", deckId: "deck-b", deckName: "B", entry: b.entry });
+  await registerSignup(a.slug, {
+    playerId,
+    nexusIdentityKey: "test-identity-key",
+    displayName: "Reg7",
+    deckId: "deck-a",
+    deckName: "A",
+    entry: a.entry,
+  });
+  await registerSignup(b.slug, {
+    playerId,
+    nexusIdentityKey: "test-identity-key",
+    displayName: "Reg7",
+    deckId: "deck-b",
+    deckName: "B",
+    entry: b.entry,
+  });
 
   const signups = await listSignupsForPlayer(playerId);
   assert.equal(signups.get(a.slug), "deck-a");
   assert.equal(signups.get(b.slug), "deck-b");
+});
+
+test("registerSignup snapshots the Nexus identity key used at signup, independent of players.nexus_identity_key", async () => {
+  const tournament = await createTournament(draft);
+  const token = "token-Snap1";
+  const playerId = await player("Snap1");
+
+  await registerSignup(tournament.slug, {
+    playerId,
+    nexusIdentityKey: identityKey(token),
+    displayName: "Snap1",
+    deckId: "deck-1",
+    deckName: "Wind-Up",
+    entry: tournament.entry,
+  });
+
+  const [rows] = await getPool().query<RowDataPacket[]>(
+    "SELECT nexus_identity_key_snapshot FROM registrations WHERE player_id = ?",
+    [playerId],
+  );
+  assert.equal(rows[0]?.nexus_identity_key_snapshot, identityKey(token));
+});
+
+test("an admin-manual registration has no identity snapshot - there was never a Nexus token", async () => {
+  const tournament = await createTournament(draft);
+  const participant = await addParticipant(tournament.slug, { name: "Manual Entry", deckName: "Geargia" });
+
+  const [rows] = await getPool().query<RowDataPacket[]>(
+    "SELECT nexus_identity_key_snapshot FROM registrations WHERE id = ?",
+    [participant.id],
+  );
+  assert.equal(rows[0]?.nexus_identity_key_snapshot, null);
 });
 
 test("saving a tournament twice is a no-op, not a duplicate", async () => {

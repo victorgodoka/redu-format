@@ -1,0 +1,119 @@
+.events {
+  display: grid;
+  gap: 14px;
+  margin: 20px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.event {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr) auto;
+  gap: 26px;
+  align-items: center;
+  padding: 22px 26px;
+}
+
+.when {
+  display: grid;
+  gap: 4px;
+  font-family: var(--f-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.date {
+  font-size: 13px;
+  color: var(--c-text);
+}
+
+.time {
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  color: var(--c-muted);
+}
+
+.name {
+  font-size: clamp(19px, 2.2vw, 26px);
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin-top: 10px;
+  font-family: var(--f-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--c-muted);
+}
+
+.tag {
+  padding: 3px 9px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--c-accent) 16%, transparent);
+  color: var(--c-accent);
+}
+
+.host {
+  margin-top: 10px;
+  font-size: 13px;
+  color: #a9a7b8;
+}
+
+.signup {
+  display: grid;
+  justify-items: end;
+  gap: 12px;
+}
+
+.signup :global(.btn) {
+  min-width: 150px;
+  padding-block: 12px;
+}
+
+.seats {
+  font-family: var(--f-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--c-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.seatsFull {
+  color: var(--c-danger);
+}
+
+.seatsAlmost {
+  color: var(--c-accent);
+}
+
+/* Muted rather than hidden: the archive is still worth reading, it just must
+   not compete with what you can still sign up for. */
+.past .name,
+.past .date {
+  color: var(--c-muted);
+}
+
+.past .tag {
+  background: var(--c-line);
+  color: var(--c-muted);
+}
+
+.past:global(.panel)::before {
+  background: color-mix(in srgb, var(--c-panel) 85%, var(--c-bg));
+}
+
+.done {
+  justify-self: start;
+  margin-top: 6px;
+  padding: 3px 9px;
+  border: 1px solid var(--c-line);
+  border-radius: 3px;
+  font-family: var(--f-mono);
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--c-muted);
+}

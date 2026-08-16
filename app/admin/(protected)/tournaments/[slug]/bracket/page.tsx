@@ -8,7 +8,7 @@ import Button from "@/components/ui/Button";
 import EmptyState from "@/components/ui/EmptyState";
 import { getBracketView, getPlacings } from "@/lib/backend/services/results.service";
 import { getTournament } from "@/lib/tournaments";
-import { completeBracketAction, nextRoundAction } from "./actions";
+import { completeBracketAction, extendRoundAction, nextRoundAction } from "./actions";
 
 export const metadata: Metadata = {
   title: "Tournament bracket | REDU Format",
@@ -56,24 +56,44 @@ export default async function BracketPage({
           view={view}
           placings={placings}
           actions={
-            view.status !== "complete" && !hasOpenMatches ? (
-              <StatBar
-                actions={
-                  <>
-                    <form action={nextRoundAction}>
+            <>
+              {view.status !== "complete" && hasOpenMatches ? (
+                <StatBar
+                  actions={
+                    <form action={extendRoundAction} className="payment-controls__confirm">
                       <input type="hidden" name="slug" value={slug} />
-                      <Button type="submit">Generate next round</Button>
+                      <input
+                        type="number"
+                        name="hours"
+                        min={1}
+                        placeholder="Hours"
+                        required
+                        aria-label="Hours to extend the current round's deadline by"
+                      />
+                      <Button type="submit">Extend round deadline</Button>
                     </form>
-                    <form action={completeBracketAction}>
-                      <input type="hidden" name="slug" value={slug} />
-                      <Button variant="solid" type="submit">
-                        Complete tournament
-                      </Button>
-                    </form>
-                  </>
-                }
-              />
-            ) : null
+                  }
+                />
+              ) : null}
+              {view.status !== "complete" && !hasOpenMatches ? (
+                <StatBar
+                  actions={
+                    <>
+                      <form action={nextRoundAction}>
+                        <input type="hidden" name="slug" value={slug} />
+                        <Button type="submit">Generate next round</Button>
+                      </form>
+                      <form action={completeBracketAction}>
+                        <input type="hidden" name="slug" value={slug} />
+                        <Button variant="solid" type="submit">
+                          Complete tournament
+                        </Button>
+                      </form>
+                    </>
+                  }
+                />
+              ) : null}
+            </>
           }
         />
       )}

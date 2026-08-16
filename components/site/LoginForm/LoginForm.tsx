@@ -1,7 +1,8 @@
 "use client";
 
 import { useActionState } from "react";
-import { login, type LoginState } from "./actions";
+import Button from "@/components/ui/Button";
+import { login, type LoginState } from "@/app/login/actions";
 
 const initial: LoginState = {};
 
@@ -24,11 +25,7 @@ export default function LoginForm({ next }: { next: string }) {
       />
       <p className="form__hint">
         You can view your token by going to your{" "}
-        <a
-          href="https://duelingnexus.com/profile"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
+        <a href="https://duelingnexus.com/profile" target="_blank" rel="noopener noreferrer">
           Dueling Nexus profile
         </a>
         , selecting the options menu on the top right of the screen with the
@@ -46,9 +43,9 @@ export default function LoginForm({ next }: { next: string }) {
           {state.error}
         </p>
       ) : null}
-      <button className="btn btn--solid" type="submit" disabled={pending}>
-        {pending ? "Checking..." : "Sign in"}
-      </button>
+      <Button variant="solid" type="submit" pending={pending} pendingLabel="Checking...">
+        Sign in
+      </Button>
     </form>
   );
 }

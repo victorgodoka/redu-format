@@ -9,6 +9,7 @@ import {
   completeBracket,
   dropFromStartedTournament,
   enterMatchResult,
+  extendCurrentRoundDeadline,
   generateNextRound,
   getBracketView,
   getLeaderboard,
@@ -281,6 +282,32 @@ test("closeOverdueMatches: a fully silent elimination match still needs a winner
   assert.equal(resolved.player2!.win, 0);
 });
 
+test("extendCurrentRoundDeadline pushes out the deadline of active matches, so an overdue sweep no longer force-resolves them", async () => {
+  const tournament = await createTournament({ ...swissDraft, topCut: null, roundLimitDays: 2 });
+  await seatFourViaAdmin(tournament.slug);
+
+  const event = (await getTournament(tournament.slug))!;
+  await startBracket(tournament.slug, event);
+
+  const [matchA] = (await getBracketView(tournament.slug))!.matches;
+  const before = matchA.deadlineAt!;
+
+  // Push it just past its normal 2-day deadline.
+  const pool = getPool();
+  const backdated = toMysqlDatetimeMs(new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString());
+  await pool.query("UPDATE match_deadlines SET active_since = ? WHERE match_id = ?", [backdated, matchA.id]);
+
+  const { extended } = await extendCurrentRoundDeadline(tournament.slug, 96);
+  assert.ok(extended >= 1);
+
+  const after = (await getBracketView(tournament.slug))!.matches.find((m) => m.id === matchA.id)!;
+  assert.ok(new Date(after.deadlineAt!) > new Date(before), "the extension pushed the deadline forward");
+
+  // Overdue by the original computation, but the extension should have cleared that.
+  const { resolved } = await closeOverdueMatches(tournament.slug);
+  assert.equal(resolved, 0, "the extended match isn't overdue anymore");
+});
+
 test("dropFromStartedTournament: current round becomes a loss for them and an automatic win for their opponent, future rounds skip them", async () => {
   const tournament = await createTournament({ ...swissDraft, topCut: null });
   await seatFourViaAdmin(tournament.slug);
@@ -440,6 +467,22 @@ test("enterMatchResult refuses to correct a match once the next round has starte
   await assert.doesNotReject(() => enterMatchResult(tournament.slug, round2[0].id, 1, 0));
 });
 
+test("completeBracket assigns ranking points by finishing place, separate from match points", async () => {
+  const tournament = await createTournament({ ...swissDraft, structure: "single-elim", topCut: null });
+  await seatFourViaAdmin(tournament.slug);
+  const event = (await getTournament(tournament.slug))!;
+  await startBracket(tournament.slug, event);
+  await playOutTournament(tournament.slug);
+  await completeBracket(tournament.slug);
+
+  const placings = await getPlacings(tournament.slug);
+  const first = placings.find((p) => p.place === 1)!;
+  const second = placings.find((p) => p.place === 2)!;
+  assert.equal(first.rankingPoints, 100, "1st place awards the leaderboard formula's top value");
+  assert.equal(second.rankingPoints, 75);
+  assert.notEqual(first.rankingPoints, first.points, "ranking points and match points are tracked separately");
+});
+
 test("leaderboard aggregates points across tournaments, only for real players", async () => {
   const a = await createTournament({ ...swissDraft, name: "LB Cup A", topCut: null });
   const b = await createTournament({ ...swissDraft, name: "LB Cup B", topCut: null });
@@ -454,6 +497,7 @@ test("leaderboard aggregates points across tournaments, only for real players", 
   for (const tournament of [a, b]) {
     await registerSignup(tournament.slug, {
       playerId,
+      nexusIdentityKey: "test-identity-key",
       displayName: "LeaderboardPlayer",
       deckId: "deck-1",
       deckName: "Wind-Up",

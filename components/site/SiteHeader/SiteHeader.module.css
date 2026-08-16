@@ -1,0 +1,102 @@
+.topbar {
+  position: relative;
+  z-index: var(--z-nav);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding-block: 26px;
+}
+
+.mark {
+  font-family: var(--f-display);
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.nav {
+  display: flex;
+  gap: clamp(16px, 3vw, 40px);
+}
+
+.link {
+  display: flex;
+  gap: 8px;
+  font-family: var(--f-mono);
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--c-muted);
+  transition: all 200ms ease;
+}
+
+.link:hover {
+  color: var(--c-text);
+}
+
+.link[data-n]::before {
+  content: attr(data-n);
+  color: var(--c-accent);
+}
+
+/* dark ink on gold: light text here measured 1.86:1, well under the 4.5:1 floor */
+.linkSignIn {
+  padding: 9px 14px;
+  border-radius: 999px;
+  background-color: var(--c-accent);
+  color: #16130c;
+  white-space: nowrap;
+}
+
+.linkSignIn:hover {
+  background-color: var(--c-accent-hi);
+  color: #16130c;
+}
+
+.auth {
+  display: flex;
+  align-items: center;
+}
+
+/* Below --wrap (1240px) the 8-item nav plus the account chip no longer fit
+   on one row - the row wraps to two lines and then, once the account chip
+   collapses to a bare sign-in link, the row is still too wide and forces a
+   page-level horizontal scrollbar. This range covers phones through small
+   laptops; scoped by content width (--wrap), not a device-name guess. */
+@media (max-width: 1240px) {
+  .topbar {
+    flex-wrap: wrap;
+    gap: 14px;
+    padding-block: 18px;
+  }
+
+  .auth {
+    margin-inline-start: auto;
+  }
+
+  .nav {
+    order: 3;
+    flex: 1 0 100%;
+    gap: 20px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    overscroll-behavior-inline: contain;
+    /* bleed to the viewport edge so the strip reads as scrollable */
+    margin-inline: calc(var(--gutter) * -1);
+    padding-inline: var(--gutter);
+    scroll-padding-inline: var(--gutter);
+    /* fade the trailing edge as the affordance for "there is more" */
+    mask-image: linear-gradient(to right, #000 88%, transparent 100%);
+  }
+
+  .nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .link {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+}

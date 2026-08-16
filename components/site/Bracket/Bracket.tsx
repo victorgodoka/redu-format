@@ -1,3 +1,5 @@
+import styles from "./Bracket.module.css";
+
 export type BracketSide = {
   seed?: number | string;
   name: string;
@@ -17,15 +19,11 @@ export type BracketRound = {
 
 function Side({ side }: { side: BracketSide }) {
   return (
-    <div className={`bracket__side${side.winner ? " bracket__side--win" : ""}`}>
-      {side.seed !== undefined ? (
-        <span className="bracket__seed">{side.seed}</span>
-      ) : null}
-      <span className="bracket__player">{side.name}</span>
+    <div className={`${styles.side}${side.winner ? ` ${styles.sideWin}` : ""}`}>
+      {side.seed !== undefined ? <span className={styles.seed}>{side.seed}</span> : null}
+      <span className={styles.player}>{side.name}</span>
       {side.score !== undefined ? (
-        <span
-          className={`bracket__score${side.winner ? " bracket__score--win" : ""}`}
-        >
+        <span className={`${styles.score}${side.winner ? ` ${styles.scoreWin}` : ""}`}>
           {side.score}
         </span>
       ) : null}
@@ -35,7 +33,7 @@ function Side({ side }: { side: BracketSide }) {
 
 function Match({ match }: { match: BracketMatch }) {
   return (
-    <div className="bracket__match">
+    <div className={styles.match}>
       <Side side={match.sides[0]} />
       <Side side={match.sides[1]} />
     </div>
@@ -59,19 +57,17 @@ function pairUp(matches: readonly BracketMatch[]): BracketMatch[][] {
  */
 export function Bracket({ rounds }: { rounds: readonly BracketRound[] }) {
   return (
-    <div className="bracket">
+    <div className={styles.bracket}>
       {rounds.map((round, i) => {
         const isLast = i === rounds.length - 1;
         return (
-          <div className="bracket__col" key={round.label}>
-            <p className="bracket__label">{round.label}</p>
-            <div className="bracket__round">
+          <div className={styles.col} key={round.label}>
+            <p className={styles.label}>{round.label}</p>
+            <div className={styles.round}>
               {isLast
-                ? round.matches.map((match, m) => (
-                    <Match match={match} key={match.id ?? m} />
-                  ))
+                ? round.matches.map((match, m) => <Match match={match} key={match.id ?? m} />)
                 : pairUp(round.matches).map((pair, p) => (
-                    <div className="bracket__pair" key={p}>
+                    <div className={styles.pair} key={p}>
                       {pair.map((match, m) => (
                         <Match match={match} key={match.id ?? m} />
                       ))}

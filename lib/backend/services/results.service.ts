@@ -172,6 +172,11 @@ async function persistEngine(tournamentId: string, engine: EngineTournament): Pr
   await repos().brackets.save(tournamentId, engine.getValues() as ExportedTournamentValues);
 }
 
+/** The deadline that actually governs a match: Staff's override if they extended it, otherwise the normal activeSince + roundLimitDays computation. */
+function effectiveDeadline(t: MatchTracking, cutoffMs: number): Date {
+  return t.deadlineOverride ?? new Date(t.activeSince.getTime() + cutoffMs);
+}
+
 function toView(
   engine: EngineTournament,
   format: Structure,
@@ -206,7 +211,7 @@ function toView(
       hasResult: Boolean(m.hasEnded()) || m.getMeta().doubleLoss === true,
       player1: toBracketPlayer(p1),
       player2: toBracketPlayer(p2),
-      deadlineAt: matchTracking ? new Date(matchTracking.activeSince.getTime() + cutoffMs).toISOString() : null,
+      deadlineAt: matchTracking ? effectiveDeadline(matchTracking, cutoffMs).toISOString() : null,
       roomHash: matchTracking?.roomHash ?? null,
       reports: matchReports.map((r) => ({ registrationId: r.registrationId, result: r.result })),
       disputed: matchReports.length === 2 && !reportsAgree(matchReports[0].result, matchReports[1].result),
@@ -570,8 +575,8 @@ export async function closeOverdueMatches(slug: string): Promise<{ resolved: num
   const now = Date.now();
 
   const overdue = engine.getMatches().filter((m) => {
-    const since = tracking.get(m.getId())?.activeSince;
-    return m.isActive() && since !== undefined && now - since.getTime() >= cutoffMs;
+    const t = tracking.get(m.getId());
+    return m.isActive() && t !== undefined && now >= effectiveDeadline(t, cutoffMs).getTime();
   });
   if (overdue.length === 0) return { resolved: 0 };
 
@@ -613,6 +618,41 @@ export async function closeOverdueMatches(slug: string): Promise<{ resolved: num
   return { resolved: overdue.length };
 }
 
+/**
+ * Extends the deadline of every currently-active match by `extraHours`, on
+ * top of whatever deadline currently governs it (the normal computation, or
+ * an earlier extension) - e.g. the duel engine went down for a day. Since
+ * "active right now" and "the round in progress" are the same set of matches
+ * (a round can't advance while any of its matches are still open), this
+ * naturally only ever touches the current round, never a past or future one.
+ */
+export async function extendCurrentRoundDeadline(slug: string, extraHours: number): Promise<{ extended: number }> {
+  const { tournaments, matchDeadlines } = repos();
+  const [tournamentId, event] = await Promise.all([tournaments.findIdBySlug(slug), tournaments.findBySlug(slug)]);
+  if (!tournamentId || !event) throw new Error(`Tournament "${slug}" does not exist`);
+
+  const engine = await loadEngine(tournamentId);
+  if (!engine) throw new Error(`Tournament "${slug}" has no bracket yet`);
+
+  const activeMatches = engine.getMatches().filter((m) => m.isActive());
+  if (activeMatches.length === 0) return { extended: 0 };
+
+  const tracking = await matchDeadlines.getTrackingMap(tournamentId);
+  const cutoffMs = event.roundLimitDays * 24 * 60 * 60 * 1000;
+  const extraMs = extraHours * 60 * 60 * 1000;
+
+  const updates = activeMatches
+    .map((m) => {
+      const t = tracking.get(m.getId());
+      if (!t) return null;
+      return { matchId: m.getId(), until: new Date(effectiveDeadline(t, cutoffMs).getTime() + extraMs) };
+    })
+    .filter((u): u is { matchId: string; until: Date } => u !== null);
+
+  await matchDeadlines.extendDeadlines(tournamentId, updates);
+  return { extended: updates.length };
+}
+
 /** Sweeps every tournament with an open bracket - what the round-deadline cron route calls. Best-effort per tournament so one bad one can't block the rest. */
 export async function closeAllOverdueMatches(): Promise<{ slug: string; resolved: number; error?: string }[]> {
   const slugs = await repos().brackets.listSlugsWithBracket();
@@ -625,6 +665,20 @@ export async function closeAllOverdueMatches(): Promise<{ slug: string; resolved
     }
   }
   return results;
+}
+
+/**
+ * The global leaderboard's placement-based formula (docs/fluxo-do-torneio.md
+ * §15) - flat by finishing place, not scaled by field size or match points
+ * earned. Marked as a starting proposal there, still subject to validation.
+ */
+function rankingPointsForPlace(place: number): number {
+  if (place === 1) return 100;
+  if (place === 2) return 75;
+  if (place <= 4) return 50;
+  if (place <= 8) return 25;
+  if (place <= 16) return 10;
+  return 5;
 }
 
 /** Ends the bracket (if not already ended by the library itself) and freezes final placings for the leaderboard. */
@@ -654,6 +708,7 @@ export async function completeBracket(slug: string): Promise<void> {
     registrationId: r.registrationId,
     place: index + 1,
     points: r.points,
+    rankingPoints: rankingPointsForPlace(index + 1),
   }));
 
   await repos().placings.replaceForTournament(tournamentId, placings);

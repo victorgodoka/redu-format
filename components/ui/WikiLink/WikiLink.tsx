@@ -1,4 +1,6 @@
-interface WikiLinkProps extends React.ComponentPropsWithoutRef<'a'> {
+import type { ComponentPropsWithoutRef } from "react";
+
+interface WikiLinkProps extends ComponentPropsWithoutRef<"a"> {
   cardName: string;
 }
 

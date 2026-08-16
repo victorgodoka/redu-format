@@ -1,9 +1,18 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Bracket } from "@/app/bracket";
-import FallbackImage from "@/app/fallback-image";
+import AdminList, { AdminRow } from "@/components/admin/AdminList";
+import Bracket from "@/components/site/Bracket";
+import Footer from "@/components/site/Footer";
+import SiteHeader from "@/components/site/SiteHeader";
+import TopDeckList from "@/components/site/TopDeckList";
+import Button from "@/components/ui/Button";
+import FactsList from "@/components/ui/FactsList";
+import Lede from "@/components/ui/Lede";
+import Notice from "@/components/ui/Notice";
+import PageHeading from "@/components/ui/PageHeading";
+import Tab from "@/components/ui/Tab";
+import Wrap from "@/components/ui/Wrap";
 import { fetchProfile, getSession } from "@/lib/auth";
 import { findPlayerIdByToken } from "@/lib/backend/services/player.service";
 import {
@@ -12,8 +21,6 @@ import {
   listSavedSlugsForPlayer,
 } from "@/lib/backend/services/registration.service";
 import { getMyCurrentMatch, getMyMatchHistory, getPlacingsForPlayer } from "@/lib/backend/services/results.service";
-import { CARD_ART, CARD_IMAGE } from "@/lib/banlist";
-import { Card, cardsByIds } from "@/lib/cards";
 import {
   FEATURED_EVENT,
   formatDate,
@@ -26,17 +33,9 @@ import {
   STRUCTURES,
 } from "@/lib/events";
 import { getTournament } from "@/lib/tournaments";
-import {
-  YCS_PROVIDENCE_2012_BRACKET,
-  YCS_PROVIDENCE_2012_DECKS,
-  type YcsDeck,
-} from "@/lib/ycs-providence-2012";
-import SiteHeader from "../../site-header";
-import { WikiLink } from "@/app/wiki-link";
+import { YCS_PROVIDENCE_2012_BRACKET, YCS_PROVIDENCE_2012_DECKS } from "@/lib/ycs-providence-2012";
 import { saveTournamentAction, unsaveTournamentAction } from "../saved-actions";
 import { submitMatchReportAction } from "./report-actions";
-
-const EDITOR = "https://duelingnexus.com/editor";
 
 export async function generateMetadata({
   params,
@@ -78,185 +77,22 @@ export async function generateMetadata({
   };
 }
 
-/** Ids repeat in the source list once per copy; this collapses them to counts. */
-function groupCards(ids: readonly number[]) {
-  const counts = new Map<number, number>();
-  for (const id of ids) counts.set(id, (counts.get(id) ?? 0) + 1);
-  return cardsByIds([...counts.keys()]).map((card) => ({
-    card,
-    count: counts.get(card.id) ?? 0,
-  }));
-}
-
-function DeckSection({ title, ids }: { title: string; ids: readonly number[] }) {
-  const rows = groupCards(ids);
-  if (rows.length === 0) return null;
-
-  return (
-    <div className="deck__section">
-      <p className="deck__section-title">
-        {title} · {ids.length}
-      </p>
-      <ul className="deck__cards">
-        {rows.map(({ card, count }) => (
-          <li key={card.id}>
-            <WikiLink cardName={card.name}>
-              <b>×{count}</b> {card.name}
-            </WikiLink>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
-function DeckArt({ title, ids }: { title: string; ids: readonly number[] }) {
-  const rows = groupCards(ids);
-  if (rows.length === 0) return null;
-
-  return (
-    <div className="deck__section">
-      <p className="deck__section-title">
-        {title} · {ids.length}
-      </p>
-      <ul className="deck__art-grid">
-        {rows.map(({ card, count }) => (
-          <li className="deck__art-card" key={card.id} title={card.name}>
-            <WikiLink cardName={card.name}>
-              <Image
-                src={`${CARD_IMAGE}/${card.id}.jpg`}
-                alt={card.name}
-                width={421}
-                height={614}
-                sizes="128px"
-              />
-              <span className="deck__art-count">×{count}</span>
-            </WikiLink>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
-function DeckCard({ deck }: { deck: YcsDeck }) {
-  const coverId = deck.cover ?? deck.main[0];
-  return (
-    <li className="deck panel">
-      <div className="deck__link">
-        <div className="deck__cover">
-          <FallbackImage
-            key={coverId}
-            src={`${CARD_ART}/${coverId}.jpg`}
-            fallbackSrc={`${CARD_ART}/${new Card(coverId).id}.jpg`}
-            alt=""
-            width={680}
-            height={680}
-            sizes="416px"
-          />
-        </div>
-        <div className="deck__body">
-          <span className="deck__place">{deck.place}</span>
-          <span className="deck__name">{deck.archetype}</span>
-          <span className="deck__player">{deck.player}</span>
-          <dl className="deck__counts">
-            <dt>
-              <b>{deck.main.length}</b> main
-            </dt>
-            <dt>
-              <b>{deck.extra.length}</b> extra
-            </dt>
-            <dt>
-              <b>{deck.side.length}</b> side
-            </dt>
-          </dl>
-        </div>
-
-        <div className="deck__actions">
-          <a
-            className="btn btn--solid"
-            href={`${EDITOR}/${deck.id}`}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Save Deck
-          </a>
-        </div>
-      </div>
-
-      <details className="deck__list">
-        <summary>Full decklist</summary>
-        {/* radio-driven tabs: images shown first, no client JS needed */}
-        <div className="deck__view">
-          <input
-            className="deck__view-radio"
-            type="radio"
-            name={`view-${deck.id}`}
-            id={`view-${deck.id}-images`}
-            defaultChecked
-          />
-          <label className="deck__view-tab" htmlFor={`view-${deck.id}-images`}>
-            Images
-          </label>
-          <input
-            className="deck__view-radio"
-            type="radio"
-            name={`view-${deck.id}`}
-            id={`view-${deck.id}-text`}
-          />
-          <label className="deck__view-tab" htmlFor={`view-${deck.id}-text`}>
-            Text
-          </label>
-
-          <div className="deck__view-panel deck__view-panel--images">
-            <DeckArt title="Main" ids={deck.main} />
-            <DeckArt title="Extra" ids={deck.extra} />
-            <DeckArt title="Side" ids={deck.side} />
-          </div>
-          <div className="deck__view-panel deck__view-panel--text">
-            <DeckSection title="Main" ids={deck.main} />
-            <DeckSection title="Extra" ids={deck.extra} />
-            <DeckSection title="Side" ids={deck.side} />
-          </div>
-        </div>
-      </details>
-    </li>
-  );
-}
-
 function FeaturedEventPage() {
   return (
     <main className="section" id="main">
-      <div className="wrap">
-        <p className="tab">Hall of Fame</p>
-        <h1 className="section__title">{FEATURED_EVENT.name}</h1>
+      <Wrap>
+        <PageHeading tab="Hall of Fame" title={FEATURED_EVENT.name} />
 
-        <dl className="facts panel">
-          <div className="facts__row">
-            <dt>Date</dt>
-            <dd>{formatDate(FEATURED_EVENT.date)}</dd>
-          </div>
-          <div className="facts__row">
-            <dt>Winner</dt>
-            <dd>{FEATURED_EVENT.winner}</dd>
-          </div>
-          <div className="facts__row">
-            <dt>Community</dt>
-            <dd>{FEATURED_EVENT.community}</dd>
-          </div>
-          <div className="facts__row">
-            <dt>Players</dt>
-            <dd>{FEATURED_EVENT.players.toLocaleString("en-GB")}</dd>
-          </div>
-          <div className="facts__row">
-            <dt>Format</dt>
-            <dd>{FEATURED_EVENT.format}</dd>
-          </div>
-          <div className="facts__row">
-            <dt>Winning deck</dt>
-            <dd>{FEATURED_EVENT.winningDeck}</dd>
-          </div>
-        </dl>
+        <FactsList
+          rows={[
+            { label: "Date", value: formatDate(FEATURED_EVENT.date) },
+            { label: "Winner", value: FEATURED_EVENT.winner },
+            { label: "Community", value: FEATURED_EVENT.community },
+            { label: "Players", value: FEATURED_EVENT.players.toLocaleString("en-GB") },
+            { label: "Format", value: FEATURED_EVENT.format },
+            { label: "Winning deck", value: FEATURED_EVENT.winningDeck },
+          ]}
+        />
 
         <h2 className="section__subtitle">Bracket</h2>
         <Bracket rounds={YCS_PROVIDENCE_2012_BRACKET} />
@@ -264,12 +100,8 @@ function FeaturedEventPage() {
         <h2 className="section__subtitle" id="decklists">
           Top decks
         </h2>
-        <ul className="decklist decklist--wide">
-          {YCS_PROVIDENCE_2012_DECKS.map((deck) => (
-            <DeckCard deck={deck} key={deck.id} />
-          ))}
-        </ul>
-      </div>
+        <TopDeckList decks={YCS_PROVIDENCE_2012_DECKS} />
+      </Wrap>
     </main>
   );
 }
@@ -300,55 +132,52 @@ async function GenericEventPage({ slug }: { slug: string }) {
 
   return (
     <main className="section" id="main">
-      <div className="wrap">
-        <p className="tab">{finished ? "Results" : "Tournament"}</p>
-        <div className="admin-bar">
-          <h1 className="section__title">{event.name}</h1>
-          {session.token ? (
-            <form action={isSaved ? unsaveTournamentAction : saveTournamentAction}>
-              <input type="hidden" name="slug" value={slug} />
-              <button
-                className={`btn btn--quiet${isSaved ? " btn--in" : ""}`}
-                type="submit"
-              >
-                {isSaved ? "Saved" : "Save"}
-              </button>
-            </form>
-          ) : null}
-        </div>
+      <Wrap>
+        <PageHeading
+          tab={finished ? "Results" : "Tournament"}
+          title={event.name}
+          action={
+            session.token ? (
+              <form action={isSaved ? unsaveTournamentAction : saveTournamentAction}>
+                <input type="hidden" name="slug" value={slug} />
+                <Button variant="quiet" className={isSaved ? "btn--in" : undefined} type="submit">
+                  {isSaved ? "Saved" : "Save"}
+                </Button>
+              </form>
+            ) : undefined
+          }
+        />
 
         <div className="signup">
           <div className="signup__main">
             {registeredDeck ? (
-              <div className="notice notice--done panel">
-                <p className="tab">{finished ? "You played" : "Registered"}</p>
-                <h2 className="notice__title">
-                  {registeredDeck.name}
-                </h2>
+              <Notice variant="done">
+                <Tab>{finished ? "You played" : "Registered"}</Tab>
+                <h2 className="notice__title">{registeredDeck.name}</h2>
                 {finished ? (
-                  <p className="lede">
+                  <Lede>
                     {placing
                       ? `Placed #${placing.place} of ${event.taken}, ${placing.points} pts.`
                       : "Results for this event have not been finalized yet."}
-                  </p>
+                  </Lede>
                 ) : past ? (
-                  <p className="lede">This tournament is underway - check your current match below.</p>
+                  <Lede>This tournament is underway - check your current match below.</Lede>
                 ) : (
-                  <p className="lede">
+                  <Lede>
                     {registeredDeck.main} main · {registeredDeck.extra} extra ·{" "}
-                    {registeredDeck.side} side. Bring it to{" "}
-                    {formatDate(event.startsAt)} at {formatTime(event.startsAt)}.
-                  </p>
+                    {registeredDeck.side} side. Bring it to {formatDate(event.startsAt)} at{" "}
+                    {formatTime(event.startsAt)}.
+                  </Lede>
                 )}
                 {finished ? null : (
                   <Link className="btn" href={`/events/${slug}/signup`}>
                     Manage registration
                   </Link>
                 )}
-              </div>
+              </Notice>
             ) : (
-              <div className="notice panel">
-                <p className="lede">
+              <Notice>
+                <Lede>
                   {finished
                     ? "This event has finished."
                     : past
@@ -356,23 +185,25 @@ async function GenericEventPage({ slug }: { slug: string }) {
                       : left === 0
                         ? "Every seat is taken."
                         : "You are not registered for this event yet."}
-                </p>
+                </Lede>
                 {past || left === 0 ? null : (
                   <Link className="btn btn--solid" href={`/events/${slug}/signup`}>
                     Sign up
                   </Link>
                 )}
-              </div>
+              </Notice>
             )}
 
             {myMatch ? (
-              <div className="notice panel">
-                <p className="tab">Round {myMatch.round} · Your duel</p>
+              <Notice>
+                <Tab>
+                  Round {myMatch.round} · Your duel
+                </Tab>
                 <h2 className="notice__title">vs {myMatch.opponentName ?? "TBD"}</h2>
                 {myMatch.deadlineAt ? (
-                  <p className="lede">
+                  <Lede>
                     Round closes {formatDate(myMatch.deadlineAt)} at {formatTime(myMatch.deadlineAt)}.
-                  </p>
+                  </Lede>
                 ) : null}
                 {myMatch.roomHash ? (
                   <a
@@ -385,99 +216,86 @@ async function GenericEventPage({ slug }: { slug: string }) {
                   </a>
                 ) : null}
                 {myMatch.disputed ? (
-                  <p className="lede">
-                    You and your opponent reported different results - a staff member will
-                    step in to sort it out.
-                  </p>
+                  <Lede>
+                    You and your opponent reported different results - a staff member will step
+                    in to sort it out.
+                  </Lede>
                 ) : myMatch.myReport ? (
-                  <p className="lede">
+                  <Lede>
                     You reported <b>{myMatch.myReport}</b>.{" "}
                     {myMatch.opponentReported
                       ? "Reconciling with your opponent's report."
                       : "Waiting on your opponent to report too."}
-                  </p>
+                  </Lede>
                 ) : (
-                  <p className="lede">Report your result once the duel is over.</p>
+                  <Lede>Report your result once the duel is over.</Lede>
                 )}
                 <form action={submitMatchReportAction} className="admin-row__actions">
                   <input type="hidden" name="slug" value={slug} />
                   <input type="hidden" name="matchId" value={myMatch.matchId} />
-                  <button className="btn btn--solid" type="submit" name="result" value="win">
+                  <Button variant="solid" type="submit" name="result" value="win">
                     I won
-                  </button>
-                  <button className="btn" type="submit" name="result" value="loss">
+                  </Button>
+                  <Button type="submit" name="result" value="loss">
                     I lost
-                  </button>
-                  <button className="btn btn--quiet" type="submit" name="result" value="draw">
+                  </Button>
+                  <Button variant="quiet" type="submit" name="result" value="draw">
                     Draw
-                  </button>
+                  </Button>
                 </form>
-              </div>
+              </Notice>
             ) : null}
 
             {myHistory.length > 0 ? (
-              <div className="notice panel">
-                <p className="tab">Your duels</p>
-                <ul className="admin-list">
+              <Notice>
+                <Tab>Your duels</Tab>
+                <AdminList>
                   {myHistory.map((entry) => (
-                    <li className="admin-row" key={entry.round}>
-                      <div className="admin-row__main">
+                    <AdminRow key={entry.round}>
+                      <AdminRow.Main>
                         <span className="admin-row__title">
-                          Round {entry.round} · {entry.result === "bye" ? "Bye" : `vs ${entry.opponentName ?? "?"}`}
+                          Round {entry.round} ·{" "}
+                          {entry.result === "bye" ? "Bye" : `vs ${entry.opponentName ?? "?"}`}
                         </span>
                         <span className="admin-row__meta">
                           {entry.result === "bye"
                             ? "Automatic win"
                             : `${entry.result === "win" ? "Won" : entry.result === "loss" ? "Lost" : "Drew"} ${entry.score}`}
                         </span>
-                      </div>
-                    </li>
+                      </AdminRow.Main>
+                    </AdminRow>
                   ))}
-                </ul>
-              </div>
+                </AdminList>
+              </Notice>
             ) : null}
           </div>
 
           <aside className="signup__side">
-            <dl className="facts panel">
-              <div className="facts__row">
-                <dt>Starts</dt>
-                <dd>
-                  {formatDate(event.startsAt)}, {formatTime(event.startsAt)}
-                </dd>
-              </div>
-              <div className="facts__row">
-                <dt>Structure</dt>
-                <dd>{STRUCTURES[event.structure].label}</dd>
-              </div>
-              <div className="facts__row">
-                <dt>Rounds</dt>
-                <dd>
-                  {event.rounds} · {event.matchFormat} · {event.roundLimitDays}-day round
-                  deadline
-                  {event.topCut ? ` · Top ${event.topCut}` : ""}
-                </dd>
-              </div>
-              <div className="facts__row">
-                <dt>Seats</dt>
-                <dd>
-                  {event.seats === null
-                    ? `${event.taken} registered (unlimited)`
-                    : past
-                      ? `${event.taken} of ${event.seats} duelists`
-                      : `${left} of ${event.seats} left`}
-                </dd>
-              </div>
-              <div className="facts__row">
-                <dt>Host</dt>
-                <dd>
-                  {event.host} · {formatEntry(event.entry)}
-                </dd>
-              </div>
-            </dl>
+            <FactsList
+              rows={[
+                { label: "Starts", value: `${formatDate(event.startsAt)}, ${formatTime(event.startsAt)}` },
+                { label: "Structure", value: STRUCTURES[event.structure].label },
+                {
+                  label: "Rounds",
+                  value: `${event.rounds} · ${event.matchFormat} · ${event.roundLimitDays}-day round deadline${
+                    event.topCut ? ` · Top ${event.topCut}` : ""
+                  }`,
+                },
+                {
+                  label: "Seats",
+                  value:
+                    event.seats === null
+                      ? `${event.taken} registered (unlimited)`
+                      : past
+                        ? `${event.taken} of ${event.seats} duelists`
+                        : `${left} of ${event.seats} left`,
+                },
+                { label: "Host", value: `${event.host} · ${formatEntry(event.entry)}` },
+              ]}
+            />
           </aside>
         </div>
-      </div>
+      </Wrap>
     </main>
   );
 }
@@ -491,17 +309,11 @@ export default async function EventDetailPage({
 
   return (
     <>
-      <a className="skip-link" href="#main">
-        Skip to content
-      </a>
-
       <SiteHeader />
 
-      {slug === FEATURED_EVENT.slug ? (
-        <FeaturedEventPage />
-      ) : (
-        <GenericEventPage slug={slug} />
-      )}
+      {slug === FEATURED_EVENT.slug ? <FeaturedEventPage /> : <GenericEventPage slug={slug} />}
+
+      <Footer />
     </>
   );
 }

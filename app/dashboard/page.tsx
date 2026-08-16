@@ -1,25 +1,27 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import FallbackImage from "../fallback-image";
+import AdminList, { AdminRow } from "@/components/admin/AdminList";
+import StatBar from "@/components/admin/StatBar";
+import DeckList from "@/components/site/DeckList";
+import Footer from "@/components/site/Footer";
+import SiteHeader from "@/components/site/SiteHeader";
+import Button from "@/components/ui/Button";
+import EmptyState from "@/components/ui/EmptyState";
+import FallbackImage from "@/components/ui/FallbackImage";
+import Tab from "@/components/ui/Tab";
+import Wrap from "@/components/ui/Wrap";
 import { deckLegality, fetchProfile, getSession } from "@/lib/auth";
 import { findPlayerIdByToken } from "@/lib/backend/services/player.service";
 import { listSavedSlugsForPlayer, listSignupsForPlayer } from "@/lib/backend/services/registration.service";
 import { getPlacingsForPlayer } from "@/lib/backend/services/results.service";
-import { CARD_ART } from "@/lib/banlist";
 import { Card } from "@/lib/cards";
 import { DEFAULT_AVATAR } from "@/lib/nexus-parse";
-import {
-  formatDate,
-  formatTime,
-  isPast,
-  pastEvents,
-} from "@/lib/events";
+import { formatDate, formatTime, isPast, pastEvents } from "@/lib/events";
 import { listTournaments } from "@/lib/tournaments";
 import { validateDecks } from "@/lib/validateDecks";
 import { unsaveTournamentAction } from "../events/saved-actions";
 import { logout, refresh } from "../login/actions";
-import SiteHeader from "../site-header";
 
 export const metadata: Metadata = {
   title: "Dashboard | REDU Format",
@@ -108,15 +110,11 @@ export default async function DashboardPage() {
 
   return (
     <>
-      <a className="skip-link" href="#main">
-        Skip to content
-      </a>
-
       <SiteHeader />
 
       <main className="section" id="main">
-        <div className="wrap">
-          <p className="tab">Dashboard</p>
+        <Wrap>
+          <Tab>Dashboard</Tab>
 
           <div className="profile">
             {profile.avatar ? (
@@ -140,46 +138,32 @@ export default async function DashboardPage() {
             </div>
             <div className="profile__out">
               <form action={refresh}>
-                <button className="btn" type="submit">
-                  Refresh
-                </button>
+                <Button type="submit">Refresh</Button>
               </form>
               <form action={logout}>
-                <button className="btn" type="submit">
-                  Sign out
-                </button>
+                <Button type="submit">Sign out</Button>
               </form>
             </div>
           </div>
 
-          <dl className="featured__stats dash-stats panel">
-            <div>
-              <dt>Decks</dt>
-              <dd>{profile.decks.length}</dd>
-            </div>
-            <div>
-              <dt>REDU legal</dt>
-              <dd>{legalDeckCount}</dd>
-            </div>
-            <div>
-              <dt>Upcoming signups</dt>
-              <dd>{upcomingEvents.length}</dd>
-            </div>
-          </dl>
+          <StatBar
+            stats={[
+              { label: "Decks", value: profile.decks.length },
+              { label: "REDU legal", value: legalDeckCount },
+              { label: "Upcoming signups", value: upcomingEvents.length },
+            ]}
+            actions={
+              <>
+                <Button variant="solid" href="/events">
+                  Browse events
+                </Button>
+                <a className="btn" href={EDITOR} target="_blank" rel="noopener noreferrer">
+                  Deck editor
+                </a>
+              </>
+            }
+          />
 
-          <div className="dash-actions">
-            <Link className="btn btn--solid" href="/events">
-              Browse events
-            </Link>
-            <a
-              className="btn"
-              href={EDITOR}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Deck editor
-            </a>
-          </div>
           <div className="section__grid">
             <div className="section__content">
               {yourEvents.length > 0 ? (
@@ -187,49 +171,49 @@ export default async function DashboardPage() {
                   <h2 className="section__subtitle">Your events</h2>
 
                   {upcomingEvents.length > 0 ? (
-                    <ul className="admin-list">
+                    <AdminList>
                       {upcomingEvents.map(({ event, deck }) => (
-                        <li className="admin-row panel" key={event.slug}>
-                          <div className="admin-row__main">
+                        <AdminRow key={event.slug}>
+                          <AdminRow.Main>
                             <span className="admin-row__title">{event.name}</span>
                             <span className="admin-row__meta">
                               {formatDate(event.startsAt)} · {formatTime(event.startsAt)}
                               {deck ? ` · ${deck.name}` : ""}
                             </span>
-                          </div>
-                          <div className="admin-row__actions">
+                          </AdminRow.Main>
+                          <AdminRow.Actions>
                             <Link className="btn" href={`/events/${event.slug}`}>
                               View event
                             </Link>
-                          </div>
-                        </li>
+                          </AdminRow.Actions>
+                        </AdminRow>
                       ))}
-                    </ul>
+                    </AdminList>
                   ) : null}
 
                   {pastYourEvents.length > 0 ? (
-                    <ul className="admin-list">
+                    <AdminList>
                       {pastYourEvents.map(({ event, deck }) => {
                         const placing = placings.get(event.slug);
                         return (
-                        <li className="admin-row panel" key={event.slug}>
-                          <div className="admin-row__main">
-                            <span className="admin-row__title">{event.name}</span>
-                            <span className="admin-row__meta">
-                              {formatDate(event.startsAt)}
-                              {deck ? ` · ${deck.name}` : ""}
-                              {placing ? ` · Placed #${placing.place}` : ""}
-                            </span>
-                          </div>
-                          <div className="admin-row__actions">
-                            <Link className="btn" href={`/events/${event.slug}`}>
-                              View results
-                            </Link>
-                          </div>
-                        </li>
+                          <AdminRow key={event.slug}>
+                            <AdminRow.Main>
+                              <span className="admin-row__title">{event.name}</span>
+                              <span className="admin-row__meta">
+                                {formatDate(event.startsAt)}
+                                {deck ? ` · ${deck.name}` : ""}
+                                {placing ? ` · Placed #${placing.place}` : ""}
+                              </span>
+                            </AdminRow.Main>
+                            <AdminRow.Actions>
+                              <Link className="btn" href={`/events/${event.slug}`}>
+                                View results
+                              </Link>
+                            </AdminRow.Actions>
+                          </AdminRow>
                         );
                       })}
-                    </ul>
+                    </AdminList>
                   ) : null}
                 </>
               ) : null}
@@ -241,127 +225,79 @@ export default async function DashboardPage() {
                   <h2 className="section__subtitle">Saved tournaments</h2>
 
                   {savedUpcoming.length > 0 ? (
-                    <ul className="admin-list">
+                    <AdminList>
                       {savedUpcoming.map(({ event }) => (
-                        <li className="admin-row panel" key={event.slug}>
-                          <div className="admin-row__main">
+                        <AdminRow key={event.slug}>
+                          <AdminRow.Main>
                             <span className="admin-row__title">{event.name}</span>
                             <span className="admin-row__meta">
                               {formatDate(event.startsAt)} · {formatTime(event.startsAt)}
                             </span>
-                          </div>
-                          <div className="admin-row__actions">
+                          </AdminRow.Main>
+                          <AdminRow.Actions>
                             <Link className="btn" href={`/events/${event.slug}`}>
                               View event
                             </Link>
                             <form action={unsaveTournamentAction}>
                               <input type="hidden" name="slug" value={event.slug} />
-                              <button className="btn btn--quiet" type="submit">
+                              <Button variant="quiet" type="submit">
                                 Unsave
-                              </button>
+                              </Button>
                             </form>
-                          </div>
-                        </li>
+                          </AdminRow.Actions>
+                        </AdminRow>
                       ))}
-                    </ul>
+                    </AdminList>
                   ) : null}
 
                   {savedPast.length > 0 ? (
-                    <ul className="admin-list">
+                    <AdminList>
                       {savedPast.map(({ event }) => (
-                        <li className="admin-row panel" key={event.slug}>
-                          <div className="admin-row__main">
+                        <AdminRow key={event.slug}>
+                          <AdminRow.Main>
                             <span className="admin-row__title">{event.name}</span>
                             <span className="admin-row__meta">
                               {formatDate(event.startsAt)} · Finished
                             </span>
-                          </div>
-                          <div className="admin-row__actions">
+                          </AdminRow.Main>
+                          <AdminRow.Actions>
                             <Link className="btn" href={`/events/${event.slug}`}>
                               View results
                             </Link>
                             <form action={unsaveTournamentAction}>
                               <input type="hidden" name="slug" value={event.slug} />
-                              <button className="btn btn--quiet" type="submit">
+                              <Button variant="quiet" type="submit">
                                 Unsave
-                              </button>
+                              </Button>
                             </form>
-                          </div>
-                        </li>
+                          </AdminRow.Actions>
+                        </AdminRow>
                       ))}
-                    </ul>
+                    </AdminList>
                   ) : null}
                 </>
               ) : null}
             </div>
           </div>
+
           <h2 className="section__subtitle">Your decks</h2>
 
           {profile.decks.length === 0 ? (
-            <div className="empty panel">
-              <p className="lede">
-                No decks on this account yet. Build one in the Dueling Nexus
-                editor and it will show up here.
-              </p>
-              <a
-                className="btn"
-                href={EDITOR}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                Open the editor
-              </a>
-            </div>
+            <EmptyState
+              message="No decks on this account yet. Build one in the Dueling Nexus editor and it will show up here."
+              action={
+                <a className="btn" href={EDITOR} target="_blank" rel="noopener noreferrer">
+                  Open the editor
+                </a>
+              }
+            />
           ) : (
-            <ul className="decklist">
-              {deckRows.map(({ deck, legal, coverFallbackId }) => (
-                <li
-                  className={`deck panel${legal ? " deck--legal" : " deck--illegal"}`}
-                  key={deck.id}
-                >
-                  <a
-                    className="deck__link"
-                    href={`${EDITOR}/${deck.id}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    <span className="deck__cover">
-                      {deck.coverId ? (
-                        <FallbackImage
-                          key={deck.coverId}
-                          src={`${CARD_ART}/${deck.coverId}.jpg`}
-                          fallbackSrc={`${CARD_ART}/${coverFallbackId}.jpg`}
-                          alt=""
-                          width={72}
-                          height={72}
-                          sizes="72px"
-                        />
-                      ) : null}
-                    </span>
-                    <span className="deck__body">
-                      <span className="deck__legality">
-                        {legal ? "REDU legal" : "Not legal"}
-                      </span>
-                      <span className="deck__name">{deck.name}</span>
-                      <span className="deck__counts">
-                        <span>
-                          <b>{deck.main}</b> main
-                        </span>
-                        <span>
-                          <b>{deck.extra}</b> extra
-                        </span>
-                        <span>
-                          <b>{deck.side}</b> side
-                        </span>
-                      </span>
-                    </span>
-                  </a>
-                </li>
-              ))}
-            </ul>
+            <DeckList decks={deckRows} />
           )}
-        </div>
+        </Wrap>
       </main>
+
+      <Footer />
     </>
   );
 }

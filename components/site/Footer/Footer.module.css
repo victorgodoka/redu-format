@@ -1,0 +1,31 @@
+.footer {
+  padding-block: clamp(40px, 6vw, 72px);
+}
+
+.inner {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 24px;
+  padding: clamp(28px, 4vw, 48px);
+}
+
+.links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 28px;
+}
+
+.footer a,
+.footer p {
+  font-family: var(--f-mono);
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--c-muted);
+  transition: color 200ms ease;
+}
+
+.footer a:hover {
+  color: var(--c-accent);
+}

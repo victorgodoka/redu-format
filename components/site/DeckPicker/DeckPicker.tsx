@@ -1,11 +1,13 @@
 "use client";
 
 import { useActionState } from "react";
-import FallbackImage from "@/app/fallback-image";
+import Button from "@/components/ui/Button";
+import FallbackImage from "@/components/ui/FallbackImage";
 import { CARD_ART } from "@/lib/banlist";
 import { deckLegality, type NexusDeck } from "@/lib/nexus-parse";
 import { describeError, type ValidatedDeck } from "@/lib/validateDecks";
-import { register, type SignupState } from "./actions";
+import { register, type SignupState } from "@/app/events/[slug]/signup/actions";
+import styles from "./DeckPicker.module.css";
 
 const initial: SignupState = {};
 
@@ -48,17 +50,17 @@ export default function DeckPicker({
   const firstPlayable = rows.find((row) => row.playable)?.deck;
 
   return (
-    <form action={action} className="picker">
+    <form action={action} className={styles.picker}>
       <input type="hidden" name="slug" value={slug} />
 
-      <fieldset className="picker__set">
-        <legend className="picker__legend">Choose the deck you will play</legend>
+      <fieldset className={styles.set}>
+        <legend className={styles.legend}>Choose the deck you will play</legend>
 
-        <ul className="picker__list">
+        <ul className={styles.list}>
           {rows.map(({ deck, problems, playable }) => (
             <li key={deck.id}>
               <label
-                className={`pick${playable ? "" : " pick--illegal"}`}
+                className={`${styles.pick}${playable ? "" : ` ${styles.illegal}`}`}
                 htmlFor={`deck-${deck.id}`}
               >
                 <input
@@ -70,7 +72,7 @@ export default function DeckPicker({
                   defaultChecked={deck.id === firstPlayable?.id}
                   required
                 />
-                <span className="pick__cover">
+                <span className={styles.cover}>
                   {deck.coverId ? (
                     <FallbackImage
                       key={deck.coverId}
@@ -82,9 +84,9 @@ export default function DeckPicker({
                     />
                   ) : null}
                 </span>
-                <span className="pick__body">
-                  <span className="pick__name">{deck.name}</span>
-                  <span className="pick__counts">
+                <span className={styles.body}>
+                  <span className={styles.name}>{deck.name}</span>
+                  <span className={styles.counts}>
                     <span>
                       <b>{deck.main}</b> main
                     </span>
@@ -97,19 +99,18 @@ export default function DeckPicker({
                   </span>
 
                   {playable ? null : (
-                    <span className="pick__problems">
-                      <span className="pick__problems-head">
-                        {problems.length}{" "}
-                        {problems.length === 1 ? "problem" : "problems"}
+                    <span className={styles.problems}>
+                      <span className={styles.problemsHead}>
+                        {problems.length} {problems.length === 1 ? "problem" : "problems"}
                       </span>
-                      <span className="pick__problem-list">
+                      <span className={styles.problemList}>
                         {problems.slice(0, 4).map((problem) => (
-                          <span className="pick__problem" key={problem}>
+                          <span className={styles.problem} key={problem}>
                             {problem}
                           </span>
                         ))}
                         {problems.length > 4 ? (
-                          <span className="pick__problem pick__problem--more">
+                          <span className={`${styles.problem} ${styles.problemMore}`}>
                             and {problems.length - 4} more
                           </span>
                         ) : null}
@@ -129,13 +130,15 @@ export default function DeckPicker({
         </p>
       ) : null}
 
-      <button
-        className="btn btn--solid"
+      <Button
+        variant="solid"
         type="submit"
         disabled={pending || !firstPlayable}
+        pending={pending}
+        pendingLabel="Registering..."
       >
-        {pending ? "Registering..." : "Complete sign up"}
-      </button>
+        Complete sign up
+      </Button>
 
       {firstPlayable ? null : (
         <p className="form__hint">

@@ -7,10 +7,12 @@ export type AdminAction =
   | "tournament.create"
   | "tournament.update"
   | "tournament.delete"
+  | "tournament.cancel"
   | "participant.add"
   | "participant.remove"
   | "participant.drop"
   | "participant.deck_update"
+  | "participant.deck_override"
   | "payment.confirm"
   | "payment.contest"
   | "nexus.link"
@@ -18,7 +20,8 @@ export type AdminAction =
   | "bracket.start"
   | "bracket.round"
   | "bracket.result"
-  | "bracket.complete";
+  | "bracket.complete"
+  | "bracket.extend_round";
 
 export const ADMIN_ACTIONS: readonly AdminAction[] = [
   "admin.login",
@@ -26,10 +29,12 @@ export const ADMIN_ACTIONS: readonly AdminAction[] = [
   "tournament.create",
   "tournament.update",
   "tournament.delete",
+  "tournament.cancel",
   "participant.add",
   "participant.remove",
   "participant.drop",
   "participant.deck_update",
+  "participant.deck_override",
   "payment.confirm",
   "payment.contest",
   "nexus.link",
@@ -38,6 +43,7 @@ export const ADMIN_ACTIONS: readonly AdminAction[] = [
   "bracket.round",
   "bracket.result",
   "bracket.complete",
+  "bracket.extend_round",
 ];
 
 export type AuditLogEntry = {

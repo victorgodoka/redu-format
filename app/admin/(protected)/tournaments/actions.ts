@@ -13,6 +13,7 @@ import {
   type Structure,
 } from "@/lib/events";
 import {
+  cancelTournament,
   createTournament,
   deleteTournament,
   getTournament,
@@ -168,6 +169,38 @@ export async function updateTournamentAction(
   revalidatePath(`/admin/tournaments/${slug}`);
   revalidatePath("/events");
   redirect(`/admin/tournaments/${updated.slug}`);
+}
+
+/**
+ * Cancels a tournament instead of deleting it - the record, and anything
+ * already played, stays visible in history; it just stops counting for
+ * placings or the ranking. Valid from `scheduled` or `running` only;
+ * cancelTournament() throws for anything else (already finished or
+ * cancelled), which surfaces as a plain redirect back with nothing recorded.
+ */
+export async function cancelTournamentAction(form: FormData) {
+  const slug = String(form.get("slug") ?? "");
+  const before = await getTournament(slug);
+  if (!before) redirect("/admin/tournaments");
+
+  try {
+    await cancelTournament(slug);
+  } catch {
+    revalidatePath(`/admin/tournaments/${slug}`);
+    redirect(`/admin/tournaments/${slug}`);
+  }
+
+  await recordAction({
+    ...(await actor()),
+    action: "tournament.cancel",
+    target: slug,
+    detail: `Cancelled tournament "${before.name}" (was ${before.status})`,
+  });
+
+  revalidatePath("/admin/tournaments");
+  revalidatePath(`/admin/tournaments/${slug}`);
+  revalidatePath("/events");
+  redirect(`/admin/tournaments/${slug}`);
 }
 
 export async function deleteTournamentAction(form: FormData) {

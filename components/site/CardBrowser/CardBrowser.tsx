@@ -1,9 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
-import FallbackImage from "@/app/fallback-image";
+import Button from "@/components/ui/Button";
+import FallbackImage from "@/components/ui/FallbackImage";
+import Tab from "@/components/ui/Tab";
+import Lede from "@/components/ui/Lede";
 import { CARD_IMAGE } from "@/lib/banlist";
 import { parseCardText, type CardJson } from "@/lib/card-text";
+import styles from "./CardBrowser.module.css";
 
 export type BrowserCard = CardJson;
 
@@ -21,6 +25,12 @@ type Selection = { card: BrowserCard; legality: string };
 /** Tablet and below: no room for a side panel, and no hover to drive it. */
 const COMPACT = "(max-width: 1024px)";
 const LONG_PRESS_MS = 500;
+
+const LEGALITY_CLASS: Record<string, string> = {
+  forbidden: styles.legalityForbidden,
+  limited: styles.legalityLimited,
+  "semi-limited": styles.legalitySemiLimited,
+};
 
 function subscribe(onChange: () => void) {
   const mq = window.matchMedia(COMPACT);
@@ -42,11 +52,13 @@ function useCompact() {
 
 /** Shared by the desktop panel and the compact modal. */
 function CardDetail({ card, legality }: Selection) {
+  const toneClass = LEGALITY_CLASS[legality.toLowerCase().split(" ")[0]] ?? "";
+
   return (
     <>
       <FallbackImage
         key={card.printId}
-        className="preview__art"
+        className={styles.previewArt}
         src={`${CARD_IMAGE}/${card.printId}.jpg`}
         fallbackSrc={`${CARD_IMAGE}/${card.id}.jpg`}
         alt={card.name}
@@ -55,10 +67,10 @@ function CardDetail({ card, legality }: Selection) {
         sizes="(max-width: 1024px) 60vw, 340px"
       />
 
-      <div className="preview__body panel">
-        <h3 className="preview__name">{card.name}</h3>
+      <div className={`${styles.previewBody} panel`}>
+        <h3 className={styles.previewName}>{card.name}</h3>
 
-        <dl className="preview__facts">
+        <dl className={styles.previewFacts}>
           <div>
             <dt>Passcode</dt>
             <dd>{card.id}</dd>
@@ -71,30 +83,19 @@ function CardDetail({ card, legality }: Selection) {
           ) : null}
           <div>
             <dt>Legality</dt>
-            <dd
-              className={`preview__legality preview__legality--${
-                legality.toLowerCase().split(" ")[0]
-              }`}
-            >
-              {legality}
-            </dd>
+            <dd className={toneClass}>{legality}</dd>
           </div>
         </dl>
 
-        <p className="preview__desc">
+        <p className={styles.previewDesc}>
           {parseCardText(card.desc).map((part, i) =>
             part.bold ? <b key={i}>{part.text}</b> : <span key={i}>{part.text}</span>,
           )}
         </p>
 
-        <a
-          className="btn btn--solid"
-          href={card.rulingsUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
+        <Button variant="solid" href={card.rulingsUrl} target="_blank" rel="noopener noreferrer">
           View rulings
-        </a>
+        </Button>
       </div>
     </>
   );
@@ -142,31 +143,28 @@ export default function CardBrowser({
   }
 
   return (
-    <div className="browser">
-      <div className="browser__grid">
+    <div className={styles.browser}>
+      <div>
         {sections.map((section) => (
           <section className="section" id={section.slug} key={section.slug}>
-            <div className="browser__head">
-              <p className="tab">{section.copies}</p>
+            <div className={styles.browserHead}>
+              <Tab>{section.copies}</Tab>
               <h2 className="section__title">
-                {section.label}{" "}
-                <span className="section__count">({section.cards.length})</span>
+                {section.label} <span className={styles.sectionCount}>({section.cards.length})</span>
               </h2>
-              <p className="lede">{section.note}</p>
+              <Lede>{section.note}</Lede>
             </div>
 
-            <ul className="cards">
+            <ul className={styles.cards}>
               {section.cards.map((card) => {
                 const selection = { card, legality: section.legality };
 
                 return (
-                  <li className="card" key={card.id}>
+                  <li className={styles.card} key={card.id}>
                     <button
                       type="button"
-                      className={`card__art${
-                        !compact && hovered?.card.id === card.id
-                          ? " card__art--on"
-                          : ""
+                      className={`${styles.cardArt}${
+                        !compact && hovered?.card.id === card.id ? ` ${styles.cardArtOn}` : ""
                       }`}
                       // Desktop drives the side panel; compact drives the modal.
                       onMouseEnter={() => !compact && setHovered(selection)}
@@ -206,9 +204,9 @@ export default function CardBrowser({
       {/* Desktop only: hidden below the breakpoint by CSS as well, so it never
           costs layout on a phone. */}
       {compact ? null : (
-        <aside className="preview" aria-live="polite">
+        <aside className={styles.preview} aria-live="polite">
           {hovered ? (
-            <div className="preview__inner">
+            <div className={styles.previewInner}>
               <CardDetail {...hovered} />
             </div>
           ) : null}
@@ -218,7 +216,7 @@ export default function CardBrowser({
       {/* The modal exists only in compact mode. */}
       {compact ? (
         <dialog
-          className="card-modal"
+          className={styles.cardModal}
           ref={dialogRef}
           onClose={() => setModal(null)}
           onClick={(e) => {
@@ -227,10 +225,10 @@ export default function CardBrowser({
           }}
         >
           {modal ? (
-            <div className="card-modal__inner">
+            <div className={styles.cardModalInner}>
               <button
                 type="button"
-                className="card-modal__close"
+                className={styles.cardModalClose}
                 onClick={() => setModal(null)}
               >
                 Close

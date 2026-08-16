@@ -6,7 +6,7 @@ import StatBar from "@/components/admin/StatBar";
 import TournamentForm from "@/components/admin/TournamentForm";
 import Button from "@/components/ui/Button";
 import { getTournament } from "@/lib/tournaments";
-import { deleteTournamentAction, updateTournamentAction } from "../actions";
+import { cancelTournamentAction, deleteTournamentAction, updateTournamentAction } from "../actions";
 
 export const metadata: Metadata = {
   title: "Edit tournament | REDU Format",
@@ -38,6 +38,14 @@ export default async function EditTournamentPage({
               Manage participants
             </Button>
             <Button href={`/admin/tournaments/${tournament.slug}/bracket`}>Manage bracket</Button>
+            {tournament.status === "scheduled" || tournament.status === "running" ? (
+              <DeleteButton
+                action={cancelTournamentAction}
+                hidden={{ slug: tournament.slug }}
+                confirmText={`Cancel ${tournament.name}? It won't generate placings or count for the ranking. This can't be undone.`}
+                label="Cancel tournament"
+              />
+            ) : null}
             <DeleteButton
               action={deleteTournamentAction}
               hidden={{ slug: tournament.slug }}

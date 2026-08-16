@@ -6,8 +6,7 @@ import { deckLegality } from "@/lib/nexus-parse";
 import { seatsLeft } from "@/lib/events";
 import { getTournament } from "@/lib/tournaments";
 import { dropRegistration, registerSignup } from "@/lib/backend/services/registration.service";
-import { hasBracket } from "@/lib/backend/services/results.service";
-import { findPlayerIdByToken, resolvePlayerId } from "@/lib/backend/services/player.service";
+import { findPlayerIdByToken, identityKey, resolvePlayerId } from "@/lib/backend/services/player.service";
 import { describeError, validateDeck } from "@/lib/validateDecks";
 
 export type SignupState = { error?: string };
@@ -24,13 +23,11 @@ export async function register(
 
   const event = await getTournament(slug);
   if (!event) return { error: "That event no longer exists." };
-  if (new Date(event.startsAt) < new Date()) {
-    return { error: "That event has already finished." };
-  }
-  if (seatsLeft(event) === 0) return { error: "That event is sold out." };
-  if (await hasBracket(slug)) {
+  if (event.status === "cancelled") return { error: "That event was cancelled." };
+  if (event.status !== "scheduled") {
     return { error: "This event has already started - registration is closed." };
   }
+  if (seatsLeft(event) === 0) return { error: "That event is sold out." };
 
   if (!deckId) return { error: "Pick a deck to register." };
 
@@ -67,6 +64,7 @@ export async function register(
 
   await registerSignup(slug, {
     playerId,
+    nexusIdentityKey: identityKey(session.token),
     displayName: profile.name,
     deckId: deck.id,
     deckName: deck.name,

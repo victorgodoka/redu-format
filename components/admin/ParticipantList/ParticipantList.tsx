@@ -17,6 +17,7 @@ export default function ParticipantList({
   confirmPaymentAction,
   contestPaymentAction,
   editParticipantDeckAction,
+  overrideParticipantDeckAction,
   removeParticipantAction,
 }: {
   slug: string;
@@ -26,6 +27,7 @@ export default function ParticipantList({
   confirmPaymentAction: FormAction;
   contestPaymentAction: FormAction;
   editParticipantDeckAction: FormAction;
+  overrideParticipantDeckAction: FormAction;
   removeParticipantAction: FormAction;
 }) {
   return (
@@ -108,7 +110,17 @@ export default function ParticipantList({
 
           <AdminRow.Actions>
             {started ? (
-              <span className="admin-row__meta">Deck locked - tournament in progress</span>
+              <details className="admin-row__override">
+                <summary className="admin-row__meta">Deck locked - tournament in progress</summary>
+                <form action={overrideParticipantDeckAction} className="payment-controls__confirm">
+                  <input type="hidden" name="slug" value={slug} />
+                  <input type="hidden" name="participantId" value={p.id} />
+                  <input type="text" name="deckName" placeholder="New deck UUID" required />
+                  <Button variant="danger" type="submit">
+                    Override deck (exceptional)
+                  </Button>
+                </form>
+              </details>
             ) : (
               <form action={editParticipantDeckAction} className="payment-controls__confirm">
                 <input type="hidden" name="slug" value={slug} />

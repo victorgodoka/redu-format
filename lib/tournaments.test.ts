@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   addParticipant,
+  cancelTournament,
   createTournament,
   deleteTournament,
   getTournament,
@@ -13,6 +14,7 @@ import {
   setParticipantPayment,
   updateTournament,
 } from "./tournaments.ts";
+import { completeBracket, startBracket } from "./backend/services/results.service.ts";
 
 test.after(teardownTestDb);
 
@@ -144,4 +146,49 @@ test("setParticipantPayment on a missing participant returns null", async () => 
     by: "Mod One",
   });
   assert.equal(result, null);
+});
+
+test("cancelTournament: a scheduled tournament moves straight to cancelled", async () => {
+  const created = await createTournament(draft);
+  assert.equal(created.status, "scheduled");
+
+  await cancelTournament(created.slug);
+
+  const after = await getTournament(created.slug);
+  assert.equal(after?.status, "cancelled");
+  assert.notEqual(after?.cancelledAt, null);
+});
+
+test("cancelTournament: a running tournament can also be cancelled", async () => {
+  const created = await createTournament(draft);
+  await addParticipant(created.slug, { name: "Alice", deckName: "Wind-Up" });
+  await addParticipant(created.slug, { name: "Bob", deckName: "Geargia" });
+  await startBracket(created.slug, created);
+
+  const running = await getTournament(created.slug);
+  assert.equal(running?.status, "running");
+
+  await cancelTournament(created.slug);
+
+  const after = await getTournament(created.slug);
+  assert.equal(after?.status, "cancelled");
+});
+
+test("cancelTournament: refuses a finished tournament - a frozen result can't un-happen", async () => {
+  const created = await createTournament(draft);
+  await addParticipant(created.slug, { name: "Alice", deckName: "Wind-Up" });
+  await addParticipant(created.slug, { name: "Bob", deckName: "Geargia" });
+  await startBracket(created.slug, created);
+  await completeBracket(created.slug);
+
+  await assert.rejects(() => cancelTournament(created.slug));
+
+  const after = await getTournament(created.slug);
+  assert.equal(after?.status, "finished", "still finished, not cancelled");
+});
+
+test("cancelTournament: refuses an already-cancelled tournament", async () => {
+  const created = await createTournament(draft);
+  await cancelTournament(created.slug);
+  await assert.rejects(() => cancelTournament(created.slug));
 });

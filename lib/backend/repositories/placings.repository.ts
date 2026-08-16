@@ -1,6 +1,6 @@
 import type { Pool, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 
-export type Placing = { registrationId: string; place: number; points: number };
+export type Placing = { registrationId: string; place: number; points: number; rankingPoints: number };
 
 export type LeaderboardRow = {
   playerId: string;
@@ -23,16 +23,23 @@ export class PlacingsRepository {
     ]);
     for (const placing of placings) {
       await this.pool.query(
-        `INSERT INTO tournament_placings (id, tournament_id, registration_id, place, points)
-         VALUES (?, ?, ?, ?, ?)`,
-        [crypto.randomUUID(), tournamentId, placing.registrationId, placing.place, placing.points],
+        `INSERT INTO tournament_placings (id, tournament_id, registration_id, place, points, ranking_points)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [
+          crypto.randomUUID(),
+          tournamentId,
+          placing.registrationId,
+          placing.place,
+          placing.points,
+          placing.rankingPoints,
+        ],
       );
     }
   }
 
   async listForTournament(tournamentId: string): Promise<(Placing & { displayName: string })[]> {
     const [rows] = await this.pool.query<RowDataPacket[]>(
-      `SELECT p.registration_id, p.place, p.points, r.display_name
+      `SELECT p.registration_id, p.place, p.points, p.ranking_points, r.display_name
        FROM tournament_placings p
        JOIN registrations r ON r.id = p.registration_id
        WHERE p.tournament_id = ?
@@ -43,6 +50,7 @@ export class PlacingsRepository {
       registrationId: r.registration_id,
       place: r.place,
       points: Number(r.points),
+      rankingPoints: Number(r.ranking_points),
       displayName: r.display_name,
     }));
   }
@@ -60,11 +68,18 @@ export class PlacingsRepository {
     return rows.map((r) => ({ slug: r.slug, place: r.place, points: Number(r.points) }));
   }
 
-  /** Only registrations linked to a real player count - a leaderboard of accounts, not of names typed into a form. */
+  /**
+   * Only registrations linked to a real player count - a leaderboard of
+   * accounts, not of names typed into a form. Sums ranking_points (the
+   * placement-based formula - 1st = 100, 2nd = 75, ...), not the raw match
+   * points earned within each tournament - otherwise a player who just enters
+   * a lot of events and wins a lot of matches would outrank someone who
+   * actually places higher less often.
+   */
   async leaderboard(limit: number): Promise<LeaderboardRow[]> {
     const [rows] = await this.pool.query<RowDataPacket[]>(
       `SELECT pl.id AS player_id, pl.nexus_name AS player_name,
-              SUM(tp.points) AS total_points, COUNT(*) AS events_played
+              SUM(tp.ranking_points) AS total_points, COUNT(*) AS events_played
        FROM tournament_placings tp
        JOIN registrations r ON r.id = tp.registration_id
        JOIN players pl ON pl.id = r.player_id

@@ -1,8 +1,12 @@
 import type { Metadata } from "next";
+import BanlistSectionNav from "@/components/site/BanlistSectionNav";
+import CardBrowser, { type BrowserSection } from "@/components/site/CardBrowser";
+import Footer from "@/components/site/Footer";
+import SiteHeader from "@/components/site/SiteHeader";
+import PageHeading from "@/components/ui/PageHeading";
+import Wrap from "@/components/ui/Wrap";
 import { BANLIST_IDS } from "@/lib/banlist";
 import { Card } from "@/lib/cards";
-import SiteHeader from "../site-header";
-import CardBrowser, { type BrowserSection } from "./card-browser";
 
 export const metadata: Metadata = {
   title: "REDU Format banlist | September 2012 Forbidden & Limited List",
@@ -42,17 +46,12 @@ const total = sections.reduce((sum, section) => sum + section.cards.length, 0);
 export default function BanlistPage() {
   return (
     <>
-      <a className="skip-link" href="#main">
-        Skip to content
-      </a>
-
       <SiteHeader />
 
       <main id="main">
         <section className="section">
-          <div className="wrap">
-            <p className="tab">Forbidden &amp; Limited</p>
-            <h1 className="section__title">REDU Format banlist</h1>
+          <Wrap>
+            <PageHeading tab="Forbidden & Limited" title="REDU Format banlist" />
             <div className="section__split">
               <div className="prose">
                 <p>
@@ -67,26 +66,19 @@ export default function BanlistPage() {
                   format plays.
                 </p>
               </div>
-              <nav className="banjump panel" aria-label="Banlist sections">
-                {sections.map((section) => (
-                  <a
-                    className="banjump__item"
-                    key={section.slug}
-                    href={`#${section.slug}`}
-                  >
-                    <span>{section.label}</span>
-                    <b>{section.cards.length}</b>
-                  </a>
-                ))}
-              </nav>
+              <BanlistSectionNav
+                sections={sections.map((s) => ({ slug: s.slug, label: s.label, count: s.cards.length }))}
+              />
             </div>
-          </div>
+          </Wrap>
         </section>
 
-        <div className="wrap">
+        <Wrap>
           <CardBrowser sections={sections} />
-        </div>
+        </Wrap>
       </main>
+
+      <Footer />
     </>
   );
 }

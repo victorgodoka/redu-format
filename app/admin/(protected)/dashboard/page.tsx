@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import FallbackImage from "@/app/fallback-image";
+import FallbackImage from "@/components/ui/FallbackImage";
 import { AdminRow } from "@/components/admin/AdminList";
 import AdminPageHead from "@/components/admin/AdminPageHead";
 import LinkNexusForm from "@/components/admin/LinkNexusForm";

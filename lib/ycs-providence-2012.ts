@@ -1,4 +1,4 @@
-import type { BracketRound } from "@/app/bracket";
+import type { BracketRound } from "@/components/site/Bracket";
 
 /** Top 16 single-elimination bracket, transcribed from the event's results page. */
 export const YCS_PROVIDENCE_2012_BRACKET: readonly BracketRound[] = [

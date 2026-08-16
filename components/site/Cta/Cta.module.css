@@ -1,0 +1,22 @@
+.cta {
+  padding: clamp(44px, 7vw, 88px) clamp(28px, 5vw, 64px);
+  text-align: center;
+}
+
+.title {
+  font-size: clamp(30px, 4.6vw, 60px);
+}
+
+.cta :global(.lede) {
+  margin: 24px auto 0;
+}
+
+.cta :global(.lede) + :global(.lede) {
+  margin-top: 18px;
+}
+
+.actions {
+  display: flex;
+  justify-content: center;
+  margin-top: 36px;
+}

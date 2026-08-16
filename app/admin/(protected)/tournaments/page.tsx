@@ -2,11 +2,26 @@ import type { Metadata } from "next";
 import AdminPageHead from "@/components/admin/AdminPageHead";
 import DeleteButton from "@/components/admin/DeleteButton";
 import TournamentList from "@/components/admin/TournamentList";
+import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import EmptyState from "@/components/ui/EmptyState";
-import { formatDate, formatTime, STRUCTURES } from "@/lib/events";
+import { formatDate, formatTime, STRUCTURES, type TournamentStatus } from "@/lib/events";
 import { listTournaments } from "@/lib/tournaments";
 import { deleteTournamentAction } from "./actions";
+
+const STATUS_LABEL: Record<TournamentStatus, string> = {
+  scheduled: "Scheduled",
+  running: "Running",
+  finished: "Finished",
+  cancelled: "Cancelled",
+};
+
+const STATUS_TONE: Record<TournamentStatus, "neutral" | "positive" | "negative"> = {
+  scheduled: "neutral",
+  running: "positive",
+  finished: "neutral",
+  cancelled: "negative",
+};
 
 export const metadata: Metadata = {
   title: "Manage tournaments | REDU Format",
@@ -37,6 +52,7 @@ export default async function AdminTournamentsPage() {
           tournaments={tournaments}
           meta={(t) => (
             <>
+              <Badge tone={STATUS_TONE[t.status]}>{STATUS_LABEL[t.status]}</Badge>{" "}
               {formatDate(t.startsAt)} · {formatTime(t.startsAt)} · {STRUCTURES[t.structure].label} ·{" "}
               {t.taken}/{t.seats === null ? "unlimited" : t.seats} seats
             </>

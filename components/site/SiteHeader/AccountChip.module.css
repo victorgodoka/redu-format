@@ -1,0 +1,49 @@
+.account {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 14px 6px 6px;
+  border: 1px solid var(--c-line);
+  border-radius: 999px;
+  transition:
+    border-color 200ms ease,
+    background 200ms ease;
+}
+
+.account:hover {
+  border-color: var(--c-accent);
+  background: color-mix(in srgb, var(--c-accent) 10%, transparent);
+}
+
+.avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  object-fit: cover;
+}
+
+.avatarEmpty {
+  display: grid;
+  place-items: center;
+  background: var(--c-line);
+  font-family: var(--f-display);
+  font-size: 14px;
+  text-transform: uppercase;
+}
+
+.name {
+  font-family: var(--f-mono);
+  font-size: 12px;
+  letter-spacing: 0.1em;
+}
+
+.badge {
+  padding: 3px 8px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--c-accent) 18%, transparent);
+  color: var(--c-accent);
+  font-family: var(--f-mono);
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}

@@ -1,0 +1,79 @@
+.mrules {
+  display: grid;
+  gap: clamp(16px, 2vw, 24px);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+  margin: 32px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.mrule {
+  padding: clamp(22px, 3vw, 32px);
+}
+
+/* the rule set this format actually plays gets the accent edge */
+.mruleCurrent {
+  background: var(--c-accent);
+}
+
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.name {
+  font-size: clamp(20px, 2.4vw, 26px);
+}
+
+.badge {
+  padding: 3px 10px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--c-accent) 18%, transparent);
+  font-family: var(--f-mono);
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--c-accent);
+}
+
+.when {
+  margin-top: 8px;
+  font-family: var(--f-mono);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  color: var(--c-muted);
+}
+
+.group {
+  margin-top: 22px;
+}
+
+.groupTitle {
+  margin-bottom: 8px;
+  font-family: var(--f-mono);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--c-muted);
+}
+
+.items {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 15px;
+  color: #c6c4d2;
+}
+
+.items li {
+  padding-left: 14px;
+  border-left: 2px solid var(--c-line);
+}
+
+.arrow {
+  color: var(--c-accent);
+}

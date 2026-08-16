@@ -4,7 +4,16 @@ import { PlayersRepository, type PlayerProfile } from "../repositories/players.r
 
 export type { PlayerProfile };
 
-function identityKey(token: string): string {
+/**
+ * sha256 of the Nexus token - the stable-ish id a registration snapshots at
+ * signup time (see registration.service.ts's registerSignup), so a
+ * tournament's historical record of "who played" stays tied to the actual
+ * identity used that event even if players.nexus_identity_key later moves
+ * (reconciled onto a different key by resolvePlayerId, a renamed account,
+ * etc.) Exported for that snapshot; resolvePlayerId/findPlayerIdByToken use
+ * it internally for the live players table lookup.
+ */
+export function identityKey(token: string): string {
   return createHash("sha256").update(token).digest("hex");
 }
 

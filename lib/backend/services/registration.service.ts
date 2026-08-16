@@ -27,10 +27,18 @@ function initialPaymentStatus(entry: EntryFee): PaymentStatus {
  */
 export async function registerSignup(
   slug: string,
-  input: { playerId: string; displayName: string; deckId: string; deckName: string; entry: EntryFee },
+  input: {
+    playerId: string;
+    nexusIdentityKey: string;
+    displayName: string;
+    deckId: string;
+    deckName: string;
+    entry: EntryFee;
+  },
 ): Promise<void> {
   await repos().registrations.upsertPublicSignup(crypto.randomUUID(), slug, {
     playerId: input.playerId,
+    nexusIdentityKey: input.nexusIdentityKey,
     displayName: input.displayName,
     deckId: input.deckId,
     deckName: input.deckName,

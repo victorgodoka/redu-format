@@ -13,6 +13,7 @@ import {
   confirmPaymentAction,
   contestPaymentAction,
   editParticipantDeckAction,
+  overrideParticipantDeckAction,
   removeParticipantAction,
 } from "./actions";
 
@@ -73,6 +74,7 @@ export default async function ParticipantsPage({
           confirmPaymentAction={confirmPaymentAction}
           contestPaymentAction={contestPaymentAction}
           editParticipantDeckAction={editParticipantDeckAction}
+          overrideParticipantDeckAction={overrideParticipantDeckAction}
           removeParticipantAction={removeParticipantAction}
         />
       )}

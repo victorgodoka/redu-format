@@ -155,13 +155,32 @@ export class RegistrationsRepository {
   async upsertPublicSignup(
     id: string,
     slug: string,
-    input: { playerId: string; displayName: string; deckId: string; deckName: string; initialPaymentStatus: PaymentStatus },
+    input: {
+      playerId: string;
+      nexusIdentityKey: string;
+      displayName: string;
+      deckId: string;
+      deckName: string;
+      initialPaymentStatus: PaymentStatus;
+    },
   ): Promise<void> {
     await this.pool.query(
-      `INSERT INTO registrations (id, tournament_id, player_id, source, display_name, deck_name, deck_id, payment_status)
-       SELECT ?, id, ?, 'public_signup', ?, ?, ?, ? FROM tournaments WHERE slug = ?
-       ON DUPLICATE KEY UPDATE display_name = VALUES(display_name), deck_name = VALUES(deck_name), deck_id = VALUES(deck_id)`,
-      [id, input.playerId, input.displayName, input.deckName, input.deckId, input.initialPaymentStatus, slug],
+      `INSERT INTO registrations
+        (id, tournament_id, player_id, nexus_identity_key_snapshot, source, display_name, deck_name, deck_id, payment_status)
+       SELECT ?, id, ?, ?, 'public_signup', ?, ?, ?, ? FROM tournaments WHERE slug = ?
+       ON DUPLICATE KEY UPDATE
+        nexus_identity_key_snapshot = VALUES(nexus_identity_key_snapshot),
+        display_name = VALUES(display_name), deck_name = VALUES(deck_name), deck_id = VALUES(deck_id)`,
+      [
+        id,
+        input.playerId,
+        input.nexusIdentityKey,
+        input.displayName,
+        input.deckName,
+        input.deckId,
+        input.initialPaymentStatus,
+        slug,
+      ],
     );
   }
 

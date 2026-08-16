@@ -56,6 +56,7 @@ test("isPast: a bracket started ahead of its advertised time is no longer upcomi
   const scheduledForTomorrow: TournamentEvent = {
     ...events[0],
     startsAt: new Date(NOW.getTime() + 24 * 60 * 60 * 1000).toISOString(),
+    status: "running",
     startedAt: new Date(NOW.getTime() - 60 * 1000).toISOString(), // started a minute ago
   };
 
@@ -67,10 +68,11 @@ test("isPast: a bracket started ahead of its advertised time is no longer upcomi
 test("isFinished: in-progress (started, not finished) is distinct from finished", () => {
   const inProgress: TournamentEvent = {
     ...events[0],
+    status: "running",
     startedAt: new Date(NOW.getTime() - 60 * 1000).toISOString(),
     finishedAt: null,
   };
-  const finished: TournamentEvent = { ...inProgress, finishedAt: NOW.toISOString() };
+  const finished: TournamentEvent = { ...inProgress, status: "finished", finishedAt: NOW.toISOString() };
 
   assert.equal(isPast(inProgress, NOW), true, "in progress is no longer upcoming");
   assert.equal(isFinished(inProgress), false, "but it isn't finished yet");

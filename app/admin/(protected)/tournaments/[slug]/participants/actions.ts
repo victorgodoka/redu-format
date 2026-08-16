@@ -121,6 +121,39 @@ export async function editParticipantDeckAction(form: FormData) {
 }
 
 /**
+ * Exceptional post-start deck correction - e.g. a registration was made with
+ * the wrong deck by mistake. Unlike editParticipantDeckAction, this is
+ * reachable after the bracket has started; it exists specifically for that
+ * case, logged under its own audit action so it's never confused with a
+ * routine pre-start edit.
+ */
+export async function overrideParticipantDeckAction(form: FormData) {
+  const slug = String(form.get("slug") ?? "");
+  const participantId = String(form.get("participantId") ?? "");
+  const deckUuid = String(form.get("deckName") ?? "").trim();
+  if (!slug || !participantId || !deckUuid) return;
+
+  const check = await verifyDeckUuid(deckUuid);
+  if (!check.ok) errorRedirect(slug, check.error);
+
+  const before = (await listParticipants(slug)).find((p) => p.id === participantId);
+  const updated = await setParticipantDeck(slug, participantId, deckUuid);
+  if (!updated) errorRedirect(slug, "That participant no longer exists.");
+
+  await recordAction({
+    ...(await actor()),
+    action: "participant.deck_override",
+    target: slug,
+    detail: before
+      ? `OVERRIDE: changed the deck for "${before.name}" in "${slug}" from ${before.deckName} to ${deckUuid} after the tournament had already started`
+      : `OVERRIDE: changed a participant's deck in "${slug}" to ${deckUuid} after the tournament had already started`,
+  });
+
+  revalidatePath(`/admin/tournaments/${slug}/participants`);
+  redirect(`/admin/tournaments/${slug}/participants`);
+}
+
+/**
  * Confirms a paid entry. A new proof URL replaces the stored one; leaving it
  * blank re-approves the existing proof as-is (the "confirm the old one"
  * path out of a contested state). Requires a proof from one source or the

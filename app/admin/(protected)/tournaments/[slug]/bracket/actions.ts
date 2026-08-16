@@ -6,6 +6,7 @@ import { getAdminSession } from "@/lib/auth/session";
 import {
   completeBracket,
   enterMatchResult,
+  extendCurrentRoundDeadline,
   generateNextRound,
   startBracket,
 } from "@/lib/backend/services/results.service";
@@ -110,6 +111,29 @@ export async function nextRoundAction(form: FormData) {
     action: "bracket.round",
     target: slug,
     detail: `Advanced "${slug}" to the next round`,
+  });
+
+  revalidatePath(`/admin/tournaments/${slug}/bracket`);
+}
+
+/**
+ * Extends every currently-active match's deadline by the given number of
+ * hours - e.g. the duel engine is down. Only touches the round in progress
+ * (see extendCurrentRoundDeadline's own doc comment for why that's automatic).
+ */
+export async function extendRoundAction(form: FormData) {
+  const slug = String(form.get("slug") ?? "");
+  const hours = Number(form.get("hours") ?? "");
+  if (!slug || !Number.isFinite(hours) || hours <= 0) return;
+
+  const { extended } = await extendCurrentRoundDeadline(slug, hours);
+  if (extended === 0) return;
+
+  await recordAction({
+    ...(await actor()),
+    action: "bracket.extend_round",
+    target: slug,
+    detail: `Extended the deadline of ${extended} active match(es) in "${slug}" by ${hours}h`,
   });
 
   revalidatePath(`/admin/tournaments/${slug}/bracket`);

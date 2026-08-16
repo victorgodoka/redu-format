@@ -1,7 +1,10 @@
-import Link from "next/link";
-import SiteHeader from "./site-header";
-
-const DISCORD = "https://discord.gg/duelingnexus";
+import Cta from "@/components/site/Cta";
+import Footer from "@/components/site/Footer";
+import Hero from "@/components/site/Hero";
+import SiteHeader from "@/components/site/SiteHeader";
+import FactsList from "@/components/ui/FactsList";
+import PageHeading from "@/components/ui/PageHeading";
+import Wrap from "@/components/ui/Wrap";
 
 const facts = [
   { k: "Card pool", v: "Up to Return of the Duelist" },
@@ -48,44 +51,14 @@ export default function Home() {
         }}
       />
 
-      <a className="skip-link" href="#main">
-        Skip to content
-      </a>
-
       <SiteHeader />
 
-      <div className="wrap">
-        <section className="hero panel">
-          <h1 className="hero__title">
-            REDU
-            <span>Format</span>
-          </h1>
-          <p className="lede">
-            Explore the Zexal-era retro format set in October 2012, with a card
-            pool that extends up to the Return of the Duelist set, exclusively
-            on Dueling Nexus.
-          </p>
-          <div className="hero__actions">
-            <a
-              className="btn btn--solid"
-              href={DISCORD}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Start dueling today
-            </a>
-            <Link className="btn" href="/events">
-              View the latest events
-            </Link>
-          </div>
-        </section>
-      </div>
+      <Hero />
 
       <main id="main">
         <section className="section" id="format">
-          <div className="wrap">
-            <p className="tab">The format</p>
-            <h2 className="section__title">What is REDU Format?</h2>
+          <Wrap>
+            <PageHeading tab="The format" title="What is REDU Format?" level="h2" />
             <div className="section__split">
               <div className="prose">
                 <p>
@@ -117,22 +90,14 @@ export default function Home() {
                   you will be part of it.
                 </p>
               </div>
-              <dl className="facts panel">
-                {facts.map(({ k, v }) => (
-                  <div className="facts__row" key={k}>
-                    <dt>{k}</dt>
-                    <dd>{v}</dd>
-                  </div>
-                ))}
-              </dl>
+              <FactsList rows={facts.map((f) => ({ label: f.k, value: f.v }))} />
             </div>
-          </div>
+          </Wrap>
         </section>
 
         <section className="section" id="why">
-          <div className="wrap">
-            <p className="tab">Why play REDU</p>
-            <h2 className="section__title">Why play REDU Format?</h2>
+          <Wrap>
+            <PageHeading tab="Why play REDU" title="Why play REDU Format?" level="h2" />
             <div className="prose">
               <p>
                 With the October 2012 card pool and the September 2012 banlist,
@@ -146,58 +111,17 @@ export default function Home() {
                 at YCS events.
               </p>
             </div>
-          </div>
+          </Wrap>
         </section>
 
         <section className="section" id="community">
-          <div className="wrap">
-            <div className="cta panel">
-              <p className="tab">Join REDU community</p>
-              <h2 className="cta__title">Ready to play REDU Format?</h2>
-              <p className="lede">
-                Our platform hosts the biggest REDU Format tournaments and
-                events, and our community of over 85,000 Discord members is as
-                enthusiastic about REDU as it is about the TCG, Edison, Genesys
-                and other formats. New and returning players are welcome, and
-                you can choose between an automatic and a manual experience,
-                all within Dueling Nexus.
-              </p>
-              <p className="lede">
-                Discuss your favourite decks, strategies and tricks in our
-                Discord, and join to catch the latest on events, tournaments,
-                giveaways and collaborations.
-              </p>
-              <div className="cta__actions">
-                <a
-                  className="btn btn--solid"
-                  href={DISCORD}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  Join our Discord
-                </a>
-              </div>
-            </div>
-          </div>
+          <Wrap>
+            <Cta />
+          </Wrap>
         </section>
       </main>
 
-      <footer className="site-footer">
-        <div className="wrap">
-          <div className="site-footer__inner panel">
-            <p>REDU Format</p>
-            <div className="site-footer__links">
-              <Link href="/banlist">Banlist</Link>
-              <a href="https://duelingnexus.com/home" target="_blank" rel="noopener noreferrer">
-                Dueling Nexus
-              </a>
-              <a href={DISCORD} target="_blank" rel="noopener noreferrer">
-                Discord
-              </a>
-            </div>
-          </div>
-        </div>
-      </footer>
+      <Footer />
     </>
   );
 }
