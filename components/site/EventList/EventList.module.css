@@ -74,7 +74,7 @@
 
 .seats {
   font-family: var(--f-mono);
-  font-size: 10px;
+  font-size: 12px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--c-muted);
@@ -116,4 +116,15 @@
   letter-spacing: 0.18em;
   text-transform: uppercase;
   color: var(--c-muted);
+}
+
+@media (max-width: 760px) {
+  .event {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .signup {
+    justify-items: start;
+  }
 }

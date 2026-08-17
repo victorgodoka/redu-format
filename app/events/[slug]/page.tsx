@@ -14,11 +14,7 @@ import Tab from "@/components/ui/Tab";
 import Wrap from "@/components/ui/Wrap";
 import { fetchProfile, getSession } from "@/lib/auth";
 import { findPlayerIdByToken } from "@/lib/backend/services/player.service";
-import {
-  findMyRegistrationId,
-  findSignupDeckId,
-  listSavedSlugsForPlayer,
-} from "@/lib/backend/services/registration.service";
+import { findMySignup, listSavedSlugsForPlayer } from "@/lib/backend/services/registration.service";
 import {
   getMyCurrentMatch,
   getMyMatchHistory,
@@ -115,7 +111,7 @@ function MatchHistory({ history }: { history: MyMatchHistoryEntry[] }) {
           <AdminRow key={entry.round}>
             <AdminRow.Main>
               <span className="admin-row__title">
-                Round {entry.round} · {entry.result === "bye" ? "Bye" : `vs ${entry.opponentName ?? "?"}`}
+                {entry.roundLabel} · {entry.result === "bye" ? "Bye" : `vs ${entry.opponentName ?? "?"}`}
               </span>
               <span className="admin-row__meta">
                 {entry.result === "bye"
@@ -136,13 +132,13 @@ async function FeaturedEventPage({
   registeredDeckName,
   myPlacing,
   myHistory,
-  isSaved,
+  saveAction,
 }: {
   event: TournamentEvent;
   registeredDeckName: string | null;
   myPlacing: { place: number; points: number } | undefined;
   myHistory: MyMatchHistoryEntry[];
-  isSaved: boolean;
+  saveAction: ReactNode;
 }) {
   const placings = await getPlacings(event.slug);
   const winner = placings.find((p) => p.place === 1);
@@ -150,11 +146,7 @@ async function FeaturedEventPage({
   return (
     <main className="section" id="main">
       <Wrap>
-        <PageHeading
-          tab="Results"
-          title={event.name}
-          action={<SaveToggle slug={event.slug} isSaved={isSaved} />}
-        />
+        <PageHeading tab="Results" title={event.name} action={saveAction} />
 
         <div className="signup">
           <div className="signup__main">
@@ -211,22 +203,18 @@ function OngoingEventPage({
   registeredDeck,
   myMatch,
   myHistory,
-  isSaved,
+  saveAction,
 }: {
   event: TournamentEvent;
   registeredDeck: { name: string; main: number; extra: number; side: number } | undefined;
   myMatch: MyMatchView | null;
   myHistory: MyMatchHistoryEntry[];
-  isSaved: boolean;
+  saveAction: ReactNode;
 }) {
   return (
     <main className="section" id="main">
       <Wrap>
-        <PageHeading
-          tab="Tournament"
-          title={event.name}
-          action={<SaveToggle slug={event.slug} isSaved={isSaved} />}
-        />
+        <PageHeading tab="Tournament" title={event.name} action={saveAction} />
 
         <div className="signup">
           <div className="signup__main">
@@ -243,9 +231,12 @@ function OngoingEventPage({
             )}
 
             {myMatch ? (
-              <Notice>
-                <Tab>Round {myMatch.round} · Your duel</Tab>
+              <Notice variant={myMatch.phase === "topCut" ? "done" : undefined}>
+                <Tab>{myMatch.roundLabel} · Your duel</Tab>
                 <h2 className="notice__title">vs {myMatch.opponentName ?? "TBD"}</h2>
+                {myMatch.phase === "topCut" ? (
+                  <Lede>You made Top Cut - this is single elimination from here, no more Swiss cushion.</Lede>
+                ) : null}
                 {myMatch.deadlineAt ? (
                   <Lede>
                     Round closes {formatDate(myMatch.deadlineAt)} at {formatTime(myMatch.deadlineAt)}.
@@ -308,22 +299,21 @@ function OngoingEventPage({
 function UpcomingEventPage({
   event,
   registeredDeck,
-  isSaved,
+  paymentStatus,
+  saveAction,
 }: {
   event: TournamentEvent;
   registeredDeck: { name: string; main: number; extra: number; side: number } | undefined;
-  isSaved: boolean;
+  paymentStatus: "pending" | "confirmed" | "contested" | "not_required" | null;
+  saveAction: ReactNode;
 }) {
   const left = seatsLeft(event);
+  const paymentDue = event.entry.type === "paid" && paymentStatus && paymentStatus !== "confirmed";
 
   return (
     <main className="section" id="main">
       <Wrap>
-        <PageHeading
-          tab="Tournament"
-          title={event.name}
-          action={<SaveToggle slug={event.slug} isSaved={isSaved} />}
-        />
+        <PageHeading tab="Tournament" title={event.name} action={saveAction} />
 
         <div className="signup">
           <div className="signup__main">
@@ -335,6 +325,14 @@ function UpcomingEventPage({
                   {registeredDeck.main} main · {registeredDeck.extra} extra · {registeredDeck.side} side.
                   Bring it to {formatDate(event.startsAt)} at {formatTime(event.startsAt)}.
                 </Lede>
+                {paymentDue ? (
+                  <p className="payment-status">
+                    <span className={`badge ${paymentStatus === "contested" ? "badge--negative" : "badge--neutral"}`}>
+                      {paymentStatus === "contested" ? "Payment contested" : "Payment pending"}
+                    </span>
+                    {formatEntry(event.entry)} still owed - submit your proof from the registration page.
+                  </p>
+                ) : null}
                 <Link className="btn" href={`/events/${event.slug}/signup`}>
                   Manage registration
                 </Link>
@@ -376,15 +374,16 @@ export default async function EventDetailPage({
 
   const session = await getSession();
   const playerId = session.token ? await findPlayerIdByToken(session.token) : null;
-  const [profile, registeredId, myRegistrationId, savedSlugs, placings] = await Promise.all([
+  const [profile, signup, savedSlugs, placings] = await Promise.all([
     session.token ? fetchProfile(session.token) : null,
-    playerId ? findSignupDeckId(slug, playerId) : null,
-    playerId ? findMyRegistrationId(slug, playerId) : null,
+    playerId ? findMySignup(slug, playerId) : null,
     playerId ? listSavedSlugsForPlayer(playerId) : Promise.resolve<string[]>([]),
     playerId ? getPlacingsForPlayer(playerId) : Promise.resolve(new Map<string, { place: number; points: number }>()),
   ]);
-  const registeredDeck = profile?.decks.find((d) => d.id === registeredId);
+  const registeredDeck = profile?.decks.find((d) => d.id === signup?.deckId);
+  const myRegistrationId = signup?.registrationId ?? null;
   const isSaved = savedSlugs.includes(slug);
+  const saveAction = session.token ? <SaveToggle slug={slug} isSaved={isSaved} /> : undefined;
 
   const finished = isFinished(event);
   const past = isPast(event, new Date());
@@ -402,7 +401,7 @@ export default async function EventDetailPage({
           registeredDeckName={registeredDeck?.name ?? null}
           myPlacing={placings.get(slug)}
           myHistory={myHistory}
-          isSaved={isSaved}
+          saveAction={saveAction}
         />
       ) : past ? (
         <OngoingEventPage
@@ -410,10 +409,15 @@ export default async function EventDetailPage({
           registeredDeck={registeredDeck}
           myMatch={myMatch}
           myHistory={myHistory}
-          isSaved={isSaved}
+          saveAction={saveAction}
         />
       ) : (
-        <UpcomingEventPage event={event} registeredDeck={registeredDeck} isSaved={isSaved} />
+        <UpcomingEventPage
+          event={event}
+          registeredDeck={registeredDeck}
+          paymentStatus={signup?.paymentStatus ?? null}
+          saveAction={saveAction}
+        />
       )}
 
       <Footer />

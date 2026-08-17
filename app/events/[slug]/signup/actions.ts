@@ -5,7 +5,11 @@ import { fetchProfile, getSession } from "@/lib/auth";
 import { deckLegality } from "@/lib/nexus-parse";
 import { seatsLeft } from "@/lib/events";
 import { getTournament } from "@/lib/tournaments";
-import { dropRegistration, registerSignup } from "@/lib/backend/services/registration.service";
+import {
+  dropRegistration,
+  registerSignup,
+  submitPaymentProof,
+} from "@/lib/backend/services/registration.service";
 import { findPlayerIdByToken, identityKey, resolvePlayerId } from "@/lib/backend/services/player.service";
 import { describeError, validateDeck } from "@/lib/validateDecks";
 
@@ -97,4 +101,25 @@ export async function cancel(form: FormData) {
   revalidatePath(`/events/${slug}`);
   revalidatePath("/events");
   revalidatePath("/dashboard");
+}
+
+/** The player's side of attaching a payment proof - always leaves it pending for Staff to confirm. */
+export async function submitProof(form: FormData) {
+  const slug = String(form.get("slug") ?? "");
+  const proofUrl = String(form.get("proofUrl") ?? "").trim();
+  if (!slug || !proofUrl) return;
+
+  const session = await getSession();
+  if (!session.token) return;
+
+  const profile = await fetchProfile(session.token);
+  if (!profile) return;
+
+  const playerId = await findPlayerIdByToken(session.token);
+  if (!playerId) return;
+
+  await submitPaymentProof(slug, playerId, proofUrl, profile.name);
+
+  revalidatePath(`/events/${slug}/signup`);
+  revalidatePath(`/events/${slug}`);
 }

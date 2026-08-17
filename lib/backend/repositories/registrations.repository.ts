@@ -31,6 +31,7 @@ export type PublicSignup = {
   deckId: string | null;
   deckName: string;
   paymentStatus: PaymentStatus;
+  proofUrl: string | null;
 };
 
 export class RegistrationsRepository {
@@ -115,7 +116,7 @@ export class RegistrationsRepository {
   /** A dropped registration doesn't count as "still signed up" - the row stays (history, tiebreakers) but the player shouldn't see themselves as registered anymore. */
   async findPublicSignup(slug: string, playerId: string): Promise<PublicSignup | null> {
     const [rows] = await this.pool.query<RowDataPacket[]>(
-      `SELECT r.id, r.deck_id, r.deck_name, r.payment_status FROM registrations r
+      `SELECT r.id, r.deck_id, r.deck_name, r.payment_status, r.proof_url FROM registrations r
        JOIN tournaments t ON t.id = r.tournament_id
        WHERE t.slug = ? AND r.player_id = ? AND r.source = 'public_signup' AND r.dropped_at IS NULL
        LIMIT 1`,
@@ -123,7 +124,13 @@ export class RegistrationsRepository {
     );
     const row = rows[0];
     return row
-      ? { registrationId: row.id, deckId: row.deck_id, deckName: row.deck_name, paymentStatus: row.payment_status }
+      ? {
+          registrationId: row.id,
+          deckId: row.deck_id,
+          deckName: row.deck_name,
+          paymentStatus: row.payment_status,
+          proofUrl: row.proof_url,
+        }
       : null;
   }
 

@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { recordAction } from "@/lib/audit-log";
 import { dropFromStartedTournament, hasBracket } from "@/lib/backend/services/results.service";
 import { getAdminSession } from "@/lib/auth/session";
+import { isHttpUrl } from "@/lib/safe-url";
 import {
   addParticipant,
   listParticipants,
@@ -14,16 +15,6 @@ import {
 } from "@/lib/tournaments";
 
 const NEXUS_DECK_INFO = "https://duelingnexus.com/api/get-deck-info.php";
-
-/** Payment proof is rendered as a clickable link, so only http(s) is trusted. */
-function isSafeUrl(value: string): boolean {
-  try {
-    const url = new URL(value);
-    return url.protocol === "https:" || url.protocol === "http:";
-  } catch {
-    return false;
-  }
-}
 
 /**
  * Confirms a Dueling Nexus deck UUID is real and public before it's stored -
@@ -164,7 +155,7 @@ export async function confirmPaymentAction(form: FormData) {
   const participantId = String(form.get("participantId") ?? "");
   const newProofUrl = String(form.get("proofUrl") ?? "").trim();
   if (!slug || !participantId) return;
-  if (newProofUrl && !isSafeUrl(newProofUrl)) return;
+  if (newProofUrl && !isHttpUrl(newProofUrl)) return;
 
   const before = (await listParticipants(slug)).find((p) => p.id === participantId);
   if (!before) return;

@@ -32,12 +32,17 @@ export default function DeckPicker({
   decks,
   deckLists,
   coverFallbackIds,
+  selectedDeckId,
+  submitLabel = "Complete sign up",
 }: {
   slug: string;
   decks: NexusDeck[];
   deckLists: ValidatedDeck[];
   /** Original passcode per deck id, in case the cover's own print has no art. */
   coverFallbackIds: Record<string, number>;
+  /** Pre-select this deck (e.g. the one already registered) if it's still playable - falls back to the first playable deck. */
+  selectedDeckId?: string;
+  submitLabel?: string;
 }) {
   const [state, action, pending] = useActionState(register, initial);
 
@@ -48,6 +53,12 @@ export default function DeckPicker({
   });
 
   const firstPlayable = rows.find((row) => row.playable)?.deck;
+  const preselected = rows.find((row) => row.deck.id === selectedDeckId && row.playable)?.deck ?? firstPlayable;
+
+  // Two decks can share a name (e.g. a main build and a testing copy) - a
+  // trailing id fragment is the only thing telling them apart in the list.
+  const nameCounts = new Map<string, number>();
+  for (const deck of decks) nameCounts.set(deck.name, (nameCounts.get(deck.name) ?? 0) + 1);
 
   return (
     <form action={action} className={styles.picker}>
@@ -69,7 +80,7 @@ export default function DeckPicker({
                   name="deckId"
                   value={deck.id}
                   disabled={!playable}
-                  defaultChecked={deck.id === firstPlayable?.id}
+                  defaultChecked={deck.id === preselected?.id}
                   required
                 />
                 <span className={styles.cover}>
@@ -85,7 +96,12 @@ export default function DeckPicker({
                   ) : null}
                 </span>
                 <span className={styles.body}>
-                  <span className={styles.name}>{deck.name}</span>
+                  <span className={styles.name}>
+                    {deck.name}
+                    {(nameCounts.get(deck.name) ?? 0) > 1 ? (
+                      <span className={styles.dupeId}> · #{deck.id.slice(0, 8)}</span>
+                    ) : null}
+                  </span>
                   <span className={styles.counts}>
                     <span>
                       <b>{deck.main}</b> main
@@ -137,7 +153,7 @@ export default function DeckPicker({
         pending={pending}
         pendingLabel="Registering..."
       >
-        Complete sign up
+        {submitLabel}
       </Button>
 
       {firstPlayable ? null : (

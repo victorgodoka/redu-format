@@ -735,9 +735,39 @@ export async function getPlacingsForPlayer(playerId: string): Promise<Map<string
   return new Map(rows.map((r) => [r.slug, { place: r.place, points: r.points }]));
 }
 
+export type RoundPhase = "swiss" | "topCut";
+
+/**
+ * Doc section 11: Top Cut rounds are numbered right after Swiss ones by the
+ * engine, with nothing distinguishing the two - this turns a raw round
+ * number into the phase it's actually in, and a bracket-round name for Top
+ * Cut (Quarterfinal, Semifinal, Final) instead of just the next number.
+ */
+function describeRound(engine: EngineTournament, roundNumber: number): { phase: RoundPhase; roundLabel: string } {
+  const stageOneRounds = engine.getStageOne().rounds;
+  if (roundNumber <= stageOneRounds) {
+    return { phase: "swiss", roundLabel: `Round ${roundNumber}` };
+  }
+
+  const cutSize = engine.getStageTwo().advance.value;
+  const cutRounds = cutSize > 0 ? Math.ceil(Math.log2(cutSize)) : 0;
+  const roundsLeft = cutRounds - (roundNumber - stageOneRounds);
+  const name =
+    roundsLeft <= 0
+      ? "Final"
+      : roundsLeft === 1
+        ? "Semifinal"
+        : roundsLeft === 2
+          ? "Quarterfinal"
+          : `Round of ${2 ** (roundsLeft + 1)}`;
+  return { phase: "topCut", roundLabel: `Top Cut · ${name}` };
+}
+
 export type MyMatchView = {
   matchId: string;
   round: number;
+  phase: RoundPhase;
+  roundLabel: string;
   opponentName: string | null;
   myReport: MatchResult | null;
   opponentReported: boolean;
@@ -775,6 +805,7 @@ export async function getMyCurrentMatch(slug: string, registrationId: string): P
   return {
     matchId: match.getId(),
     round: match.getRoundNumber(),
+    ...describeRound(engine, match.getRoundNumber()),
     opponentName: opponent?.getName() ?? null,
     myReport: mine?.result ?? null,
     opponentReported: Boolean(theirs),
@@ -786,6 +817,8 @@ export async function getMyCurrentMatch(slug: string, registrationId: string): P
 
 export type MyMatchHistoryEntry = {
   round: number;
+  phase: RoundPhase;
+  roundLabel: string;
   opponentName: string | null;
   result: "win" | "loss" | "draw" | "bye";
   score: string;
@@ -816,6 +849,7 @@ export async function getMyMatchHistory(slug: string, registrationId: string): P
           : "draw";
     entries.push({
       round: match.getRoundNumber(),
+      ...describeRound(engine, match.getRoundNumber()),
       opponentName: opponent?.getName() ?? null,
       result,
       score: `${m.win}-${m.loss}`,

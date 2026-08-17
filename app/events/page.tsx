@@ -174,7 +174,16 @@ export default async function EventsPage({
               : `${total} ${total === 1 ? "event" : "events"} · page ${page} of ${pages}`}
           </p>
 
-          {items.length === 0 ? (
+          {items.length === 0 && query.structure === "all" && query.when === "upcoming" && query.seats === "all" ? (
+            <EmptyState
+              message={
+                featured
+                  ? "No upcoming tournaments right now - check back soon, or see what just wrapped up above."
+                  : "No upcoming tournaments right now. Check back soon."
+              }
+              action={<Button href="/events?when=all">See past events</Button>}
+            />
+          ) : items.length === 0 ? (
             <EmptyState
               message="Nothing scheduled under those filters. Try Any date, or clear the structure filter."
               action={<Button href="/events">Clear filters</Button>}

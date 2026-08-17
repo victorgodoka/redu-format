@@ -1,9 +1,10 @@
 import type { EntryFee } from "../../events.ts";
+import { isHttpUrl } from "../../safe-url.ts";
 import { getPool } from "../db/client.ts";
 import { RegistrationsRepository, type PublicSignup } from "../repositories/registrations.repository.ts";
 import { SavedTournamentsRepository } from "../repositories/saved-tournaments.repository.ts";
 import { dropFromStartedTournament, hasBracket } from "./results.service.ts";
-import type { PaymentStatus } from "./tournament.service.ts";
+import { setParticipantPayment, type PaymentStatus } from "./tournament.service.ts";
 
 function repos() {
   const pool = getPool();
@@ -91,6 +92,34 @@ export async function findMyRegistrationId(slug: string, playerId: string): Prom
 /** The full signup row (registration id, deck, payment status) - what the signup page needs to decide which drop UI to show. */
 export async function findMySignup(slug: string, playerId: string): Promise<PublicSignup | null> {
   return repos().registrations.findPublicSignup(slug, playerId);
+}
+
+export type SubmitProofOutcome = "saved" | "not_registered" | "already_confirmed" | "invalid_url";
+
+/**
+ * The player's side of the doc's "player (or Staff) attaches proof" step.
+ * Submitting always leaves the status at "pending" for Staff to review - a
+ * player can never self-confirm, and re-submitting after a contest simply
+ * goes back to "pending" rather than staying "contested".
+ */
+export async function submitPaymentProof(
+  slug: string,
+  playerId: string,
+  proofUrl: string,
+  displayName: string,
+): Promise<SubmitProofOutcome> {
+  if (!isHttpUrl(proofUrl)) return "invalid_url";
+
+  const signup = await repos().registrations.findPublicSignup(slug, playerId);
+  if (!signup) return "not_registered";
+  if (signup.paymentStatus === "confirmed") return "already_confirmed";
+
+  await setParticipantPayment(slug, signup.registrationId, {
+    status: "pending",
+    proofUrl,
+    by: displayName,
+  });
+  return "saved";
 }
 
 /** tournament slug -> deck id, for every public signup this player has. */

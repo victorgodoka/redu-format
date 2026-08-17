@@ -20,7 +20,7 @@ import { formatDate, formatEntry, formatTime, isFinished, isPast, seatsLeft, STR
 import { DEFAULT_AVATAR } from "@/lib/nexus-parse";
 import { getTournament } from "@/lib/tournaments";
 import { validateDecks } from "@/lib/validateDecks";
-import { cancel } from "./actions";
+import { cancel, submitProof } from "./actions";
 
 export const metadata: Metadata = {
   title: "Event sign up | REDU Format",
@@ -121,6 +121,38 @@ export default async function SignupPage({
                       Your payment is already confirmed. Contact a Staff member if you need to
                       drop before the event starts.
                     </Lede>
+                  ) : event.entry.type === "paid" ? (
+                    <>
+                      <Lede>
+                        {signup?.paymentStatus === "contested"
+                          ? "Staff contested your last payment proof - submit a new one below."
+                          : `Payment pending (${formatEntry(event.entry)}). Submit a proof link once you've paid; a Staff member will confirm it.`}
+                      </Lede>
+                      {signup?.proofUrl ? (
+                        <p className="payment-status">
+                          Last submitted:{" "}
+                          <a href={signup.proofUrl} target="_blank" rel="noopener noreferrer">
+                            view proof
+                          </a>
+                        </p>
+                      ) : null}
+                      <form action={submitProof} className="form">
+                        <input type="hidden" name="slug" value={slug} />
+                        <label htmlFor="proofUrl">Payment proof URL</label>
+                        <input id="proofUrl" name="proofUrl" type="url" placeholder="https://..." required />
+                        <Button variant="solid" type="submit">
+                          Submit proof
+                        </Button>
+                      </form>
+                      <div className="notice__actions">
+                        <form action={cancel}>
+                          <input type="hidden" name="slug" value={slug} />
+                          <Button variant="quiet" type="submit">
+                            Cancel registration
+                          </Button>
+                        </form>
+                      </div>
+                    </>
                   ) : (
                     <div className="notice__actions">
                       <form action={cancel}>
@@ -131,6 +163,22 @@ export default async function SignupPage({
                         Back to events
                       </Button>
                     </div>
+                  )}
+
+                  {started ? null : (
+                    <details className="notice__drop">
+                      <summary className="btn">Change deck</summary>
+                      <div className="notice__drop-body">
+                        <DeckPicker
+                          slug={slug}
+                          decks={profile.decks}
+                          deckLists={validDecklists}
+                          coverFallbackIds={coverFallbackIds}
+                          selectedDeckId={registeredDeck.id}
+                          submitLabel="Save deck"
+                        />
+                      </div>
+                    </details>
                   )}
                 </Notice>
               ) : profile.decks.length === 0 ? (
