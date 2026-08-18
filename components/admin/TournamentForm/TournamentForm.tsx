@@ -195,7 +195,7 @@ export default function TournamentForm({
           // eslint-disable-next-line @next/next/no-img-element
           <img className="event-banner" src={`/events/${tournament.slug}/banner`} alt="" />
         ) : null}
-        <Input id="banner" name="banner" type="file" accept="image/*" />
+        <Input readOnly={false} id="banner" name="banner" type="file" accept="image/*" />
         {tournament?.hasBanner ? (
           <Label className="topcut__toggle">
             <input type="checkbox" name="removeBanner" />
