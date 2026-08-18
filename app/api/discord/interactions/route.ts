@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { verifyKey } from 'discord-interactions';
 
 export async function POST(request: Request) {
-  const publicKey = process.env.DISCORD_CLIENT_ID;
+  const publicKey = process.env.DISCORD_BOT_PUBLIC_KEY;
 
   if (!publicKey) {
     return NextResponse.json({ error: 'Missing public key' }, { status: 500 });
