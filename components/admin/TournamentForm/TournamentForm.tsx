@@ -208,7 +208,7 @@ export default function TournamentForm({
         label="Description"
         htmlFor="description"
         full
-        hint="Optional. **bold** and *italic* are supported; a blank line starts a new paragraph."
+        hint={<><span>You can use markdown to enrich your description. More infos</span> <a style={{ color: "var(--c-accent)" }} href="https://gist.github.com/allysonsilva/85fff14a22bbdf55485be947566cc09e">here</a>.</>}
       >
         <Textarea id="description" name="description" rows={6} defaultValue={tournament?.description ?? undefined} />
       </FormField>
