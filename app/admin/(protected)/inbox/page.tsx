@@ -38,7 +38,7 @@ export default async function AdminInboxPage({
         messages={messages}
         selected={selected}
         basePath="/admin/inbox"
-        emptyMessage="No alerts. Deck changes made on Dueling Nexus during an event will show up here."
+        emptyMessage="Empty inbox"
       >
         {payload ? <DeckMismatch data={payload} /> : null}
       </Inbox>
