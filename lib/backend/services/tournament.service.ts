@@ -55,11 +55,24 @@ export async function getTournament(slug: string): Promise<TournamentEvent | nul
   return repos().tournaments.findBySlug(slug);
 }
 
+export async function getTournamentBanner(slug: string): Promise<{ data: Buffer; mime: string } | null> {
+  return repos().tournaments.findBanner(slug);
+}
+
 export async function createTournament(draft: TournamentDraft): Promise<TournamentEvent> {
   const { tournaments } = repos();
   const slug = await uniqueSlug(slugify(draft.name));
   await tournaments.insert(crypto.randomUUID(), slug, draft);
-  return { ...draft, slug, taken: 0, status: "scheduled", startedAt: null, finishedAt: null, cancelledAt: null };
+  return {
+    ...draft,
+    slug,
+    taken: 0,
+    status: "scheduled",
+    startedAt: null,
+    finishedAt: null,
+    cancelledAt: null,
+    hasBanner: draft.banner != null,
+  };
 }
 
 export async function updateTournament(

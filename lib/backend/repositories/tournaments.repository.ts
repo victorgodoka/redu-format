@@ -4,14 +4,17 @@ import { fromMysqlDatetime, fromMysqlDatetimeMs, toMysqlDatetime, toMysqlDatetim
 
 export type TournamentDraft = Omit<
   TournamentEvent,
-  "slug" | "taken" | "status" | "startedAt" | "finishedAt" | "cancelledAt"
->;
+  "slug" | "taken" | "status" | "startedAt" | "finishedAt" | "cancelledAt" | "hasBanner"
+> & {
+  /** New banner to store. undefined leaves an existing banner untouched (update only - insert() treats it the same as null); null clears it. */
+  banner?: { data: Buffer; mime: string } | null;
+};
 
 type TournamentRow = RowDataPacket & {
   slug: string;
   name: string;
   description: string | null;
-  banner_url: string | null;
+  has_banner: number;
   starts_at: string;
   started_at: string | null;
   finished_at: string | null;
@@ -47,7 +50,7 @@ function rowToTournament(row: TournamentRow): TournamentEvent {
     slug: row.slug,
     name: row.name,
     description: row.description,
-    bannerUrl: row.banner_url,
+    hasBanner: Boolean(row.has_banner),
     startsAt: fromMysqlDatetime(row.starts_at),
     startedAt: fromMysqlDatetimeMs(row.started_at),
     finishedAt: fromMysqlDatetimeMs(row.finished_at),
@@ -82,7 +85,7 @@ export class TournamentsRepository {
 
   async findAll(): Promise<TournamentEvent[]> {
     const [rows] = await this.pool.query<TournamentRow[]>(
-      `SELECT t.slug, t.name, t.description, t.banner_url, t.starts_at, t.started_at, t.finished_at, t.status, t.cancelled_at,
+      `SELECT t.slug, t.name, t.description, (t.banner_image IS NOT NULL) AS has_banner, t.starts_at, t.started_at, t.finished_at, t.status, t.cancelled_at,
               t.structure, t.rounds, t.top_cut, t.match_format,
               t.round_limit_days, t.engine, t.seat_cap, t.entry_type, t.entry_amount_minor, t.entry_currency,
               t.host, t.signup_url, ${TAKEN_SUBQUERY}
@@ -95,7 +98,7 @@ export class TournamentsRepository {
 
   async findBySlug(slug: string): Promise<TournamentEvent | null> {
     const [rows] = await this.pool.query<TournamentRow[]>(
-      `SELECT t.slug, t.name, t.description, t.banner_url, t.starts_at, t.started_at, t.finished_at, t.status, t.cancelled_at,
+      `SELECT t.slug, t.name, t.description, (t.banner_image IS NOT NULL) AS has_banner, t.starts_at, t.started_at, t.finished_at, t.status, t.cancelled_at,
               t.structure, t.rounds, t.top_cut, t.match_format,
               t.round_limit_days, t.engine, t.seat_cap, t.entry_type, t.entry_amount_minor, t.entry_currency,
               t.host, t.signup_url, ${TAKEN_SUBQUERY}
@@ -105,6 +108,17 @@ export class TournamentsRepository {
       [slug],
     );
     return rows[0] ? rowToTournament(rows[0]) : null;
+  }
+
+  /** The raw banner bytes for the image route - never pulled into findAll()/findBySlug(), which only need to know it exists. */
+  async findBanner(slug: string): Promise<{ data: Buffer; mime: string } | null> {
+    const [rows] = await this.pool.query<RowDataPacket[]>(
+      "SELECT banner_image, banner_mime FROM tournaments WHERE slug = ? AND deleted_at IS NULL LIMIT 1",
+      [slug],
+    );
+    const row = rows[0];
+    if (!row?.banner_image) return null;
+    return { data: row.banner_image as Buffer, mime: row.banner_mime as string };
   }
 
   async existsBySlug(slug: string): Promise<boolean> {
@@ -159,14 +173,15 @@ export class TournamentsRepository {
     const [entryType, entryAmountMinor, entryCurrency] = entryColumns(draft.entry);
     await this.pool.query(
       `INSERT INTO tournaments
-        (id, slug, name, description, banner_url, starts_at, structure, rounds, top_cut, match_format, round_limit_days, engine, seat_cap, entry_type, entry_amount_minor, entry_currency, host, signup_url)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        (id, slug, name, description, banner_image, banner_mime, starts_at, structure, rounds, top_cut, match_format, round_limit_days, engine, seat_cap, entry_type, entry_amount_minor, entry_currency, host, signup_url)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id,
         slug,
         draft.name,
         draft.description ?? null,
-        draft.bannerUrl ?? null,
+        draft.banner?.data ?? null,
+        draft.banner?.mime ?? null,
         toMysqlDatetime(draft.startsAt),
         draft.structure,
         draft.rounds,
@@ -188,14 +203,13 @@ export class TournamentsRepository {
     const [entryType, entryAmountMinor, entryCurrency] = entryColumns(draft.entry);
     const [result] = await this.pool.query<ResultSetHeader>(
       `UPDATE tournaments SET
-        name = ?, description = ?, banner_url = ?, starts_at = ?, structure = ?, rounds = ?, top_cut = ?, match_format = ?,
+        name = ?, description = ?, starts_at = ?, structure = ?, rounds = ?, top_cut = ?, match_format = ?,
         round_limit_days = ?, engine = ?, seat_cap = ?, entry_type = ?, entry_amount_minor = ?,
         entry_currency = ?, host = ?, signup_url = ?
        WHERE slug = ? AND deleted_at IS NULL`,
       [
         draft.name,
         draft.description ?? null,
-        draft.bannerUrl ?? null,
         toMysqlDatetime(draft.startsAt),
         draft.structure,
         draft.rounds,
@@ -212,6 +226,14 @@ export class TournamentsRepository {
         slug,
       ],
     );
+    // banner is tri-state: undefined means the form didn't touch it (no re-upload on every save), so only write it when the caller actually said something.
+    if (result.affectedRows > 0 && draft.banner !== undefined) {
+      await this.pool.query("UPDATE tournaments SET banner_image = ?, banner_mime = ? WHERE slug = ?", [
+        draft.banner?.data ?? null,
+        draft.banner?.mime ?? null,
+        slug,
+      ]);
+    }
     return result.affectedRows > 0;
   }
 

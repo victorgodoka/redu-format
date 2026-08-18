@@ -8,6 +8,7 @@ import {
   createTournament,
   deleteTournament,
   getTournament,
+  getTournamentBanner,
   listParticipants,
   listTournaments,
   removeParticipant,
@@ -56,6 +57,26 @@ test("update replaces the fields but keeps the slug", async () => {
 
 test("update on a missing slug returns null", async () => {
   assert.equal(await updateTournament("does-not-exist", draft), null);
+});
+
+test("banner: uploads, survives an unrelated update, and clears via removeBanner", async () => {
+  const withBanner = await createTournament({
+    ...draft,
+    banner: { data: Buffer.from("fake-png-bytes"), mime: "image/png" },
+  });
+  assert.equal(withBanner.hasBanner, true);
+  assert.deepEqual(await getTournamentBanner(withBanner.slug), {
+    data: Buffer.from("fake-png-bytes"),
+    mime: "image/png",
+  });
+
+  // banner omitted (undefined) - an ordinary edit must not wipe it.
+  const untouched = await updateTournament(withBanner.slug, { ...draft, name: "Renamed" });
+  assert.equal(untouched?.hasBanner, true);
+
+  const cleared = await updateTournament(withBanner.slug, { ...draft, banner: null });
+  assert.equal(cleared?.hasBanner, false);
+  assert.equal(await getTournamentBanner(withBanner.slug), null);
 });
 
 test("taken is derived from real registrations, not settable", async () => {

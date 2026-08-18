@@ -10,7 +10,7 @@ import {
 import { discordConfig } from "@/lib/discord/config";
 import { createAdminSession } from "@/lib/auth/session";
 import { establishPublicSession } from "@/lib/auth";
-import { recordAction } from "@/lib/audit-log";
+// import { recordAction } from "@/lib/audit-log";
 import { getAdminNexusToken, upsertAdmin } from "@/lib/backend/services/admins.service";
 
 export async function GET(request: Request) {

@@ -12,7 +12,6 @@ import {
   type Engine,
   type Structure,
 } from "@/lib/events";
-import { isHttpUrl } from "@/lib/safe-url";
 import {
   cancelTournament,
   createTournament,
@@ -27,16 +26,26 @@ export type TournamentFormState = { error?: string };
 
 const STRUCTURES: readonly Structure[] = ["swiss", "single-elim", "double-elim"];
 const MATCH_FORMATS = ["Bo1", "Bo3"] as const;
+const MAX_BANNER_BYTES = 5 * 1024 * 1024;
 
-function readDraft(form: FormData): TournamentDraft | { error: string } {
+async function readDraft(form: FormData): Promise<TournamentDraft | { error: string }> {
   const name = String(form.get("name") ?? "").trim();
   if (!name) return { error: "Name is required." };
 
   const description = String(form.get("description") ?? "").trim() || null;
 
-  const bannerUrl = String(form.get("bannerUrl") ?? "").trim() || null;
-  if (bannerUrl && !isHttpUrl(bannerUrl)) {
-    return { error: "Banner image URL must be a valid http(s) link." };
+  // Tri-state: a chosen file replaces it, the checkbox clears it, neither
+  // leaves whatever banner is already stored untouched (see
+  // TournamentsRepository.update - a plain file input can't be "prefilled"
+  // with the existing upload, so silence must not mean "wipe it").
+  const bannerFile = form.get("banner");
+  let banner: TournamentDraft["banner"];
+  if (bannerFile instanceof File && bannerFile.size > 0) {
+    if (!bannerFile.type.startsWith("image/")) return { error: "Banner must be an image file." };
+    if (bannerFile.size > MAX_BANNER_BYTES) return { error: "Banner image must be under 5MB." };
+    banner = { data: Buffer.from(await bannerFile.arrayBuffer()), mime: bannerFile.type };
+  } else if (form.get("removeBanner") === "on") {
+    banner = null;
   }
 
   const date = String(form.get("startsAtDate") ?? "");
@@ -109,7 +118,7 @@ function readDraft(form: FormData): TournamentDraft | { error: string } {
   return {
     name,
     description,
-    bannerUrl,
+    banner,
     startsAt: startsAt.toISOString(),
     structure,
     rounds,
@@ -142,7 +151,7 @@ export async function createTournamentAction(
   _prev: TournamentFormState,
   form: FormData,
 ): Promise<TournamentFormState> {
-  const draft = readDraft(form);
+  const draft = await readDraft(form);
   if ("error" in draft) return draft;
 
   const tournament = await createTournament(draft);
@@ -163,7 +172,7 @@ export async function updateTournamentAction(
   form: FormData,
 ): Promise<TournamentFormState> {
   const slug = String(form.get("slug") ?? "");
-  const draft = readDraft(form);
+  const draft = await readDraft(form);
   if ("error" in draft) return draft;
 
   const before = await getTournament(slug);

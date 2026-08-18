@@ -186,18 +186,22 @@ export default function TournamentForm({
       </FormField>
 
       <FormField
-        label="Banner image URL"
-        htmlFor="bannerUrl"
+        label="Banner image"
+        htmlFor="banner"
         full
-        hint="Shown at the top of the tournament page. Leave blank for none."
+        hint="Shown at the top of the tournament page. Leave blank to keep the current one."
       >
-        <Input
-          id="bannerUrl"
-          name="bannerUrl"
-          type="url"
-          defaultValue={tournament?.bannerUrl ?? undefined}
-          placeholder="https://..."
-        />
+        {tournament?.hasBanner ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img className="event-banner" src={`/events/${tournament.slug}/banner`} alt="" />
+        ) : null}
+        <Input id="banner" name="banner" type="file" accept="image/*" />
+        {tournament?.hasBanner ? (
+          <Label className="topcut__toggle">
+            <input type="checkbox" name="removeBanner" />
+            <span>Remove banner</span>
+          </Label>
+        ) : null}
       </FormField>
 
       <FormField

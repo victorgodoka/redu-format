@@ -38,8 +38,8 @@ export type TournamentEvent = {
    * from before this field existed still satisfy the type.
    */
   description?: string | null;
-  /** Optional banner image URL shown at the top of the tournament page. Same optionality reasoning as description. */
-  bannerUrl?: string | null;
+  /** Whether a banner image is stored for this tournament - fetch the bytes from GET /events/[slug]/banner, never inlined here (keeps list queries light). */
+  hasBanner: boolean;
   /** ISO instant. Rendered in UTC so server and client never disagree. */
   startsAt: string;
   structure: Structure;

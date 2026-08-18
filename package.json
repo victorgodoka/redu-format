@@ -12,6 +12,7 @@
     "db:seed": "node --experimental-strip-types --env-file=.env.local lib/backend/db/seed.ts"
   },
   "dependencies": {
+    "discord-interactions": "^4.4.0",
     "iron-session": "^8.0.4",
     "jose": "^6.2.8",
     "mysql2": "^3.23.3",

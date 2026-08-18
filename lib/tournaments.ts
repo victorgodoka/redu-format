@@ -4,6 +4,7 @@ export {
   createTournament,
   deleteTournament,
   getTournament,
+  getTournamentBanner,
   listParticipants,
   listTournaments,
   removeParticipant,
