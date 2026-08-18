@@ -120,7 +120,7 @@ export function formatEntry(entry: EntryFee): string {
  * can never drift apart.
  */
 export function recommendedTopCut(seats: number): number | null {
-  // if (seats <= 8) return null;
+  if (seats <= 8) return null;
   if (seats <= 16) return 4;
   if (seats <= 128) return 8;
   if (seats <= 256) return 16;
