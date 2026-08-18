@@ -371,12 +371,14 @@ test("closeOverdueMatches auto-drops a player after two consecutive round no-sho
       await enterMatchResult(tournament.slug, m.id, 1, 0);
     }
 
+    // The whole round has to be past its deadline for it to lock and advance -
+    // one straggler match doesn't close a round early.
     const pool = getPool();
     const backdated = toMysqlDatetimeMs(new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString());
     await pool.query(
       `UPDATE match_deadlines SET active_since = ?
-       WHERE tournament_id = (SELECT id FROM tournaments WHERE slug = ?) AND match_id = ?`,
-      [backdated, tournament.slug, mine.id],
+       WHERE tournament_id = (SELECT id FROM tournaments WHERE slug = ?)`,
+      [backdated, tournament.slug],
     );
     await closeOverdueMatches(tournament.slug);
   }
@@ -545,4 +547,97 @@ test("leaderboard aggregates points across tournaments, only for real players", 
   assert.ok(entry, "leaderboard should include the linked player");
   assert.equal(entry!.eventsPlayed, 2);
   assert.ok(entry!.totalPoints > 0);
+});
+
+test("standard same-day: the round locks on its 50-minute timer, refuses late reports, and pairs the next round after the cleanup window", async () => {
+  const tournament = await createTournament({
+    ...swissDraft,
+    name: "Same Day Cup",
+    topCut: null,
+    durationMode: "same_day",
+    roundMinutes: 50,
+    cleanupMinutes: 10,
+  });
+  await seatFourViaAdmin(tournament.slug);
+  const event = (await getTournament(tournament.slug))!;
+  await startBracket(tournament.slug, event);
+
+  const pool = getPool();
+  const backdateBy = async (minutes: number) => {
+    await pool.query(
+      `UPDATE match_deadlines SET active_since = ?
+       WHERE tournament_id = (SELECT id FROM tournaments WHERE slug = ?)`,
+      [toMysqlDatetimeMs(new Date(Date.now() - minutes * 60 * 1000).toISOString()), tournament.slug],
+    );
+  };
+
+  const open = (await getBracketView(tournament.slug))!;
+  assert.equal(open.clock.locked, false, "a fresh round is open");
+  assert.equal(open.clock.durationMode, "same_day");
+
+  // 55 minutes in: the timer ran out, so the round is locked - but the cleanup
+  // window hasn't, so the next round is not paired yet.
+  await backdateBy(55);
+  const locked = (await getBracketView(tournament.slug))!;
+  assert.equal(locked.clock.locked, true, "the 50-minute timer expired");
+  assert.equal(locked.round, 1);
+
+  const [match] = locked.matches;
+  await assert.rejects(
+    () => submitMatchReport(tournament.slug, match.id, match.player1!.registrationId, "win"),
+    /locked/i,
+    "the backend refuses a report in a locked round, not just the UI",
+  );
+
+  const held = await closeOverdueMatches(tournament.slug);
+  assert.equal(held.advanced, false, "the cleanup window is still running");
+  assert.equal((await getBracketView(tournament.slug))!.round, 1);
+
+  // Past the cleanup window: unresolved matches are force-closed and the next
+  // round pairs itself, with no moderator and no open browser involved.
+  await backdateBy(65);
+  const swept = await closeOverdueMatches(tournament.slug);
+  assert.equal(swept.advanced, true);
+  assert.equal((await getBracketView(tournament.slug))!.round, 2);
+});
+
+test("long duration: the round locks when the deadline passes but only a moderator ever starts the next one", async () => {
+  const tournament = await createTournament({
+    ...swissDraft,
+    name: "Long Haul Cup",
+    topCut: null,
+    durationMode: "long",
+    roundLimitDays: 2,
+  });
+  await seatFourViaAdmin(tournament.slug);
+  const event = (await getTournament(tournament.slug))!;
+  await startBracket(tournament.slug, event);
+
+  // An hour in, a long-duration round is nowhere near its deadline.
+  const pool = getPool();
+  await pool.query(
+    `UPDATE match_deadlines SET active_since = ?
+     WHERE tournament_id = (SELECT id FROM tournaments WHERE slug = ?)`,
+    [toMysqlDatetimeMs(new Date(Date.now() - 60 * 60 * 1000).toISOString()), tournament.slug],
+  );
+  assert.equal((await getBracketView(tournament.slug))!.clock.locked, false);
+
+  await pool.query(
+    `UPDATE match_deadlines SET active_since = ?
+     WHERE tournament_id = (SELECT id FROM tournaments WHERE slug = ?)`,
+    [toMysqlDatetimeMs(new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString()), tournament.slug],
+  );
+
+  const swept = await closeOverdueMatches(tournament.slug);
+  assert.equal(swept.resolved > 0, true, "the deadline still force-closes the round's matches");
+  assert.equal(swept.advanced, false, "a long-duration tournament never pairs a round by itself");
+
+  const waiting = (await getBracketView(tournament.slug))!;
+  assert.equal(waiting.round, 1, "it waits in the locked round");
+  assert.equal(waiting.clock.locked, true);
+  assert.equal(waiting.clock.awaitingModerator, true);
+  assert.equal(waiting.clock.nextRoundAt, null);
+
+  await generateNextRound(tournament.slug);
+  assert.equal((await getBracketView(tournament.slug))!.round, 2, "a moderator moves it forward");
 });

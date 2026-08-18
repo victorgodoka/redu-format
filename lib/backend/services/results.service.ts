@@ -298,18 +298,6 @@ function clockFor(
   });
 }
 
-/** The round lock as the report paths and the event page both read it. */
-export async function getRoundClock(slug: string): Promise<RoundClock | null> {
-  const { tournaments, matchDeadlines } = repos();
-  const [tournamentId, event] = await Promise.all([tournaments.findIdBySlug(slug), tournaments.findBySlug(slug)]);
-  if (!tournamentId || !event) return null;
-
-  const engine = await loadEngine(tournamentId);
-  if (!engine) return null;
-
-  return clockFor(event, engine, await matchDeadlines.getTrackingMap(tournamentId));
-}
-
 /**
  * Extra points for winning a top cut match, beyond the normal 3/1/0 already
  * counted in matchPoints - stage two rounds are numbered right after stage
