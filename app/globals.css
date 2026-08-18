@@ -661,6 +661,13 @@ input[type="number"]::-webkit-inner-spin-button {
   margin: 16px 0;
 }
 
+.event-list.event-banner {
+  border: 1px solid var(--c-line);
+  border-radius: 2px;
+  margin: 16px 0;
+  width: 100%;
+}
+
 .prose {
   display: flex;
   flex-direction: column;
@@ -758,6 +765,26 @@ input[type="number"]::-webkit-inner-spin-button {
     color-mix(in srgb, var(--c-accent) 12%, var(--c-panel)),
     var(--c-panel) 60%
   );
+}
+
+/* A blocked/closed state, not a celebratory one - reads as a stop sign next to
+   .notice--done's accent. */
+.notice--warn {
+  border-color: var(--c-danger);
+}
+
+.notice--warn::before {
+  background: linear-gradient(
+    160deg,
+    color-mix(in srgb, var(--c-danger) 12%, var(--c-panel)),
+    var(--c-panel) 60%
+  );
+}
+
+/* Bracket trees are wider than the column on small screens: they scroll in
+   their own box rather than pushing the page sideways. */
+.bracket-scroll {
+  overflow-x: auto;
 }
 
 .notice__actions {

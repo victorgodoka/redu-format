@@ -6,9 +6,18 @@ import { RegistrationsRepository, type WatchedDeck } from "../repositories/regis
 import { notify } from "./notifications.service.ts";
 
 export const DECK_MISMATCH = "deck.mismatch";
+export const DECK_DQ = "deck.disqualified";
 
-/** Tournaments whose decks are still meant to be frozen. Nothing to police once it's over. */
-const LIVE_STATUSES = new Set(["scheduled", "running"]);
+/** A player is only policed while a tournament they're in is actually being played. */
+const ONGOING = ["running"];
+
+/**
+ * How often one registration is re-checked against Dueling Nexus while its
+ * tournament is running. The throttle is a cost control on the upstream call
+ * only: the check it gates always re-reads the registration row and the live
+ * deck, never anything the browser sent.
+ */
+export const DECK_CHECK_INTERVAL_MS = 30 * 60 * 1000;
 
 export type DeckMismatchMetadata = {
   deckId: string;
@@ -18,21 +27,12 @@ export type DeckMismatchMetadata = {
   player?: WatchedDeck["player"];
   /** Present on the admin copy only - the old-vs-new comparison. */
   changes?: DeckCardDelta[];
-  /** Present on the player copy only - the deck exactly as they registered it. */
+  /** Present on the player copy only - the deck exactly as it was locked at the start. */
   registered?: DeckSnapshot;
 };
 
 function hash(value: string): string {
   return createHash("sha256").update(value).digest("hex");
-}
-
-/** Order-insensitive, so Nexus reshuffling a list on open is not a new state. */
-function deckState(deck: DeckSnapshot): string {
-  return JSON.stringify({
-    main: [...deck.main].sort((a, b) => a - b),
-    extra: [...deck.extra].sort((a, b) => a - b),
-    side: [...deck.side].sort((a, b) => a - b),
-  });
 }
 
 function summarise(deltas: DeckCardDelta[]): string {
@@ -41,85 +41,151 @@ function summarise(deltas: DeckCardDelta[]): string {
   return lines.join("\n");
 }
 
+function repo() {
+  return new RegistrationsRepository(getPool());
+}
+
+/** The deck exactly as Dueling Nexus serves it right now, or null when it can't be read (private, deleted, upstream down). */
+async function liveSnapshot(deckId: string): Promise<DeckSnapshot | null> {
+  const live = await fetchDeckArt(deckId);
+  return live ? { main: live.main, extra: live.extra, side: live.side } : null;
+}
+
 /**
- * Compares one registration's deck as it stands on Dueling Nexus against the
- * snapshot taken when it was registered, and raises the pair of alerts if they
- * differ. Reads the deck through its public UUID rather than the player's
- * token, so a sweep can run from a round-generation or a cron with no session
- * in hand.
+ * Freezes every registered deck as it stands right now - called once, from
+ * startBracket(). Whatever a player did to their list before this moment is
+ * legal and raises nothing; from here on, that frozen list is the only one
+ * they are allowed to play.
  *
- * Returns false - not an alert - when Nexus can't be reached or the deck was
- * made private or deleted: those are not evidence of an edit, and firing on
- * them would turn every upstream blip into an accusation.
+ * Falls back to the snapshot taken at signup when Nexus can't be reached, so
+ * a tournament never starts with an unenforceable (null) baseline.
  */
-export async function checkWatchedDeck(watched: WatchedDeck): Promise<boolean> {
-  const registered = parseSnapshot(watched.deckSnapshot);
-  if (!registered) return false;
+export async function lockTournamentDecks(slug: string): Promise<number> {
+  const registrations = repo();
+  const watched = await registrations.listWatchedDecks({ slug });
 
-  const live = await fetchDeckArt(watched.deckId);
-  if (!live) return false;
+  const locked = await Promise.all(
+    watched.map(async (w) => {
+      const snapshot = (await liveSnapshot(w.deckId).catch(() => null)) ?? parseSnapshot(w.deckSnapshot);
+      if (!snapshot) return false;
+      await registrations.lockDeck(w.registrationId, snapshot);
+      return true;
+    }),
+  );
+  return locked.filter(Boolean).length;
+}
 
-  const current: DeckSnapshot = { main: live.main, extra: live.extra, side: live.side };
-  const changes = diffDeckLists(registered, current);
-  if (changes.length === 0) return false;
+/**
+ * Disqualifies a registration: the DQ is recorded on the row (permanent, and
+ * what every list and page reads back), the player is taken out of the
+ * bracket exactly like a drop, and both they and the staff are told why.
+ *
+ * results.service.ts imports this module, so the drop is pulled in
+ * dynamically to keep that cycle from being a load-order problem.
+ */
+async function disqualify(watched: WatchedDeck, changes: DeckCardDelta[], locked: DeckSnapshot): Promise<void> {
+  const { player, tournament, deckId, deckName, registrationId } = watched;
+  const reason = `Deck differs from the list locked at the start of ${tournament.name} (${changes.length} change${changes.length === 1 ? "" : "s"})`;
 
-  const { player, tournament, deckId, deckName } = watched;
-  // Includes the offending deck state, so a *further* edit raises a fresh alert
-  // while a re-scan of the same one is swallowed by the unique index.
-  const state = hash(`${deckId}|${deckState(current)}`);
+  await repo().markDisqualified(registrationId, reason);
+
+  const { dropFromStartedTournament } = await import("./results.service.ts");
+  // A DQ'd player is out of the bracket; a tournament that has since finished
+  // (or a registration already out) leaves the recorded DQ standing on its own.
+  await dropFromStartedTournament(tournament.slug, registrationId).catch(() => {});
+
   const base: DeckMismatchMetadata = { deckId, deckName, tournament };
 
   await notify({
     id: crypto.randomUUID(),
     audience: "admin",
     playerId: null,
-    kind: DECK_MISMATCH,
-    title: `Deck mismatch - ${player.name} in ${tournament.name}`,
+    kind: DECK_DQ,
+    title: `Disqualified - ${player.name} in ${tournament.name}`,
     body:
-      `${player.name} registered deck "${deckName}" (${deckId}) for ${tournament.name}, ` +
-      `but Dueling Nexus now reports a different list. ${changes.length} change${changes.length === 1 ? "" : "s"}:\n` +
+      `${player.name} was disqualified from ${tournament.name}: the deck "${deckName}" (${deckId}) ` +
+      `no longer matches the list locked when the tournament started. ${changes.length} change${changes.length === 1 ? "" : "s"}:\n` +
       summarise(changes),
     metadata: { ...base, player, changes },
-    fingerprint: hash(`admin|${DECK_MISMATCH}|${tournament.slug}|${state}`),
+    fingerprint: hash(`admin|${DECK_DQ}|${registrationId}`),
   });
 
   await notify({
     id: crypto.randomUUID(),
     audience: "player",
     playerId: player.id,
-    kind: DECK_MISMATCH,
-    title: `Your deck for ${tournament.name} no longer matches your registration`,
+    kind: DECK_DQ,
+    title: `You have been disqualified from ${tournament.name}`,
     body:
-      `The deck "${deckName}" (${deckId}) you registered for ${tournament.name} has changed on Dueling Nexus ` +
-      `since you signed up. Decks are frozen once registered, so restore the list below before your next round ` +
-      `and contact staff if you did not make this change.`,
-    metadata: { ...base, registered },
-    fingerprint: hash(`player|${player.id}|${DECK_MISMATCH}|${tournament.slug}|${state}`),
+      `You are DISQUALIFIED from ${tournament.name}. The deck "${deckName}" (${deckId}) you are playing is not ` +
+      `the list that was locked in when the tournament started, and decks are frozen for the whole event. ` +
+      `This is automatic and takes effect immediately - the list you were required to play is below. ` +
+      `Contact a Tournament Organizer if you believe this is a mistake.`,
+    metadata: { ...base, registered: locked },
+    fingerprint: hash(`player|${player.id}|${DECK_DQ}|${registrationId}`),
   });
+}
 
+/**
+ * Compares one registration's live deck against the list locked at the start
+ * of its tournament, and disqualifies on any difference - detection is the
+ * penalty, there is no warning step. The comparison always runs against the
+ * stored tournament records (the locked snapshot on the registration row) and
+ * a fresh read from Dueling Nexus; nothing the client sends is consulted.
+ *
+ * Returns false - not a DQ - when there is no locked baseline yet, or when
+ * Nexus can't be reached or the deck was made private or deleted: none of
+ * those are evidence of an edit, and firing on them would turn an upstream
+ * blip into an accusation.
+ */
+export async function enforceWatchedDeck(watched: WatchedDeck): Promise<boolean> {
+  const locked = parseSnapshot(watched.lockedSnapshot);
+  if (!locked) return false;
+
+  const current = await liveSnapshot(watched.deckId);
+  if (!current) return false;
+
+  const changes = diffDeckLists(locked, current);
+  if (changes.length === 0) return false;
+
+  await disqualify(watched, changes, locked);
   return true;
 }
 
-async function check(watched: WatchedDeck[]): Promise<number> {
+async function enforce(watched: WatchedDeck[]): Promise<number> {
   // ponytail: one upstream call per registration, all in flight at once - fine
   // at event sizes this site runs. Batch or queue it if a sweep ever spans
   // hundreds of decks at once.
   const results = await Promise.all(
-    watched
-      .filter((w) => LIVE_STATUSES.has(w.tournament.status))
-      // One unreachable deck must not abort the rest of the sweep, and none of
-      // this is worth failing a round generation over.
-      .map((w) => checkWatchedDeck(w).catch(() => false)),
+    // One unreachable deck must not abort the rest of the sweep, and none of
+    // this is worth failing a round generation or a page render over.
+    watched.map((w) => enforceWatchedDeck(w).catch(() => false)),
   );
+  // Checked means "we looked", pass or fail - a deck that couldn't be read
+  // waits out the same interval as one that matched, instead of being retried
+  // on every single page view.
+  await repo().touchDeckChecked(watched.map((w) => w.registrationId));
   return results.filter(Boolean).length;
 }
 
-/** Every registered deck in one tournament: run at start, and at every new round. */
-export async function sweepTournamentDecks(slug: string): Promise<number> {
-  return check(await new RegistrationsRepository(getPool()).listWatchedDecks({ slug }));
+/** Every locked deck in one running tournament: the checkpoint at each new round. Not throttled - a round boundary is rare and worth a full pass. */
+export async function enforceTournamentDecks(slug: string): Promise<number> {
+  return enforce(await repo().listWatchedDecks({ slug, statuses: ONGOING }));
 }
 
-/** Every live registration one player holds: run when they log in or resume a session. */
-export async function sweepPlayerDecks(playerId: string): Promise<number> {
-  return check(await new RegistrationsRepository(getPool()).listWatchedDecks({ playerId }));
+/**
+ * Every ongoing tournament this player is in, checked at most once every 30
+ * minutes per registration - run on each visit (see SiteHeader), so a player
+ * who swaps decks mid-event is caught without waiting for a round to end.
+ * Works across however many tournaments they are playing at once: each
+ * registration carries its own baseline and its own throttle.
+ */
+export async function enforcePlayerDecks(playerId: string): Promise<number> {
+  return enforce(
+    await repo().listWatchedDecks({
+      playerId,
+      statuses: ONGOING,
+      checkedBefore: new Date(Date.now() - DECK_CHECK_INTERVAL_MS),
+    }),
+  );
 }

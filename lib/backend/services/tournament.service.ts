@@ -18,6 +18,26 @@ export type Participant = {
   paymentAt: string | null;
   /** Where the registration came from - a public signup or an admin adding someone manually. */
   source: "public_signup" | "admin_manual";
+  /** ISO instant they left (or were auto-dropped from) a started tournament, or null. */
+  droppedAt: string | null;
+  /** ISO instant they were disqualified, or null. A DQ also drops them, so both are set. */
+  disqualifiedAt: string | null;
+  dqReason: string | null;
+};
+
+/**
+ * What a participant looks like in the public participant list: registered
+ * before the start, active/eliminated once it is running, and disqualified if
+ * they broke the deck lock.
+ */
+export type ParticipantStatus = "registered" | "active" | "eliminated" | "disqualified";
+
+export type PublicParticipant = {
+  id: string;
+  name: string;
+  status: ParticipantStatus;
+  /** Only set for a DQ, so the list can say why without anyone having to ask. */
+  reason: string | null;
 };
 
 // Strips combining diacritics (U+0300-U+036F) left behind by NFKD, e.g. "é" -> "e".
@@ -111,6 +131,34 @@ export async function listParticipants(slug: string): Promise<Participant[]> {
   return repos().registrations.findByTournamentSlug(slug);
 }
 
+/**
+ * The registered field as everyone else sees it - name and standing only, no
+ * payment state, proof links, or deck ids. `eliminatedIds` comes from the
+ * bracket (a player the engine no longer has active), so a knocked-out
+ * duelist reads as eliminated rather than still active.
+ */
+export async function listPublicParticipants(
+  slug: string,
+  eliminatedIds: ReadonlySet<string> = new Set(),
+): Promise<PublicParticipant[]> {
+  const event = await getTournament(slug);
+  const participants = await listParticipants(slug);
+  const started = event ? event.status !== "scheduled" : false;
+
+  return participants.map((p) => ({
+    id: p.id,
+    name: p.name,
+    reason: p.dqReason,
+    status: p.disqualifiedAt
+      ? "disqualified"
+      : !started
+        ? "registered"
+        : p.droppedAt || eliminatedIds.has(p.id)
+          ? "eliminated"
+          : "active",
+  }));
+}
+
 export async function addParticipant(
   slug: string,
   input: { name: string; deckName: string },
@@ -126,6 +174,9 @@ export async function addParticipant(
     paymentBy: null,
     paymentAt: null,
     source: "admin_manual",
+    droppedAt: null,
+    disqualifiedAt: null,
+    dqReason: null,
   };
 }
 

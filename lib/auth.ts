@@ -17,7 +17,7 @@ import {
   invalidateCachedProfile,
   setCachedProfile,
 } from "./backend/services/nexus-cache.service";
-import { sweepPlayerDecks } from "./backend/services/deck-watch.service";
+import { enforcePlayerDecks } from "./backend/services/deck-watch.service";
 import { resolvePlayerId } from "./backend/services/player.service";
 
 const NEXUS_INFO = "https://duelingnexus.com/api/get-info.php";
@@ -197,9 +197,9 @@ export async function establishPublicSession(token: string): Promise<boolean> {
     contributorTime: profile.contributorTime,
   });
 
-  // Logging in is the third checkpoint the alerts spec names, alongside
-  // tournament start and each new round.
-  await sweepPlayerDecks(playerId).catch(() => 0);
+  // Signing in is one of the deck-lock checkpoints, alongside every new round
+  // and every visit (SiteHeader).
+  await enforcePlayerDecks(playerId).catch(() => 0);
 
   const session = await getSession();
   session.token = token;

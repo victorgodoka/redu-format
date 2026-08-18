@@ -6,12 +6,17 @@
   list-style: none;
 }
 
-.event {
+.event--wrapper {
   display: grid;
-  grid-template-columns: 150px minmax(0, 1fr) auto;
-  gap: 26px;
-  align-items: center;
-  padding: 22px 26px;
+  gap: 14px;
+  margin: 20px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.event {
+  display: flex;
+  flex-direction: column;
 }
 
 .when {

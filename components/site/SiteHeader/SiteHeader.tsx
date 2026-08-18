@@ -3,6 +3,7 @@ import SkipLink from "@/components/ui/SkipLink";
 import Wrap from "@/components/ui/Wrap";
 import { fetchProfile, getSession } from "@/lib/auth";
 import { FEATURED_EVENT } from "@/lib/events";
+import { enforcePlayerDecks } from "@/lib/backend/services/deck-watch.service";
 import { countUnread, playerReader } from "@/lib/backend/services/notifications.service";
 import { findPlayerIdByToken } from "@/lib/backend/services/player.service";
 import { DEFAULT_AVATAR } from "@/lib/nexus-parse";
@@ -32,6 +33,16 @@ export default async function SiteHeader() {
   // No player row yet (a session from before they ever registered) simply
   // means nothing has been addressed to them.
   const playerId = session.token ? await findPlayerIdByToken(session.token) : null;
+
+  /**
+   * The header renders on every page, which makes it the "every visit" hook
+   * for the deck lock: any tournament this player has running is re-checked
+   * against Dueling Nexus (throttled to once per 30 minutes per registration,
+   * see enforcePlayerDecks) and a changed deck is disqualified on the spot.
+   * Best-effort - a failed upstream read must never take the site down.
+   */
+  if (playerId) await enforcePlayerDecks(playerId).catch(() => 0);
+
   const unread = playerId ? await countUnread(playerReader(playerId)) : 0;
 
   const account = session.name

@@ -6,6 +6,7 @@ export {
   getTournament,
   getTournamentBanner,
   listParticipants,
+  listPublicParticipants,
   listTournaments,
   removeParticipant,
   setParticipantDeck,
@@ -16,6 +17,8 @@ export {
 
 export type {
   Participant,
+  ParticipantStatus,
+  PublicParticipant,
   PaymentStatus,
   Structure,
   TournamentDraft,

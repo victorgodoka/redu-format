@@ -12,6 +12,9 @@ type RegistrationRow = RowDataPacket & {
   payment_by: string | null;
   payment_at: string | null;
   source: "public_signup" | "admin_manual";
+  dropped_at: string | null;
+  disqualified_at: string | null;
+  dq_reason: string | null;
 };
 
 function rowToParticipant(row: RegistrationRow): Participant {
@@ -24,6 +27,9 @@ function rowToParticipant(row: RegistrationRow): Participant {
     paymentBy: row.payment_by,
     paymentAt: fromMysqlDatetime(row.payment_at),
     source: row.source,
+    droppedAt: fromMysqlDatetime(row.dropped_at),
+    disqualifiedAt: fromMysqlDatetime(row.disqualified_at),
+    dqReason: row.dq_reason,
   };
 }
 
@@ -41,8 +47,10 @@ export type WatchedDeck = {
   playerId: string;
   deckId: string;
   deckName: string;
-  /** Raw deck_snapshot column - parse with parseSnapshot() from lib/deck-diff.ts. */
+  /** Raw deck_snapshot column (the list registered at signup) - parse with parseSnapshot() from lib/deck-diff.ts. */
   deckSnapshot: unknown;
+  /** Raw deck_locked_snapshot column - the list frozen when the bracket started, and the only one a running tournament is judged against. Null until the tournament starts. */
+  lockedSnapshot: unknown;
   /** Never carries a token: alerts built from this go out to every admin. */
   player: { id: string; name: string; avatar: string | null; contributor: boolean };
   tournament: {
@@ -265,9 +273,22 @@ export class RegistrationsRepository {
    * snapshots existed carry no baseline, so there is nothing to compare them
    * against and they're filtered out here rather than guessed at downstream.
    */
-  async listWatchedDecks(filter: { slug?: string; playerId?: string }): Promise<WatchedDeck[]> {
-    const conditions = ["r.source = 'public_signup'", "r.dropped_at IS NULL", "r.deck_id IS NOT NULL", "r.deck_snapshot IS NOT NULL"];
-    const params: string[] = [];
+  async listWatchedDecks(filter: {
+    slug?: string;
+    playerId?: string;
+    /** Only tournaments in these statuses - `['running']` for the on-visit enforcement, which is the only state a deck change is a violation in. */
+    statuses?: string[];
+    /** Only rows whose last check is older than this (or never checked) - the 30-minute throttle. */
+    checkedBefore?: Date;
+  }): Promise<WatchedDeck[]> {
+    const conditions = [
+      "r.source = 'public_signup'",
+      "r.dropped_at IS NULL",
+      "r.disqualified_at IS NULL",
+      "r.deck_id IS NOT NULL",
+      "r.deck_snapshot IS NOT NULL",
+    ];
+    const params: unknown[] = [];
 
     if (filter.slug) {
       conditions.push("t.slug = ?");
@@ -277,9 +298,17 @@ export class RegistrationsRepository {
       conditions.push("r.player_id = ?");
       params.push(filter.playerId);
     }
+    if (filter.statuses?.length) {
+      conditions.push(`t.status IN (${filter.statuses.map(() => "?").join(", ")})`);
+      params.push(...filter.statuses);
+    }
+    if (filter.checkedBefore) {
+      conditions.push("(r.deck_checked_at IS NULL OR r.deck_checked_at < ?)");
+      params.push(toMysqlDatetime(filter.checkedBefore.toISOString()));
+    }
 
     const [rows] = await this.pool.query<RowDataPacket[]>(
-      `SELECT r.id, r.player_id, r.display_name, r.deck_id, r.deck_name, r.deck_snapshot,
+      `SELECT r.id, r.player_id, r.display_name, r.deck_id, r.deck_name, r.deck_snapshot, r.deck_locked_snapshot,
               t.slug, t.name AS tournament_name, t.starts_at, t.structure, t.match_format, t.status,
               p.nexus_name, p.avatar_url, p.contributor
        FROM registrations r
@@ -295,6 +324,7 @@ export class RegistrationsRepository {
       deckId: row.deck_id,
       deckName: row.deck_name,
       deckSnapshot: row.deck_snapshot,
+      lockedSnapshot: row.deck_locked_snapshot,
       player: {
         id: row.player_id,
         name: row.nexus_name ?? row.display_name,
@@ -310,5 +340,42 @@ export class RegistrationsRepository {
         status: row.status,
       },
     }));
+  }
+
+  // --- Deck lock + disqualification (tournament start onward) ---
+
+  /**
+   * Freezes the list this registration is allowed to play for the rest of the
+   * tournament. Written once, when the bracket starts: anything the player
+   * did to their deck before that moment is legal, and everything after it is
+   * measured against this row.
+   */
+  async lockDeck(registrationId: string, snapshot: DeckSnapshot): Promise<void> {
+    await this.pool.query(
+      "UPDATE registrations SET deck_locked_snapshot = ?, deck_checked_at = ? WHERE id = ?",
+      [JSON.stringify(snapshot), toMysqlDatetime(new Date().toISOString()), registrationId],
+    );
+  }
+
+  /** Records that these registrations were just checked against Dueling Nexus - the throttle's clock, nothing more. */
+  async touchDeckChecked(registrationIds: string[]): Promise<void> {
+    if (registrationIds.length === 0) return;
+    await this.pool.query("UPDATE registrations SET deck_checked_at = ? WHERE id IN (?)", [
+      toMysqlDatetime(new Date().toISOString()),
+      registrationIds,
+    ]);
+  }
+
+  /**
+   * Disqualification is permanent and separate from a drop: the player is out
+   * of the bracket either way, but a DQ records *why*, and the row keeps
+   * saying so for the rest of the tournament's life. Never overwrites an
+   * earlier DQ.
+   */
+  async markDisqualified(registrationId: string, reason: string): Promise<void> {
+    await this.pool.query(
+      "UPDATE registrations SET disqualified_at = ?, dq_reason = ? WHERE id = ? AND disqualified_at IS NULL",
+      [toMysqlDatetime(new Date().toISOString()), reason, registrationId],
+    );
   }
 }

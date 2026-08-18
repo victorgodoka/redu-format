@@ -49,6 +49,18 @@ export default function ParticipantList({
             <span className="admin-row__meta">
               {p.source === "public_signup" ? "Public signup" : "Added by admin"}
             </span>
+            {p.disqualifiedAt ? (
+              <span className="payment-status">
+                <Badge tone="negative">Disqualified</Badge>
+                {p.dqReason ?? "Deck violation"} · {formatDate(p.disqualifiedAt)}{" "}
+                {formatTime(p.disqualifiedAt)}
+              </span>
+            ) : p.droppedAt ? (
+              <span className="payment-status">
+                <Badge tone="muted">Dropped</Badge>
+                {formatDate(p.droppedAt)} {formatTime(p.droppedAt)}
+              </span>
+            ) : null}
             {isPaid ? (
               <span className="payment-status">
                 <Badge

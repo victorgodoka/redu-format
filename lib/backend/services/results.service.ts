@@ -10,7 +10,12 @@ import { TournamentBracketsRepository } from "../repositories/tournament-bracket
 import { TournamentsRepository } from "../repositories/tournaments.repository.ts";
 import { RegistrationsRepository } from "../repositories/registrations.repository.ts";
 import { generateNexusRoomHash } from "./nexus-room.ts";
-import { sweepTournamentDecks } from "./deck-watch.service.ts";
+import { enforceTournamentDecks, lockTournamentDecks } from "./deck-watch.service.ts";
+import { roundClock, roundCutoffMs, shouldAutoAdvance, type RoundClock } from "../../rounds.ts";
+
+/** What a locked round rejects a report with - the same wording the player-facing notice carries. */
+export const ROUND_LOCKED_MESSAGE =
+  "This round is locked - reporting is closed. Contact a Tournament Organizer if something is wrong.";
 
 /** Winning a top cut (stage two) match is worth this many extra leaderboard points, on top of the normal match score. */
 const TOP_CUT_MATCH_BONUS = 5;
@@ -46,6 +51,10 @@ export type BracketStanding = {
 export type BracketView = {
   status: "setup" | "stage-one" | "stage-two" | "complete";
   round: number;
+  /** How many stage-one (Swiss) rounds this bracket has - anything past it is Top Cut. */
+  stageOneRounds: number;
+  /** Timer/lock state of the round in progress, derived from persisted deadlines. */
+  clock: RoundClock;
   format: Structure;
   topCutFormat: "single-elimination" | "double-elimination" | "stepladder" | null;
   matches: BracketMatch[];
@@ -180,13 +189,12 @@ function effectiveDeadline(t: MatchTracking, cutoffMs: number): Date {
 
 function toView(
   engine: EngineTournament,
-  format: Structure,
-  roundLimitDays: number,
+  event: TournamentEvent,
   tracking: Map<string, MatchTracking>,
   reports: MatchReport[],
 ): BracketView {
   const playersById = new Map(engine.getPlayers().map((p) => [p.getId(), p]));
-  const cutoffMs = roundLimitDays * 24 * 60 * 60 * 1000;
+  const cutoffMs = roundCutoffMs(event);
   const reportsByMatch = new Map<string, MatchReport[]>();
   for (const r of reports) {
     if (!reportsByMatch.has(r.matchId)) reportsByMatch.set(r.matchId, []);
@@ -235,11 +243,71 @@ function toView(
   return {
     status: engine.getStatus(),
     round: engine.getRoundNumber(),
-    format,
+    stageOneRounds: engine.getStageOne().rounds,
+    clock: clockFor(event, engine, tracking),
+    format: event.structure,
     topCutFormat: stageTwoFormat,
     matches,
     standings,
   };
+}
+
+/**
+ * The deadline that governs the round in progress: the latest of its own
+ * matches' deadlines, so a Staff extension of one match holds the whole round
+ * open rather than locking it out from under them. Null when the round has no
+ * tracked match (nothing has opened yet).
+ */
+function currentRoundDeadline(
+  engine: EngineTournament,
+  tracking: Map<string, MatchTracking>,
+  cutoffMs: number,
+): Date | null {
+  const round = engine.getRoundNumber();
+  const deadlines = engine
+    .getMatches()
+    .filter((m) => m.getRoundNumber() === round)
+    .map((m) => tracking.get(m.getId()))
+    .filter((t): t is MatchTracking => t !== undefined)
+    .map((t) => effectiveDeadline(t, cutoffMs).getTime());
+  return deadlines.length ? new Date(Math.max(...deadlines)) : null;
+}
+
+/** True once nothing in the current round is still open to report. */
+function roundFullyResolved(engine: EngineTournament): boolean {
+  const round = engine.getRoundNumber();
+  const matches = engine.getMatches().filter((m) => m.getRoundNumber() === round);
+  return matches.length > 0 && matches.every((m) => !m.isActive());
+}
+
+/**
+ * Round lock state, computed from persisted timestamps only - never from a
+ * client clock, and it survives a refresh, a closed tab, or a cron that
+ * hasn't fired yet.
+ */
+function clockFor(
+  event: TournamentEvent,
+  engine: EngineTournament,
+  tracking: Map<string, MatchTracking>,
+  now: Date = new Date(),
+): RoundClock {
+  return roundClock(event, {
+    deadlineAt: currentRoundDeadline(engine, tracking, roundCutoffMs(event)),
+    allMatchesResolved: roundFullyResolved(engine),
+    now,
+  });
+}
+
+/** The round lock as the report paths and the event page both read it. */
+export async function getRoundClock(slug: string): Promise<RoundClock | null> {
+  const { tournaments, matchDeadlines } = repos();
+  const [tournamentId, event] = await Promise.all([tournaments.findIdBySlug(slug), tournaments.findBySlug(slug)]);
+  if (!tournamentId || !event) return null;
+
+  const engine = await loadEngine(tournamentId);
+  if (!engine) return null;
+
+  return clockFor(event, engine, await matchDeadlines.getTrackingMap(tournamentId));
 }
 
 /**
@@ -327,6 +395,46 @@ function rankByOfficialTiebreak<T extends { registrationId: string; name: string
   });
 }
 
+/**
+ * Who is out of a running bracket, for the public participant list. Three
+ * ways to be out: the engine no longer has you active (a drop, an auto-drop,
+ * or a DQ), you lost enough elimination matches (one in single elim and Top
+ * Cut, two in double elim), or Swiss ended and you didn't make the cut.
+ *
+ * Pure - derived from the view the page already loaded, no extra query.
+ */
+export function eliminatedRegistrationIds(view: BracketView): Set<string> {
+  const out = new Set(view.standings.filter((s) => s.dropped).map((s) => s.registrationId));
+
+  const losses = new Map<string, number>();
+  for (const m of view.matches) {
+    if (!m.hasResult || m.bye || !m.player1 || !m.player2) continue;
+    // Swiss losses cost points, not your place in the event - only elimination
+    // rounds (a whole elim bracket, or a Top Cut round) knock anyone out.
+    if (view.format === "swiss" && m.round <= view.stageOneRounds) continue;
+    const loser = m.player1.win > m.player2.win ? m.player2 : m.player2.win > m.player1.win ? m.player1 : null;
+    if (loser) losses.set(loser.registrationId, (losses.get(loser.registrationId) ?? 0) + 1);
+  }
+  const allowed = view.format === "double-elim" ? 2 : 1;
+  for (const [registrationId, count] of losses) {
+    if (count >= allowed) out.add(registrationId);
+  }
+
+  // Once the Top Cut is under way, everyone who isn't in it is done playing.
+  if (view.status === "stage-two") {
+    const inCut = new Set(
+      view.matches
+        .filter((m) => m.round > view.stageOneRounds)
+        .flatMap((m) => [m.player1?.registrationId, m.player2?.registrationId]),
+    );
+    for (const s of view.standings) {
+      if (!inCut.has(s.registrationId)) out.add(s.registrationId);
+    }
+  }
+
+  return out;
+}
+
 export async function hasBracket(slug: string): Promise<boolean> {
   const tournamentId = await repos().tournaments.findIdBySlug(slug);
   if (!tournamentId) return false;
@@ -346,7 +454,7 @@ export async function getBracketView(slug: string): Promise<BracketView | null> 
     matchReports.listForTournament(tournamentId),
   ]);
 
-  return toView(engine, event.structure, event.roundLimitDays, tracking, reports);
+  return toView(engine, event, tracking, reports);
 }
 
 /**
@@ -412,10 +520,11 @@ export async function startBracket(slug: string, event: TournamentEvent): Promis
   // staff can (and did) start a bracket ahead of the advertised time. This is
   // what the public site checks to stop calling it "upcoming".
   await tournaments.markStarted(tournamentId, new Date().toISOString());
-  // Decks are frozen from here on, so this is the first point a change is worth
-  // reporting. Awaited rather than fired and forgotten: a floating promise does
-  // not reliably survive the end of a serverless request.
-  await sweepTournamentDecks(slug);
+  // The deck each player holds *right now* becomes the only legal list for the
+  // rest of this tournament - changes made before this instant are not
+  // violations. Awaited rather than fired and forgotten: a floating promise
+  // does not reliably survive the end of a serverless request.
+  await lockTournamentDecks(slug);
 }
 
 export async function generateNextRound(slug: string): Promise<void> {
@@ -427,7 +536,7 @@ export async function generateNextRound(slug: string): Promise<void> {
   engine.nextRound();
   await persistEngine(tournamentId, engine);
   await syncMatchDeadlines(tournamentId, engine);
-  await sweepTournamentDecks(slug);
+  await enforceTournamentDecks(slug);
 }
 
 /**
@@ -532,11 +641,17 @@ export async function submitMatchReport(
   registrationId: string,
   result: MatchResult,
 ): Promise<void> {
-  const { tournaments, matchReports } = repos();
-  const tournamentId = await tournaments.findIdBySlug(slug);
-  if (!tournamentId) throw new Error(`Tournament "${slug}" does not exist`);
+  const { tournaments, matchReports, matchDeadlines } = repos();
+  const [tournamentId, event] = await Promise.all([tournaments.findIdBySlug(slug), tournaments.findBySlug(slug)]);
+  if (!tournamentId || !event) throw new Error(`Tournament "${slug}" does not exist`);
   const engine = await loadEngine(tournamentId);
   if (!engine) throw new Error(`Tournament "${slug}" has no bracket yet`);
+
+  // The lock is enforced here, not just hidden in the UI: a round is closed
+  // the moment its persisted deadline passes, whether or not the cron has run
+  // and whatever the browser believes.
+  const tracking = await matchDeadlines.getTrackingMap(tournamentId);
+  if (clockFor(event, engine, tracking).locked) throw new Error(ROUND_LOCKED_MESSAGE);
 
   const match = engine.getMatch(matchId);
   if (!match.isActive()) throw new Error("This match isn't open for reporting");
@@ -566,25 +681,29 @@ export async function submitMatchReport(
  * engine's own enterResult() already advances the bracket one match at a
  * time as each is resolved).
  */
-export async function closeOverdueMatches(slug: string): Promise<{ resolved: number }> {
+export async function closeOverdueMatches(slug: string): Promise<{ resolved: number; advanced: boolean }> {
   const { tournaments, matchDeadlines, matchReports } = repos();
   const [tournamentId, event] = await Promise.all([tournaments.findIdBySlug(slug), tournaments.findBySlug(slug)]);
-  if (!tournamentId || !event) return { resolved: 0 };
+  if (!tournamentId || !event) return { resolved: 0, advanced: false };
 
   const engine = await loadEngine(tournamentId);
   if (!engine || engine.getStatus() === "setup" || engine.getStatus() === "complete") {
-    return { resolved: 0 };
+    return { resolved: 0, advanced: false };
   }
 
   const tracking = await matchDeadlines.getTrackingMap(tournamentId);
-  const cutoffMs = event.roundLimitDays * 24 * 60 * 60 * 1000;
-  const now = Date.now();
+  const cutoffMs = roundCutoffMs(event);
+  const nowDate = new Date();
+  const now = nowDate.getTime();
+  const clock = clockFor(event, engine, tracking, nowDate);
 
   const overdue = engine.getMatches().filter((m) => {
     const t = tracking.get(m.getId());
     return m.isActive() && t !== undefined && now >= effectiveDeadline(t, cutoffMs).getTime();
   });
-  if (overdue.length === 0) return { resolved: 0 };
+  // Nothing to force-close, and no cleanup window has run out - the round is
+  // still being played.
+  if (overdue.length === 0 && !shouldAutoAdvance(clock, nowDate)) return { resolved: 0, advanced: false };
 
   const reportsByMatch = new Map<string, MatchReport[]>();
   for (const r of await matchReports.listForTournament(tournamentId)) {
@@ -610,9 +729,15 @@ export async function closeOverdueMatches(slug: string): Promise<{ resolved: num
     }
   }
 
-  if (engine.getStatus() === "stage-one") {
+  // A long-duration tournament never pairs a round on its own: once the
+  // current one locks it simply waits for a moderator. A same-day one
+  // advances by itself, but only after the cleanup window - which a moderator
+  // can cut short with generateNextRound().
+  let advanced = false;
+  if (engine.getStatus() === "stage-one" && shouldAutoAdvance(clock, nowDate)) {
     try {
       engine.nextRound();
+      advanced = true;
     } catch {
       // Other stage-one matches are still within their own deadline, so the round
       // isn't done yet - nothing more to do until they resolve too.
@@ -621,7 +746,8 @@ export async function closeOverdueMatches(slug: string): Promise<{ resolved: num
 
   await persistEngine(tournamentId, engine);
   await syncMatchDeadlines(tournamentId, engine);
-  return { resolved: overdue.length };
+  if (advanced) await enforceTournamentDecks(slug);
+  return { resolved: overdue.length, advanced };
 }
 
 /**
@@ -644,7 +770,7 @@ export async function extendCurrentRoundDeadline(slug: string, extraHours: numbe
   if (activeMatches.length === 0) return { extended: 0 };
 
   const tracking = await matchDeadlines.getTrackingMap(tournamentId);
-  const cutoffMs = event.roundLimitDays * 24 * 60 * 60 * 1000;
+  const cutoffMs = roundCutoffMs(event);
   const extraMs = extraHours * 60 * 60 * 1000;
 
   const updates = activeMatches
@@ -660,7 +786,9 @@ export async function extendCurrentRoundDeadline(slug: string, extraHours: numbe
 }
 
 /** Sweeps every tournament with an open bracket - what the round-deadline cron route calls. Best-effort per tournament so one bad one can't block the rest. */
-export async function closeAllOverdueMatches(): Promise<{ slug: string; resolved: number; error?: string }[]> {
+export async function closeAllOverdueMatches(): Promise<
+  { slug: string; resolved: number; advanced?: boolean; error?: string }[]
+> {
   const slugs = await repos().brackets.listSlugsWithBracket();
   const results = [];
   for (const slug of slugs) {
@@ -816,6 +944,10 @@ export type MyMatchView = {
   disputed: boolean;
   deadlineAt: string | null;
   roomHash: string | null;
+  /** Reporting is closed for this round - the UI must say why, and the server rejects a report regardless. */
+  locked: boolean;
+  /** Same-day tournaments only: when the next round starts by itself. */
+  nextRoundAt: string | null;
 };
 
 /** The signed-in player's current open match in this tournament, for the player-facing report UI - null if they have none right now (not registered, bye, between rounds, or the event hasn't started). */
@@ -839,10 +971,10 @@ export async function getMyCurrentMatch(slug: string, registrationId: string): P
   const mine = reports.find((r) => r.registrationId === registrationId);
   const theirs = reports.find((r) => r.registrationId !== registrationId);
 
-  const matchTracking = (await matchDeadlines.getTrackingMap(tournamentId)).get(match.getId());
-  const deadlineAt = matchTracking
-    ? new Date(matchTracking.activeSince.getTime() + event.roundLimitDays * 24 * 60 * 60 * 1000).toISOString()
-    : null;
+  const tracking = await matchDeadlines.getTrackingMap(tournamentId);
+  const matchTracking = tracking.get(match.getId());
+  const deadlineAt = matchTracking ? effectiveDeadline(matchTracking, roundCutoffMs(event)).toISOString() : null;
+  const clock = clockFor(event, engine, tracking);
 
   return {
     matchId: match.getId(),
@@ -854,6 +986,8 @@ export async function getMyCurrentMatch(slug: string, registrationId: string): P
     disputed: Boolean(mine && theirs && !reportsAgree(mine.result, theirs.result)),
     deadlineAt,
     roomHash: matchTracking?.roomHash ?? null,
+    locked: clock.locked,
+    nextRoundAt: clock.nextRoundAt,
   };
 }
 

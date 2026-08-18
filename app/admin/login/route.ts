@@ -1,9 +1,14 @@
 import { NextResponse } from "next/server";
 import { generateOAuthState } from "@/lib/auth/state";
 import { discordConfig } from "@/lib/discord/config";
+import { ADMIN_NEXT_COOKIE } from "@/lib/auth/session";
+import { safeNext } from "@/lib/safe-next";
 
 export async function GET(request: Request) {
   const state = generateOAuthState();
+  // Where the middleware turned them away from, validated before it is stored
+  // so only a path on this origin can ever come back out of the cookie.
+  const next = safeNext(new URL(request.url).searchParams.get("next"), "/admin/dashboard");
 
   const discordUrl = new URL(discordConfig.oauthUrl);
 
@@ -40,6 +45,14 @@ export async function GET(request: Request) {
     sameSite: "lax",
     path: "/admin",
     maxAge: 60 * 10, // 10 minutes
+  });
+
+  response.cookies.set(ADMIN_NEXT_COOKIE, next, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/admin",
+    maxAge: 60 * 10,
   });
 
   return response;

@@ -8,10 +8,11 @@ import {
 } from "@/lib/discord/client";
 
 import { discordConfig } from "@/lib/discord/config";
-import { createAdminSession } from "@/lib/auth/session";
+import { ADMIN_NEXT_COOKIE, createAdminSession } from "@/lib/auth/session";
 import { establishPublicSession } from "@/lib/auth";
 // import { recordAction } from "@/lib/audit-log";
 import { getAdminNexusToken, upsertAdmin } from "@/lib/backend/services/admins.service";
+import { safeNext } from "@/lib/safe-next";
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
@@ -95,12 +96,12 @@ export async function GET(request: Request) {
 
     cookieStore.delete("discord_oauth_state");
 
-    return NextResponse.redirect(
-      new URL(
-        "/admin/dashboard",
-        request.url,
-      ),
-    );
+    // Back to whatever protected page sent them to sign in, or the dashboard
+    // when they simply started at /admin.
+    const next = safeNext(cookieStore.get(ADMIN_NEXT_COOKIE)?.value, "/admin/dashboard");
+    cookieStore.delete({ name: ADMIN_NEXT_COOKIE, path: "/admin" });
+
+    return NextResponse.redirect(new URL(next, request.url));
   } catch (error) {
     console.error(
       "Discord authentication failed:",

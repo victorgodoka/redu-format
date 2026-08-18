@@ -5,10 +5,10 @@ export default function Notice({
   children,
   className,
 }: {
-  variant?: "done";
+  variant?: "done" | "warn";
   children: ReactNode;
   className?: string;
 }) {
-  const variantClass = variant === "done" ? "notice--done" : "";
+  const variantClass = variant ? `notice--${variant}` : "";
   return <div className={["notice", variantClass, "panel", className].filter(Boolean).join(" ")}>{children}</div>;
 }

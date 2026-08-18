@@ -5,10 +5,14 @@ import { redirect } from "next/navigation";
 import { recordAction } from "@/lib/audit-log";
 import { getAdminSession } from "@/lib/auth/session";
 import {
+  DEFAULT_CLEANUP_MINUTES,
+  DEFAULT_ROUND_MINUTES,
+  DURATION_MODES,
   ENGINES,
   recommendedTopCut,
   SEAT_OPTIONS,
   zonedDateTimeToUtc,
+  type DurationMode,
   type Engine,
   type Structure,
 } from "@/lib/events";
@@ -75,7 +79,26 @@ async function readDraft(form: FormData): Promise<TournamentDraft | { error: str
     return { error: "Rounds must be a positive whole number." };
   }
 
-  const roundLimitDays = Number(form.get("roundLimitDays"));
+  // Standard same-day is the default for anything that doesn't say otherwise,
+  // including an older form post that has no such field at all.
+  const durationMode = String(form.get("durationMode") ?? "same_day") as DurationMode;
+  if (!(durationMode in DURATION_MODES)) return { error: "Pick a tournament duration mode." };
+
+  // Each mode reads only the clock it actually uses; the other keeps its
+  // default so a mode switch later finds a sane value rather than a zero.
+  const roundMinutes =
+    durationMode === "same_day" ? Number(form.get("roundMinutes")) : DEFAULT_ROUND_MINUTES;
+  if (!Number.isInteger(roundMinutes) || roundMinutes <= 0) {
+    return { error: "Round length must be a positive whole number of minutes." };
+  }
+
+  const cleanupMinutes =
+    durationMode === "same_day" ? Number(form.get("cleanupMinutes")) : DEFAULT_CLEANUP_MINUTES;
+  if (!Number.isInteger(cleanupMinutes) || cleanupMinutes < 0) {
+    return { error: "Cleanup period must be a whole number of minutes." };
+  }
+
+  const roundLimitDays = durationMode === "long" ? Number(form.get("roundLimitDays")) : 1;
   if (!Number.isInteger(roundLimitDays) || roundLimitDays <= 0) {
     return { error: "Round deadline must be a positive whole number of days." };
   }
@@ -125,6 +148,9 @@ async function readDraft(form: FormData): Promise<TournamentDraft | { error: str
     topCut,
     matchFormat: matchFormat as (typeof MATCH_FORMATS)[number],
     roundLimitDays,
+    durationMode,
+    roundMinutes,
+    cleanupMinutes,
     engine,
     seats,
     entry,

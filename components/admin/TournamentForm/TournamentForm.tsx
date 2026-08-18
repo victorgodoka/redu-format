@@ -9,10 +9,14 @@ import Label from "@/components/ui/Label";
 import Select from "@/components/ui/Select";
 import Textarea from "@/components/ui/Textarea";
 import {
+  DEFAULT_CLEANUP_MINUTES,
+  DEFAULT_ROUND_MINUTES,
+  DURATION_MODES,
   ENGINES,
   recommendedTopCut,
   SEAT_OPTIONS,
   STRUCTURES,
+  type DurationMode,
   type Engine,
   type Structure,
 } from "@/lib/events";
@@ -132,6 +136,11 @@ export default function TournamentForm({
   );
   const [hasTopCut, setHasTopCut] = useState(
     tournament ? tournament.topCut !== null : false,
+  );
+  // Standard same-day is what a new tournament gets unless it is explicitly
+  // switched over - the long-duration mode is the exception, not the default.
+  const [durationMode, setDurationMode] = useState<DurationMode>(
+    tournament?.durationMode ?? "same_day",
   );
   const [entryType, setEntryType] = useState<"free" | "paid">(
     tournament?.entry.type ?? "free",
@@ -345,16 +354,69 @@ export default function TournamentForm({
         </Select>
       </FormField>
 
-      <FormField label="Round deadline (days)" htmlFor="roundLimitDays">
-        <Input
-          id="roundLimitDays"
-          name="roundLimitDays"
-          type="number"
-          min={1}
-          defaultValue={tournament?.roundLimitDays ?? 2}
-          required
-        />
+      <FormField label="Duration" htmlFor="durationMode" hint={DURATION_MODES[durationMode].hint}>
+        <Select
+          id="durationMode"
+          name="durationMode"
+          value={durationMode}
+          onChange={(e) => setDurationMode(e.target.value as DurationMode)}
+        >
+          {(Object.keys(DURATION_MODES) as DurationMode[]).map((value) => (
+            <option key={value} value={value}>
+              {DURATION_MODES[value].label}
+            </option>
+          ))}
+        </Select>
       </FormField>
+
+      {durationMode === "same_day" ? (
+        <FormGroup>
+          <FormField
+            label="Round length (minutes)"
+            htmlFor="roundMinutes"
+            hint="The round locks when this runs out - no more reports."
+          >
+            <Input
+              id="roundMinutes"
+              name="roundMinutes"
+              type="number"
+              min={1}
+              defaultValue={tournament?.roundMinutes ?? DEFAULT_ROUND_MINUTES}
+              required
+            />
+          </FormField>
+
+          <FormField
+            label="Cleanup period (minutes)"
+            htmlFor="cleanupMinutes"
+            hint="Moderator window after a round locks; the next round then starts on its own."
+          >
+            <Input
+              id="cleanupMinutes"
+              name="cleanupMinutes"
+              type="number"
+              min={0}
+              defaultValue={tournament?.cleanupMinutes ?? DEFAULT_CLEANUP_MINUTES}
+              required
+            />
+          </FormField>
+        </FormGroup>
+      ) : (
+        <FormField
+          label="Round deadline (days)"
+          htmlFor="roundLimitDays"
+          hint="How long a round stays open before it locks and waits for a moderator."
+        >
+          <Input
+            id="roundLimitDays"
+            name="roundLimitDays"
+            type="number"
+            min={1}
+            defaultValue={tournament?.roundLimitDays ?? 2}
+            required
+          />
+        </FormField>
+      )}
 
       <FormField label="Entry" htmlFor="entryType">
         {isEditing && tournament ? (

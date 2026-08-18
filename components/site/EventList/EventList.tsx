@@ -23,12 +23,14 @@ function EventCard({
   hasSession,
   saveAction,
   unsaveAction,
+  hasBanner,
 }: {
   event: TournamentEvent;
   now: Date;
   isRegistered: boolean;
   isSaved: boolean;
   hasSession: boolean;
+  hasBanner: boolean;
   saveAction: FormAction;
   unsaveAction: FormAction;
 }) {
@@ -40,84 +42,106 @@ function EventCard({
 
   return (
     <li className={`${styles.event} panel${past ? ` ${styles.past}` : ""}`}>
-      <div className={styles.when}>
-        <span className={styles.date}>{formatDate(event.startsAt)}</span>
-        <span className={styles.time}>{formatTime(event.startsAt)}</span>
-        {finished ? (
-          <span className={styles.done}>Finished</span>
-        ) : past ? (
-          <span className={styles.done}>In progress</span>
-        ) : null}
-      </div>
+      {hasBanner && (
+        <img
+          className="event-list event-banner"
+          src={`/events/${event.slug}/banner`}
+          alt=""
+        />
+      )}
+      <div className="event-wrapper">
+        <div className={styles.when}>
+          <span className={styles.date}>{formatDate(event.startsAt)}</span>
+          <span className={styles.time}>{formatTime(event.startsAt)}</span>
+          {finished ? (
+            <span className={styles.done}>Finished</span>
+          ) : past ? (
+            <span className={styles.done}>In progress</span>
+          ) : null}
+        </div>
 
-      <div>
-        <h2 className={styles.name}>
-          <Link href={`/events/${event.slug}`}>{event.name}</Link>
-        </h2>
-        <p className={styles.meta}>
-          <span className={styles.tag}>{STRUCTURES[event.structure].label}</span>
-          {event.structure === "double-elim" ? null : <span>{event.rounds} rounds</span>}
-          {event.topCut ? <span>Top {event.topCut}</span> : null}
-          <span>{event.matchFormat}</span>
-          <span>
-            {event.roundLimitDays}-day {event.structure === "double-elim" ? "deadline" : "round deadline"}
-          </span>
-        </p>
-        <p className={styles.host}>
-          {event.host} · {formatEntry(event.entry)}
-        </p>
-      </div>
+        <div>
+          <h2 className={styles.name}>
+            <Link href={`/events/${event.slug}`}>{event.name}</Link>
+          </h2>
+          <p className={styles.meta}>
+            <span className={styles.tag}>
+              {STRUCTURES[event.structure].label}
+            </span>
+            {event.structure === "double-elim" ? null : (
+              <span>{event.rounds} rounds</span>
+            )}
+            {event.topCut ? <span>Top {event.topCut}</span> : null}
+            <span>{event.matchFormat}</span>
+            <span>
+              {event.roundLimitDays}-day{" "}
+              {event.structure === "double-elim"
+                ? "deadline"
+                : "round deadline"}
+            </span>
+          </p>
+          <p className={styles.host}>
+            {event.host} · {formatEntry(event.entry)}
+          </p>
+        </div>
 
-      <div className={styles.signup}>
-        {/* Once registration is closed there's an attendance, not seats left. */}
-        {past ? (
-          <span className={styles.seats}>
-            {event.seats === null
-              ? `${event.taken} duelists`
-              : `${event.taken} of ${event.seats} duelists`}
-          </span>
-        ) : (
-          <span
-            className={`${styles.seats}${full ? ` ${styles.seatsFull}` : almost ? ` ${styles.seatsAlmost}` : ""}`}
-          >
-            {event.seats === null
-              ? "Unlimited seats"
-              : full
-                ? "Sold out"
-                : `${left} of ${event.seats} seats left`}
-          </span>
-        )}
+        <div className={styles.signup}>
+          {/* Once registration is closed there's an attendance, not seats left. */}
+          {past ? (
+            <span className={styles.seats}>
+              {event.seats === null
+                ? `${event.taken} duelists`
+                : `${event.taken} of ${event.seats} duelists`}
+            </span>
+          ) : (
+            <span
+              className={`${styles.seats}${full ? ` ${styles.seatsFull}` : almost ? ` ${styles.seatsAlmost}` : ""}`}
+            >
+              {event.seats === null
+                ? "Unlimited seats"
+                : full
+                  ? "Sold out"
+                  : `${left} of ${event.seats} seats left`}
+            </span>
+          )}
 
-        {finished ? (
-          <Link className="btn btn--quiet" href={`/events/${event.slug}`}>
-            Results
-          </Link>
-        ) : isRegistered ? (
-          <Link className="btn btn--in" href={`/events/${event.slug}/signup`}>
-            You are in
-          </Link>
-        ) : past ? (
-          <span className="btn btn--quiet" aria-disabled="true">
-            Registration closed
-          </span>
-        ) : full ? (
-          <span className="btn btn--quiet" aria-disabled="true">
-            Sold out
-          </span>
-        ) : (
-          <Link className="btn btn--solid" href={`/events/${event.slug}/signup`}>
-            Sign up
-          </Link>
-        )}
+          {finished ? (
+            <Link className="btn btn--quiet" href={`/events/${event.slug}`}>
+              Results
+            </Link>
+          ) : isRegistered ? (
+            <Link className="btn btn--in" href={`/events/${event.slug}/signup`}>
+              You are in
+            </Link>
+          ) : past ? (
+            <span className="btn btn--quiet" aria-disabled="true">
+              Registration closed
+            </span>
+          ) : full ? (
+            <span className="btn btn--quiet" aria-disabled="true">
+              Sold out
+            </span>
+          ) : (
+            <Link
+              className="btn btn--solid"
+              href={`/events/${event.slug}/signup`}
+            >
+              Sign up
+            </Link>
+          )}
 
-        {hasSession ? (
-          <form action={isSaved ? unsaveAction : saveAction}>
-            <input type="hidden" name="slug" value={event.slug} />
-            <button className={`btn btn--quiet${isSaved ? " btn--in" : ""}`} type="submit">
-              {isSaved ? "Saved" : "Save"}
-            </button>
-          </form>
-        ) : null}
+          {hasSession ? (
+            <form action={isSaved ? unsaveAction : saveAction}>
+              <input type="hidden" name="slug" value={event.slug} />
+              <button
+                className={`btn btn--quiet${isSaved ? " btn--in" : ""}`}
+                type="submit"
+              >
+                {isSaved ? "Saved" : "Save"}
+              </button>
+            </form>
+          ) : null}
+        </div>
       </div>
     </li>
   );
@@ -152,6 +176,7 @@ export default function EventList({
           hasSession={hasSession}
           saveAction={saveAction}
           unsaveAction={unsaveAction}
+          hasBanner={event.hasBanner}
         />
       ))}
     </ul>

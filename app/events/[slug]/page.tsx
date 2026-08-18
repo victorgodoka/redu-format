@@ -5,12 +5,15 @@ import { notFound } from "next/navigation";
 import AdminList, { AdminRow } from "@/components/admin/AdminList";
 import Bracket from "@/components/site/Bracket";
 import EventBanner from "@/components/site/EventBanner";
+import ParticipantsPanel from "@/components/site/ParticipantsPanel";
+import TournamentBracket from "@/components/site/TournamentBracket";
 import EventDescription from "@/components/site/EventDescription";
 import Footer from "@/components/site/Footer";
 import SiteHeader from "@/components/site/SiteHeader";
 import StandingsTable from "@/components/site/StandingsTable";
 import TopDeckList, { type StandingsDeck } from "@/components/site/TopDeckList";
 import Button from "@/components/ui/Button";
+import EmptyState from "@/components/ui/EmptyState";
 import FactsList from "@/components/ui/FactsList";
 import Lede from "@/components/ui/Lede";
 import Notice from "@/components/ui/Notice";
@@ -21,10 +24,14 @@ import { fetchProfile, getSession } from "@/lib/auth";
 import { findPlayerIdByToken } from "@/lib/backend/services/player.service";
 import { findMySignup, listSavedSlugsForPlayer } from "@/lib/backend/services/registration.service";
 import {
+  closeOverdueMatches,
+  eliminatedRegistrationIds,
+  getBracketView,
   getMyCurrentMatch,
   getMyMatchHistory,
   getPlacingsForPlayer,
   getPlacingsWithTiebreak,
+  type BracketView,
   type MyMatchHistoryEntry,
   type MyMatchView,
 } from "@/lib/backend/services/results.service";
@@ -40,7 +47,8 @@ import {
   type TournamentEvent,
 } from "@/lib/events";
 import { fetchDeckArt } from "@/lib/nexus-parse";
-import { getTournament } from "@/lib/tournaments";
+import { TO_DISCORD_URL } from "@/lib/site";
+import { getTournament, listPublicParticipants, type PublicParticipant } from "@/lib/tournaments";
 import { YCS_PROVIDENCE_2012_BRACKET, YCS_PROVIDENCE_2012_DECKS } from "@/lib/ycs-providence-2012";
 import { saveTournamentAction, unsaveTournamentAction } from "../saved-actions";
 import { submitMatchReportAction } from "./report-actions";
@@ -124,6 +132,71 @@ function EventFacts({ event, past }: { event: TournamentEvent; past: boolean }) 
         { label: "Host", value: `${event.host} · ${formatEntry(event.entry)}` },
       ]}
     />
+  );
+}
+
+/**
+ * What a player sees instead of the report buttons once the round is locked.
+ * Never a disabled button with no explanation: it says the round closed, and
+ * where to go if that looks wrong. The backend rejects a late report anyway
+ * (see submitMatchReport) - this is the human half of the same rule.
+ */
+function RoundLockedNotice({ nextRoundAt }: { nextRoundAt: string | null }) {
+  return (
+    <Notice variant="warn">
+      <Tab>Reporting closed</Tab>
+      <Lede>
+        This round is locked - the round timer ran out, so results can no longer be submitted or
+        changed for it.
+        {nextRoundAt
+          ? ` The next round is scheduled to start ${formatDate(nextRoundAt)} at ${formatTime(nextRoundAt)}.`
+          : " A Tournament Organizer will start the next round."}
+      </Lede>
+      <Lede>
+        Think this is wrong - your duel finished in time, or the result on file is not what
+        happened? Contact a Tournament Organizer in a tournament channel on our Discord and they
+        will sort it out.
+      </Lede>
+      <a className="btn btn--solid" href={TO_DISCORD_URL} target="_blank" rel="noopener noreferrer">
+        Contact a Tournament Organizer
+      </a>
+    </Notice>
+  );
+}
+
+/** Round timer/lock state, straight off the persisted deadlines - the same numbers the server enforces. */
+function RoundStatus({ view }: { view: BracketView }) {
+  const { clock } = view;
+  return (
+    <Notice>
+      <Tab>Round {view.round}</Tab>
+      <Lede>
+        {clock.locked
+          ? clock.awaitingModerator
+            ? "Round locked - waiting for a Tournament Organizer to start the next one."
+            : "Round locked - reporting is closed."
+          : clock.deadlineAt
+            ? `Reporting closes ${formatDate(clock.deadlineAt)} at ${formatTime(clock.deadlineAt)}.`
+            : "Round in progress."}
+      </Lede>
+      {clock.locked && clock.nextRoundAt ? (
+        <Lede>
+          Next round starts {formatDate(clock.nextRoundAt)} at {formatTime(clock.nextRoundAt)}.
+        </Lede>
+      ) : null}
+    </Notice>
+  );
+}
+
+/** Registered field, full width, below the bracket-level sections it belongs with. */
+function ParticipantsSection({ participants }: { participants: PublicParticipant[] }) {
+  return (
+    <div className="results-fullwidth">
+      <h2 className="section__subtitle" id="participants">
+        Registered duelists ({participants.length})
+      </h2>
+      <ParticipantsPanel participants={participants} />
+    </div>
   );
 }
 
@@ -212,12 +285,16 @@ async function FeaturedEventPage({
   registeredDeckName,
   myPlacing,
   myHistory,
+  participants,
+  view,
   saveAction,
 }: {
   event: TournamentEvent;
   registeredDeckName: string | null;
   myPlacing: { place: number; points: number } | undefined;
   myHistory: MyMatchHistoryEntry[];
+  participants: PublicParticipant[];
+  view: BracketView | null;
   saveAction: ReactNode;
 }) {
   const placings = await getPlacingsWithTiebreak(event.slug);
@@ -252,10 +329,13 @@ async function FeaturedEventPage({
       <Wrap>
         <PageHeading tab="Results" title={event.name} action={saveAction} />
         <EventBanner event={event} />
-        <EventDescription event={event} />
 
+        {/* Left: what this tournament was. Right: how it ended, then the rest
+            of the facts. Bracket, field and decklists go full width below. */}
         <div className="signup">
           <div className="signup__main">
+            <EventDescription event={event} />
+
             <Notice variant="done">
               <Tab>{registeredDeckName ? "You played" : "Results"}</Tab>
               <Lede>
@@ -268,14 +348,14 @@ async function FeaturedEventPage({
             </Notice>
 
             <MatchHistory history={myHistory} />
-
-            <Notice>
-              <Tab>Final standings</Tab>
-              <StandingsTable rows={placings} />
-            </Notice>
           </div>
 
           <aside className="signup__side">
+            <Notice>
+              <Tab>Final ranking</Tab>
+              <StandingsTable rows={placings} />
+            </Notice>
+
             <FactsList
               rows={[
                 { label: "Finished", value: formatDate(event.finishedAt ?? event.startsAt) },
@@ -287,6 +367,17 @@ async function FeaturedEventPage({
             />
           </aside>
         </div>
+
+        {view ? (
+          <div className="results-fullwidth">
+            <h2 className="section__subtitle" id="bracket">
+              {view.topCutFormat ? "Top Cut" : "Bracket"}
+            </h2>
+            <TournamentBracket view={view} />
+          </div>
+        ) : null}
+
+        <ParticipantsSection participants={participants} />
 
         {topDecks.length > 0 ? (
           <div className="results-fullwidth">
@@ -307,12 +398,19 @@ function OngoingEventPage({
   registeredDeck,
   myMatch,
   myHistory,
+  participants,
+  view,
+  disqualified,
   saveAction,
 }: {
   event: TournamentEvent;
   registeredDeck: { name: string; main: number; extra: number; side: number } | undefined;
   myMatch: MyMatchView | null;
   myHistory: MyMatchHistoryEntry[];
+  participants: PublicParticipant[];
+  view: BracketView | null;
+  /** This visitor's own DQ, if they have one - the page must say so plainly, not just grey out the controls. */
+  disqualified: PublicParticipant | null;
   saveAction: ReactNode;
 }) {
   return (
@@ -320,21 +418,35 @@ function OngoingEventPage({
       <Wrap>
         <PageHeading tab="Tournament" title={event.name} action={saveAction} />
         <EventBanner event={event} />
-        <EventDescription event={event} />
 
+        {/* Left: the tournament itself. Right: registration first, then the
+            facts. Bracket, field and decks go full width underneath. */}
         <div className="signup">
           <div className="signup__main">
-            {registeredDeck ? (
-              <Notice variant="done">
-                <Tab>You played</Tab>
-                <h2 className="notice__title">{registeredDeck.name}</h2>
-                <Lede>This tournament is underway - check your current match below.</Lede>
+            <EventDescription event={event} />
+
+            {disqualified ? (
+              <Notice variant="warn">
+                <Tab>Disqualified</Tab>
+                <h2 className="notice__title">You are out of this tournament</h2>
+                <Lede>
+                  {disqualified.reason ??
+                    "Your deck no longer matches the list locked in when this tournament started."}
+                </Lede>
+                <Lede>
+                  Decks are frozen for the whole event, so this was applied automatically and takes
+                  effect immediately. Contact a Tournament Organizer if you believe it is a mistake.
+                </Lede>
+                <a
+                  className="btn btn--solid"
+                  href={TO_DISCORD_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Contact a Tournament Organizer
+                </a>
               </Notice>
-            ) : (
-              <Notice>
-                <Lede>Registration is closed - this tournament has already started.</Lede>
-              </Notice>
-            )}
+            ) : null}
 
             {myMatch ? (
               <Notice variant={myMatch.phase === "topCut" ? "done" : undefined}>
@@ -370,31 +482,71 @@ function OngoingEventPage({
                       ? "Reconciling with your opponent's report."
                       : "Waiting on your opponent to report too."}
                   </Lede>
-                ) : (
+                ) : myMatch.locked ? null : (
                   <Lede>Report your result once the duel is over.</Lede>
                 )}
-                <form action={submitMatchReportAction} className="admin-row__actions">
-                  <input type="hidden" name="slug" value={event.slug} />
-                  <input type="hidden" name="matchId" value={myMatch.matchId} />
-                  <Button variant="solid" type="submit" name="result" value="win">
-                    I won
-                  </Button>
-                  <Button type="submit" name="result" value="loss">
-                    I lost
-                  </Button>
-                  <Button variant="quiet" type="submit" name="result" value="draw">
-                    Draw
-                  </Button>
-                </form>
+                {myMatch.locked ? null : (
+                  <form action={submitMatchReportAction} className="admin-row__actions">
+                    <input type="hidden" name="slug" value={event.slug} />
+                    <input type="hidden" name="matchId" value={myMatch.matchId} />
+                    <Button variant="solid" type="submit" name="result" value="win">
+                      I won
+                    </Button>
+                    <Button type="submit" name="result" value="loss">
+                      I lost
+                    </Button>
+                    <Button variant="quiet" type="submit" name="result" value="draw">
+                      Draw
+                    </Button>
+                  </form>
+                )}
               </Notice>
             ) : null}
+
+            {myMatch?.locked ? <RoundLockedNotice nextRoundAt={myMatch.nextRoundAt} /> : null}
 
             <MatchHistory history={myHistory} />
           </div>
 
           <aside className="signup__side">
+            {registeredDeck ? (
+              <Notice variant="done">
+                <Tab>Your registration</Tab>
+                <h2 className="notice__title">{registeredDeck.name}</h2>
+                <Lede>
+                  This tournament is underway, and your deck is locked to the list it held when it
+                  started.
+                </Lede>
+              </Notice>
+            ) : (
+              <Notice>
+                <Tab>Signup</Tab>
+                <Lede>Registration is closed - this tournament has already started.</Lede>
+              </Notice>
+            )}
+
+            {view ? <RoundStatus view={view} /> : null}
+
             <EventFacts event={event} past />
           </aside>
+        </div>
+
+        {view ? (
+          <div className="results-fullwidth">
+            <h2 className="section__subtitle" id="bracket">
+              Bracket
+            </h2>
+            <TournamentBracket view={view} />
+          </div>
+        ) : null}
+
+        <ParticipantsSection participants={participants} />
+
+        <div className="results-fullwidth">
+          <h2 className="section__subtitle" id="decklists">
+            Top decks
+          </h2>
+          <EmptyState message="Decklists are published once the tournament finishes - decks stay hidden while rounds are still being played." />
         </div>
       </Wrap>
     </main>
@@ -406,11 +558,13 @@ function UpcomingEventPage({
   event,
   registeredDeck,
   paymentStatus,
+  participants,
   saveAction,
 }: {
   event: TournamentEvent;
   registeredDeck: { name: string; main: number; extra: number; side: number } | undefined;
   paymentStatus: "pending" | "confirmed" | "contested" | "not_required" | null;
+  participants: PublicParticipant[];
   saveAction: ReactNode;
 }) {
   const left = seatsLeft(event);
@@ -421,10 +575,13 @@ function UpcomingEventPage({
       <Wrap>
         <PageHeading tab="Tournament" title={event.name} action={saveAction} />
         <EventBanner event={event} />
-        <EventDescription event={event} />
 
         <div className="signup">
           <div className="signup__main">
+            <EventDescription event={event} />
+          </div>
+
+          <aside className="signup__side">
             {registeredDeck ? (
               <Notice variant="done">
                 <Tab>Registered</Tab>
@@ -459,12 +616,12 @@ function UpcomingEventPage({
                 )}
               </Notice>
             )}
-          </div>
 
-          <aside className="signup__side">
             <EventFacts event={event} past={false} />
           </aside>
         </div>
+
+        <ParticipantsSection participants={participants} />
       </Wrap>
     </main>
   );
@@ -506,6 +663,20 @@ export default async function EventDetailPage({
   const finished = isFinished(event);
   const past = isPast(event, new Date());
 
+  // Round transitions are driven by persisted deadlines, not by anyone's open
+  // tab - but settling them on a visit keeps a locked round from lingering
+  // past its cleanup window between cron sweeps. Best-effort: the page must
+  // render either way.
+  if (event.status === "running") await closeOverdueMatches(slug).catch(() => null);
+
+  const view = past || finished ? await getBracketView(slug) : null;
+  const participants = await listPublicParticipants(
+    slug,
+    view ? eliminatedRegistrationIds(view) : undefined,
+  );
+  const disqualified =
+    participants.find((p) => p.id === myRegistrationId && p.status === "disqualified") ?? null;
+
   const myMatch = !finished && myRegistrationId ? await getMyCurrentMatch(slug, myRegistrationId) : null;
   const myHistory = myRegistrationId && (finished || past) ? await getMyMatchHistory(slug, myRegistrationId) : [];
 
@@ -519,6 +690,8 @@ export default async function EventDetailPage({
           registeredDeckName={registeredDeck?.name ?? null}
           myPlacing={placings.get(slug)}
           myHistory={myHistory}
+          participants={participants}
+          view={view}
           saveAction={saveAction}
         />
       ) : past ? (
@@ -527,6 +700,9 @@ export default async function EventDetailPage({
           registeredDeck={registeredDeck}
           myMatch={myMatch}
           myHistory={myHistory}
+          participants={participants}
+          view={view}
+          disqualified={disqualified}
           saveAction={saveAction}
         />
       ) : (
@@ -534,6 +710,7 @@ export default async function EventDetailPage({
           event={event}
           registeredDeck={registeredDeck}
           paymentStatus={signup?.paymentStatus ?? null}
+          participants={participants}
           saveAction={saveAction}
         />
       )}

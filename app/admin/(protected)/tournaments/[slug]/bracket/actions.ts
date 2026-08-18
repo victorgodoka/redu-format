@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { recordAction } from "@/lib/audit-log";
 import { getAdminSession } from "@/lib/auth/session";
 import {
+  closeOverdueMatches,
   completeBracket,
   enterMatchResult,
   extendCurrentRoundDeadline,
@@ -101,7 +102,13 @@ export async function nextRoundAction(form: FormData) {
   if (!slug) return;
 
   try {
-    await generateNextRound(slug);
+    // A round locked by its own deadline may still hold matches nobody
+    // reported - settle those first (exactly as the cron would) so starting
+    // the next round by hand behaves the same as letting it start itself.
+    // If that sweep already paired the next round (the cleanup window had
+    // run out), pairing again here would skip a round entirely.
+    const { advanced } = await closeOverdueMatches(slug);
+    if (!advanced) await generateNextRound(slug);
   } catch {
     return;
   }

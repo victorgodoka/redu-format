@@ -33,6 +33,9 @@ const swissDraft = {
   topCut: 2,
   matchFormat: "Bo1" as const,
   roundLimitDays: 2,
+  durationMode: "same_day" as const,
+  roundMinutes: 50,
+  cleanupMinutes: 10,
   engine: "dueling-nexus",
   seats: 32,
   entry: { type: "free" as const },
@@ -221,7 +224,7 @@ test("closeOverdueMatches force-resolves a match past its round deadline, honori
   await submitMatchReport(tournament.slug, reportedMatch.id, reportedMatch.player2!.registrationId, "loss");
 
   // Not overdue yet - the deadline job should leave everything untouched.
-  assert.deepEqual(await closeOverdueMatches(tournament.slug), { resolved: 0 });
+  assert.deepEqual(await closeOverdueMatches(tournament.slug), { resolved: 0, advanced: false });
 
   // Push both matches' clocks back past the 2-day round limit.
   const pool = getPool();

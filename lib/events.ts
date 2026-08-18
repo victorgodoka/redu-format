@@ -20,6 +20,33 @@ export const ENGINES: Record<Engine, { label: string }> = {
 export type EntryFee = { type: "free" } | { type: "paid"; amount: number; currency: string };
 
 /**
+ * How long a tournament is meant to span, which is what decides how a round
+ * ends and whether the next one starts on its own:
+ *
+ * - `same_day` (the default): fixed `roundMinutes` timer per round, the round
+ *   locks when it expires, and the next round starts by itself once the
+ *   moderator cleanup window (`cleanupMinutes`) is over.
+ * - `long`: days can pass between rounds. The round locks when everyone has
+ *   reported or `roundLimitDays` runs out, and then simply waits - only a
+ *   moderator ever starts the next one.
+ */
+export type DurationMode = "same_day" | "long";
+
+export const DURATION_MODES: Record<DurationMode, { label: string; hint: string }> = {
+  same_day: {
+    label: "Standard (same day)",
+    hint: "Fixed round timer, next round starts automatically after the cleanup window.",
+  },
+  long: {
+    label: "Long duration (multi-day)",
+    hint: "Rounds can be days apart. A moderator starts every round by hand.",
+  },
+};
+
+export const DEFAULT_ROUND_MINUTES = 50;
+export const DEFAULT_CLEANUP_MINUTES = 10;
+
+/**
  * Explicit lifecycle state - the source of truth for what a tournament is
  * doing right now. `scheduled` -> `running` -> `finished` is the normal path
  * (via startBracket()/completeBracket()); `cancelled` can happen from either
@@ -59,6 +86,12 @@ export type TournamentEvent = {
    * clock. Players coordinate and duel at their own pace within that window.
    */
   roundLimitDays: number;
+  /** Standard same-day (default) or long-duration. See DurationMode. */
+  durationMode: DurationMode;
+  /** Same-day only: minutes a round stays open before it locks. */
+  roundMinutes: number;
+  /** Same-day only: moderator grace period between a round locking and the next one starting automatically. */
+  cleanupMinutes: number;
   engine: Engine;
   /** null means uncapped registration. */
   seats: number | null;

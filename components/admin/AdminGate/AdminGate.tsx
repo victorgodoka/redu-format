@@ -8,7 +8,7 @@ import styles from "./AdminGate.module.css";
  * on hover/viewport, which would hit `/admin/login` (and its OAuth redirect)
  * before the user actually clicks.
  */
-export default function AdminGate() {
+export default function AdminGate({ next }: { next?: string }) {
   return (
     <main className={styles.gate} id="main">
       <p className={styles.mark}>REDU Format</p>
@@ -19,7 +19,10 @@ export default function AdminGate() {
           Tournament administration is restricted to REDU Format moderators.
           Sign in with the Discord account that holds that role.
         </p>
-        <a className="btn btn--solid" href="/admin/login">
+        <a
+          className="btn btn--solid"
+          href={next ? `/admin/login?next=${encodeURIComponent(next)}` : "/admin/login"}
+        >
           Continue with Discord
         </a>
       </Panel>
