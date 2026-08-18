@@ -1,7 +1,7 @@
 import type { Pool, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import type { DeckSnapshot } from "../../deck-diff.ts";
 import type { Participant, PaymentStatus } from "../services/tournament.service.ts";
-import { fromMysqlDatetime, toMysqlDatetime } from "../db/datetime.ts";
+import { fromMysqlDatetime, toMysqlDatetime, toMysqlDatetimeMs } from "../db/datetime.ts";
 
 type RegistrationRow = RowDataPacket & {
   id: string;
@@ -304,7 +304,7 @@ export class RegistrationsRepository {
     }
     if (filter.checkedBefore) {
       conditions.push("(r.deck_checked_at IS NULL OR r.deck_checked_at < ?)");
-      params.push(toMysqlDatetime(filter.checkedBefore.toISOString()));
+      params.push(toMysqlDatetimeMs(filter.checkedBefore.toISOString()));
     }
 
     const [rows] = await this.pool.query<RowDataPacket[]>(
@@ -353,7 +353,7 @@ export class RegistrationsRepository {
   async lockDeck(registrationId: string, snapshot: DeckSnapshot): Promise<void> {
     await this.pool.query(
       "UPDATE registrations SET deck_locked_snapshot = ?, deck_checked_at = ? WHERE id = ?",
-      [JSON.stringify(snapshot), toMysqlDatetime(new Date().toISOString()), registrationId],
+      [JSON.stringify(snapshot), toMysqlDatetimeMs(new Date().toISOString()), registrationId],
     );
   }
 
@@ -361,7 +361,7 @@ export class RegistrationsRepository {
   async touchDeckChecked(registrationIds: string[]): Promise<void> {
     if (registrationIds.length === 0) return;
     await this.pool.query("UPDATE registrations SET deck_checked_at = ? WHERE id IN (?)", [
-      toMysqlDatetime(new Date().toISOString()),
+      toMysqlDatetimeMs(new Date().toISOString()),
       registrationIds,
     ]);
   }

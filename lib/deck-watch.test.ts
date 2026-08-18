@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { getPool } from "./backend/db/client.ts";
 import { RegistrationsRepository } from "./backend/repositories/registrations.repository.ts";
+import { parseSnapshot } from "./deck-diff.ts";
 import { registerSignup } from "./backend/services/registration.service.ts";
 import { resolvePlayerId } from "./backend/services/player.service.ts";
 import { createTournament, listPublicParticipants } from "./tournaments.ts";
@@ -79,7 +80,8 @@ test("a player in two running tournaments is watched in both, each with its own 
   await repo().lockDeck(watched[0].registrationId, deck);
   const relocked = await repo().listWatchedDecks({ playerId, statuses: ["running"] });
   const locked = relocked.find((w) => w.registrationId === watched[0].registrationId)!;
-  assert.deepEqual(locked.lockedSnapshot, deck);
+  // The column comes back as raw JSON, exactly as the enforcement path reads it.
+  assert.deepEqual(parseSnapshot(locked.lockedSnapshot), deck);
 });
 
 test("a registration checked in the last 30 minutes is skipped, an older one is due again", async () => {
@@ -98,7 +100,8 @@ test("a registration checked in the last 30 minutes is skipped, an older one is 
   );
 
   assert.equal(
-    (await repo().listWatchedDecks({ playerId, statuses: ["running"], checkedBefore: new Date() })).length,
+    (await repo().listWatchedDecks({ playerId, statuses: ["running"], checkedBefore: new Date(Date.now() + 60_000) }))
+      .length,
     1,
     "once the interval is up it is due again",
   );
