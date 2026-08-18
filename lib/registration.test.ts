@@ -292,3 +292,49 @@ test("unsave removes exactly that tournament", async () => {
 
   assert.deepEqual(await listSavedSlugsForPlayer(playerId), [b.slug]);
 });
+
+test("registerSignup freezes the deck list it was given, as the baseline drift checks compare against", async () => {
+  const tournament = await createTournament(draft);
+  const playerId = await player("Snapshot1");
+  const deckSnapshot = { main: [53129443, 53129443], extra: [], side: [12580477] };
+
+  await registerSignup(tournament.slug, {
+    playerId,
+    nexusIdentityKey: "snapshot-identity-key",
+    displayName: "Snapshot1",
+    deckId: "deck-snapshot",
+    deckName: "Frozen",
+    deckSnapshot,
+    entry: tournament.entry,
+  });
+
+  const [rows] = await getPool().query<RowDataPacket[]>(
+    "SELECT deck_snapshot FROM registrations WHERE player_id = ?",
+    [playerId],
+  );
+  const stored = rows[0].deck_snapshot;
+  assert.deepEqual(typeof stored === "string" ? JSON.parse(stored) : stored, deckSnapshot);
+});
+
+test("a signup with no readable deck list stores no baseline rather than an empty one", async () => {
+  const tournament = await createTournament(draft);
+  const playerId = await player("Snapshot2");
+
+  await registerSignup(tournament.slug, {
+    playerId,
+    nexusIdentityKey: "snapshot-identity-key-2",
+    displayName: "Snapshot2",
+    deckId: "deck-no-snapshot",
+    deckName: "Unfrozen",
+    // @ts-expect-error - deliberately omitted: an older caller, or one that
+    // could not read the list back off Nexus.
+    deckSnapshot: undefined,
+    entry: tournament.entry,
+  });
+
+  const [rows] = await getPool().query<RowDataPacket[]>(
+    "SELECT deck_snapshot FROM registrations WHERE player_id = ?",
+    [playerId],
+  );
+  assert.equal(rows[0].deck_snapshot, null);
+});

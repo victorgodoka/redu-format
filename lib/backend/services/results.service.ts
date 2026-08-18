@@ -10,6 +10,7 @@ import { TournamentBracketsRepository } from "../repositories/tournament-bracket
 import { TournamentsRepository } from "../repositories/tournaments.repository.ts";
 import { RegistrationsRepository } from "../repositories/registrations.repository.ts";
 import { generateNexusRoomHash } from "./nexus-room.ts";
+import { sweepTournamentDecks } from "./deck-watch.service.ts";
 
 /** Winning a top cut (stage two) match is worth this many extra leaderboard points, on top of the normal match score. */
 const TOP_CUT_MATCH_BONUS = 5;
@@ -411,6 +412,10 @@ export async function startBracket(slug: string, event: TournamentEvent): Promis
   // staff can (and did) start a bracket ahead of the advertised time. This is
   // what the public site checks to stop calling it "upcoming".
   await tournaments.markStarted(tournamentId, new Date().toISOString());
+  // Decks are frozen from here on, so this is the first point a change is worth
+  // reporting. Awaited rather than fired and forgotten: a floating promise does
+  // not reliably survive the end of a serverless request.
+  await sweepTournamentDecks(slug);
 }
 
 export async function generateNextRound(slug: string): Promise<void> {
@@ -422,6 +427,7 @@ export async function generateNextRound(slug: string): Promise<void> {
   engine.nextRound();
   await persistEngine(tournamentId, engine);
   await syncMatchDeadlines(tournamentId, engine);
+  await sweepTournamentDecks(slug);
 }
 
 /**

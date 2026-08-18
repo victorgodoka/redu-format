@@ -3,6 +3,8 @@ import SkipLink from "@/components/ui/SkipLink";
 import Wrap from "@/components/ui/Wrap";
 import { fetchProfile, getSession } from "@/lib/auth";
 import { FEATURED_EVENT } from "@/lib/events";
+import { countUnread, playerReader } from "@/lib/backend/services/notifications.service";
+import { findPlayerIdByToken } from "@/lib/backend/services/player.service";
 import { DEFAULT_AVATAR } from "@/lib/nexus-parse";
 import AccountChip from "./AccountChip";
 import styles from "./SiteHeader.module.css";
@@ -26,6 +28,11 @@ export default async function SiteHeader() {
    * for when the upstream call fails.
    */
   const profile = session.token ? await fetchProfile(session.token) : null;
+
+  // No player row yet (a session from before they ever registered) simply
+  // means nothing has been addressed to them.
+  const playerId = session.token ? await findPlayerIdByToken(session.token) : null;
+  const unread = playerId ? await countUnread(playerReader(playerId)) : 0;
 
   const account = session.name
     ? {
@@ -59,6 +66,7 @@ export default async function SiteHeader() {
                 avatar={account.avatar}
                 fallbackAvatar={DEFAULT_AVATAR}
                 contributor={account.contributor}
+                unread={unread}
               />
             ) : (
               <Link className={`${styles.link} ${styles.linkSignIn}`} href="/login">

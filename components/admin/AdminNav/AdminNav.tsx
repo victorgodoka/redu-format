@@ -5,18 +5,37 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import styles from "./AdminNav.module.css";
 
+function EnvelopeIcon() {
+  return (
+    <svg viewBox="0 0 16 12" width="14" height="11" aria-hidden="true" focusable="false">
+      <path
+        d="M1 1h14v10H1z"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinejoin="round"
+      />
+      <path d="M1 1l7 5.5L15 1" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 const LINKS = [
   { href: "/admin/dashboard", label: "Dashboard" },
   { href: "/admin/tournaments", label: "Tournaments" },
+  { href: "/admin/inbox", label: "Inbox" },
   { href: "/admin/logs", label: "Logs" },
 ];
 
 export default function AdminNav({
   displayName,
   username,
+  unread,
 }: {
   displayName: string;
   username: string;
+  /** Unread alerts for this admin - drives the envelope beside the Inbox link. */
+  unread: number;
 }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
@@ -49,6 +68,13 @@ export default function AdminNav({
                 onClick={() => setOpen(false)}
               >
                 {label}
+                {href === "/admin/inbox" && unread > 0 ? (
+                  <span className={styles.alerts}>
+                    <EnvelopeIcon />
+                    <span className={styles.alertsCount}>{unread > 99 ? "99+" : unread}</span>
+                    <span className={styles.srOnly}>unread alerts</span>
+                  </span>
+                ) : null}
               </Link>
             );
           })}

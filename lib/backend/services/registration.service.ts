@@ -1,3 +1,4 @@
+import type { DeckSnapshot } from "../../deck-diff.ts";
 import type { EntryFee } from "../../events.ts";
 import { isHttpUrl } from "../../safe-url.ts";
 import { getPool } from "../db/client.ts";
@@ -34,6 +35,8 @@ export async function registerSignup(
     displayName: string;
     deckId: string;
     deckName: string;
+    /** The card lists Nexus served for this deck when it passed validation - the baseline every later drift check compares against. */
+    deckSnapshot: DeckSnapshot;
     entry: EntryFee;
   },
 ): Promise<void> {
@@ -43,6 +46,7 @@ export async function registerSignup(
     displayName: input.displayName,
     deckId: input.deckId,
     deckName: input.deckName,
+    deckSnapshot: input.deckSnapshot,
     initialPaymentStatus: initialPaymentStatus(input.entry),
   });
 }

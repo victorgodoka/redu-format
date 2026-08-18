@@ -1687,7 +1687,7 @@ input[type="number"]::-webkit-inner-spin-button {
   }
 }
 
-input:read-only {
+input:not([type=“file”]):read-only{
   opacity: .355;
   cursor: not-allowed;
   pointer-events: none;

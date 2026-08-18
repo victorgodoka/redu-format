@@ -123,3 +123,35 @@
     border-top: 1px solid var(--c-line-soft);
   }
 }
+
+/* Unread alerts sit on the Inbox link itself rather than in a separate spot,
+   so the rail keeps one row per destination. */
+.link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.alerts {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-inline-start: auto;
+  color: var(--c-danger);
+}
+
+.alertsCount {
+  font-family: var(--f-mono);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.08em;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

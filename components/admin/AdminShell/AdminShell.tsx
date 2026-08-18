@@ -5,17 +5,19 @@ import styles from "./AdminShell.module.css";
 export default function AdminShell({
   displayName,
   username,
+  unread,
   children,
 }: {
   displayName: string;
   username: string;
+  unread: number;
   children: ReactNode;
 }) {
   return (
     <div className={styles.shell}>
       <aside className={styles.rail}>
         <p className={styles.brand}>Admin</p>
-        <AdminNav displayName={displayName} username={username} />
+        <AdminNav displayName={displayName} username={username} unread={unread} />
       </aside>
 
       <main className={styles.main} id="main">

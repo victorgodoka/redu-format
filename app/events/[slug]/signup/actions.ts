@@ -11,6 +11,7 @@ import {
   submitPaymentProof,
 } from "@/lib/backend/services/registration.service";
 import { findPlayerIdByToken, identityKey, resolvePlayerId } from "@/lib/backend/services/player.service";
+import { toSnapshot } from "@/lib/deck-diff";
 import { describeError, validateDeck } from "@/lib/validateDecks";
 
 export type SignupState = { error?: string };
@@ -72,6 +73,9 @@ export async function register(
     displayName: profile.name,
     deckId: deck.id,
     deckName: deck.name,
+    // Stored on the successful validation, not before it: an unregistered deck
+    // has no baseline to drift from.
+    deckSnapshot: toSnapshot(list),
     entry: event.entry,
   });
 

@@ -1,0 +1,119 @@
+.detail {
+  margin: 24px 0 0;
+  display: grid;
+  gap: 24px;
+}
+
+.head {
+  font-size: 16px;
+}
+
+.id {
+  font-family: var(--f-mono);
+  font-size: 11px;
+  color: var(--c-muted);
+  word-break: break-all;
+}
+
+/* --- diff table --- */
+
+.diff {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  /* Card names are long; let the table scroll rather than the page. */
+  display: block;
+  overflow-x: auto;
+}
+
+.caption {
+  margin-bottom: 10px;
+  color: var(--c-muted);
+  font-family: var(--f-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  text-align: left;
+}
+
+.diff th {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--c-line);
+  color: var(--c-muted);
+  font-family: var(--f-mono);
+  font-size: 10px;
+  font-weight: 400;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.diff td {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--c-line-soft);
+  white-space: nowrap;
+}
+
+/* The left edge carries the meaning, so the change is readable without relying
+   on colour alone - the Registered/Now columns state it in numbers too. */
+.row[data-change="removed"] td:first-child {
+  box-shadow: inset 3px 0 0 var(--c-danger);
+}
+
+.row[data-change="added"] td:first-child {
+  box-shadow: inset 3px 0 0 var(--c-accent);
+}
+
+.row[data-change="changed"] td:first-child {
+  box-shadow: inset 3px 0 0 var(--c-muted);
+}
+
+.count {
+  font-family: var(--f-mono);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+/* --- registered deck --- */
+
+.registered {
+  display: grid;
+  gap: 20px;
+}
+
+.sectionHead {
+  margin: 0 0 8px;
+  font-family: var(--f-mono);
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--c-muted);
+}
+
+.sectionCount {
+  color: var(--c-accent);
+}
+
+.cards {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 2px;
+  font-size: 13px;
+}
+
+.cards li {
+  display: grid;
+  grid-template-columns: 32px 1fr auto;
+  gap: 10px;
+  padding: 5px 10px;
+  background: var(--c-panel);
+}
+
+.copies {
+  font-family: var(--f-mono);
+  color: var(--c-accent);
+}

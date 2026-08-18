@@ -1,0 +1,146 @@
+.inbox {
+  display: grid;
+  grid-template-columns: minmax(260px, 340px) 1fr;
+  gap: 20px;
+  align-items: start;
+  margin: 24px 0 0;
+}
+
+@media (max-width: 900px) {
+  .inbox {
+    grid-template-columns: 1fr;
+  }
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--c-line);
+  background: var(--c-raise);
+  /* The list scrolls on its own so a long inbox never pushes the open message
+     off the bottom of the page. */
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+.item {
+  display: grid;
+  grid-template-columns: 8px 1fr auto;
+  grid-template-areas:
+    "dot title meta"
+    ". preview preview";
+  gap: 4px 10px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--c-line-soft);
+  color: var(--c-muted);
+}
+
+.item:hover {
+  background: var(--c-panel);
+}
+
+.item[data-open] {
+  background: var(--c-panel);
+  box-shadow: inset 3px 0 0 var(--c-accent);
+}
+
+.dot {
+  grid-area: dot;
+  align-self: center;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: transparent;
+}
+
+.item[data-unread] .dot {
+  background: var(--c-danger);
+}
+
+.itemTitle {
+  grid-area: title;
+  color: var(--c-muted);
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+.item[data-unread] .itemTitle {
+  color: var(--c-text);
+  font-weight: 600;
+}
+
+.itemMeta {
+  grid-area: meta;
+  font-family: var(--f-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.itemPreview {
+  grid-area: preview;
+  font-size: 12px;
+  line-height: 1.5;
+  /* Two lines of the body, same as a mail client preview. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.empty {
+  padding: 20px 16px;
+  color: var(--c-muted);
+  font-size: 14px;
+}
+
+.reader {
+  min-height: 320px;
+  padding: 24px;
+  border: 1px solid var(--c-line);
+  background: var(--c-raise);
+  clip-path: var(--chamfer);
+}
+
+.readerHead {
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--c-line);
+}
+
+.readerTitle {
+  font-size: clamp(20px, 2.4vw, 28px);
+}
+
+.readerMeta {
+  margin-top: 8px;
+  color: var(--c-muted);
+  font-family: var(--f-mono);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.readerBody {
+  margin: 20px 0 0;
+  /* Bodies are written as plain text with newlines, not markup. */
+  white-space: pre-wrap;
+  font-size: 15px;
+  line-height: 1.65;
+}
+
+.placeholder {
+  color: var(--c-muted);
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

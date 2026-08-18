@@ -47,3 +47,40 @@
   letter-spacing: 0.16em;
   text-transform: uppercase;
 }
+
+/* The chip and the alert count are siblings so each is its own link - the
+   count has to be reachable on its own, and a link inside a link is invalid. */
+.chip {
+  position: relative;
+  display: inline-flex;
+}
+
+.alerts {
+  position: absolute;
+  top: -4px;
+  left: 22px;
+  min-width: 18px;
+  padding: 0 4px;
+  border: 2px solid var(--c-bg);
+  border-radius: 999px;
+  background: var(--c-danger);
+  color: #fff;
+  font-family: var(--f-mono);
+  font-size: 10px;
+  line-height: 16px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.alerts:hover {
+  background: color-mix(in srgb, var(--c-danger) 80%, #fff);
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

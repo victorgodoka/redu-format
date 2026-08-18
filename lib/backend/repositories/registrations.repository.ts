@@ -1,4 +1,5 @@
 import type { Pool, ResultSetHeader, RowDataPacket } from "mysql2/promise";
+import type { DeckSnapshot } from "../../deck-diff.ts";
 import type { Participant, PaymentStatus } from "../services/tournament.service.ts";
 import { fromMysqlDatetime, toMysqlDatetime } from "../db/datetime.ts";
 
@@ -32,6 +33,26 @@ export type PublicSignup = {
   deckName: string;
   paymentStatus: PaymentStatus;
   proofUrl: string | null;
+};
+
+/** A signup with a deck baseline the drift check can re-read from Dueling Nexus. */
+export type WatchedDeck = {
+  registrationId: string;
+  playerId: string;
+  deckId: string;
+  deckName: string;
+  /** Raw deck_snapshot column - parse with parseSnapshot() from lib/deck-diff.ts. */
+  deckSnapshot: unknown;
+  /** Never carries a token: alerts built from this go out to every admin. */
+  player: { id: string; name: string; avatar: string | null; contributor: boolean };
+  tournament: {
+    slug: string;
+    name: string;
+    startsAt: string;
+    structure: string;
+    matchFormat: string;
+    status: string;
+  };
 };
 
 export class RegistrationsRepository {
@@ -168,16 +189,19 @@ export class RegistrationsRepository {
       displayName: string;
       deckId: string;
       deckName: string;
+      /** Card lists as Nexus served them at signup, the baseline later checks diff against. */
+      deckSnapshot: DeckSnapshot;
       initialPaymentStatus: PaymentStatus;
     },
   ): Promise<void> {
     await this.pool.query(
       `INSERT INTO registrations
-        (id, tournament_id, player_id, nexus_identity_key_snapshot, source, display_name, deck_name, deck_id, payment_status)
-       SELECT ?, id, ?, ?, 'public_signup', ?, ?, ?, ? FROM tournaments WHERE slug = ?
+        (id, tournament_id, player_id, nexus_identity_key_snapshot, source, display_name, deck_name, deck_id, deck_snapshot, payment_status)
+       SELECT ?, id, ?, ?, 'public_signup', ?, ?, ?, ?, ? FROM tournaments WHERE slug = ?
        ON DUPLICATE KEY UPDATE
         nexus_identity_key_snapshot = VALUES(nexus_identity_key_snapshot),
-        display_name = VALUES(display_name), deck_name = VALUES(deck_name), deck_id = VALUES(deck_id)`,
+        display_name = VALUES(display_name), deck_name = VALUES(deck_name), deck_id = VALUES(deck_id),
+        deck_snapshot = VALUES(deck_snapshot)`,
       [
         id,
         input.playerId,
@@ -185,6 +209,9 @@ export class RegistrationsRepository {
         input.displayName,
         input.deckName,
         input.deckId,
+        // Explicitly null rather than an undefined bind when there is no list to
+        // freeze - the drift check skips a registration with no baseline.
+        input.deckSnapshot ? JSON.stringify(input.deckSnapshot) : null,
         input.initialPaymentStatus,
         slug,
       ],
@@ -227,5 +254,61 @@ export class RegistrationsRepository {
       [slug, playerId],
     );
     return result.affectedRows > 0;
+  }
+
+  // --- Deck drift watch (Fase 6) ---
+
+  /**
+   * Every public signup that can still be checked against Dueling Nexus: it
+   * has a deck id and a snapshot of what that deck held when it was accepted,
+   * and the player hasn't dropped. Admin-manual rows and signups made before
+   * snapshots existed carry no baseline, so there is nothing to compare them
+   * against and they're filtered out here rather than guessed at downstream.
+   */
+  async listWatchedDecks(filter: { slug?: string; playerId?: string }): Promise<WatchedDeck[]> {
+    const conditions = ["r.source = 'public_signup'", "r.dropped_at IS NULL", "r.deck_id IS NOT NULL", "r.deck_snapshot IS NOT NULL"];
+    const params: string[] = [];
+
+    if (filter.slug) {
+      conditions.push("t.slug = ?");
+      params.push(filter.slug);
+    }
+    if (filter.playerId) {
+      conditions.push("r.player_id = ?");
+      params.push(filter.playerId);
+    }
+
+    const [rows] = await this.pool.query<RowDataPacket[]>(
+      `SELECT r.id, r.player_id, r.display_name, r.deck_id, r.deck_name, r.deck_snapshot,
+              t.slug, t.name AS tournament_name, t.starts_at, t.structure, t.match_format, t.status,
+              p.nexus_name, p.avatar_url, p.contributor
+       FROM registrations r
+       JOIN tournaments t ON t.id = r.tournament_id
+       LEFT JOIN players p ON p.id = r.player_id
+       WHERE ${conditions.join(" AND ")}`,
+      params,
+    );
+
+    return rows.map((row) => ({
+      registrationId: row.id,
+      playerId: row.player_id,
+      deckId: row.deck_id,
+      deckName: row.deck_name,
+      deckSnapshot: row.deck_snapshot,
+      player: {
+        id: row.player_id,
+        name: row.nexus_name ?? row.display_name,
+        avatar: row.avatar_url,
+        contributor: Boolean(row.contributor),
+      },
+      tournament: {
+        slug: row.slug,
+        name: row.tournament_name,
+        startsAt: fromMysqlDatetime(row.starts_at),
+        structure: row.structure,
+        matchFormat: row.match_format,
+        status: row.status,
+      },
+    }));
   }
 }
