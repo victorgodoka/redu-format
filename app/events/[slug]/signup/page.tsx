@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import DeckPicker from "@/components/site/DeckPicker";
+import EventBanner from "@/components/site/EventBanner";
 import Footer from "@/components/site/Footer";
 import SiteHeader from "@/components/site/SiteHeader";
 import Button from "@/components/ui/Button";
@@ -70,6 +71,7 @@ export default async function SignupPage({
       <main className="section" id="main">
         <Wrap>
           <PageHeading tab="Sign up" title={event.name} />
+          <EventBanner event={event} />
 
           <div className="signup">
             <div className="signup__main">
@@ -236,12 +238,14 @@ export default async function SignupPage({
                 rows={[
                   { label: "Starts", value: `${formatDate(event.startsAt)}, ${formatTime(event.startsAt)}` },
                   { label: "Structure", value: STRUCTURES[event.structure].label },
-                  {
-                    label: "Rounds",
-                    value: `${event.rounds} · ${event.matchFormat} · ${event.roundLimitDays}-day round deadline${
-                      event.topCut ? ` · Top ${event.topCut}` : ""
-                    }`,
-                  },
+                  event.structure === "double-elim"
+                    ? { label: "Format", value: `${event.matchFormat} · ${event.roundLimitDays}-day deadline` }
+                    : {
+                        label: "Rounds",
+                        value: `${event.rounds} · ${event.matchFormat} · ${event.roundLimitDays}-day round deadline${
+                          event.topCut ? ` · Top ${event.topCut}` : ""
+                        }`,
+                      },
                   {
                     label: "Seats",
                     value:

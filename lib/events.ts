@@ -31,6 +31,15 @@ export type TournamentStatus = "scheduled" | "running" | "finished" | "cancelled
 export type TournamentEvent = {
   slug: string;
   name: string;
+  /**
+   * Optional rich-text blurb shown on the tournament page, parsed by
+   * lib/rich-text.ts (never raw HTML) - supports **bold**, *italic*, and
+   * blank lines as paragraph breaks. Optional so existing fixtures/rows
+   * from before this field existed still satisfy the type.
+   */
+  description?: string | null;
+  /** Optional banner image URL shown at the top of the tournament page. Same optionality reasoning as description. */
+  bannerUrl?: string | null;
   /** ISO instant. Rendered in UTC so server and client never disagree. */
   startsAt: string;
   structure: Structure;

@@ -4,6 +4,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import AdminList, { AdminRow } from "@/components/admin/AdminList";
 import Bracket from "@/components/site/Bracket";
+import EventBanner from "@/components/site/EventBanner";
+import EventDescription from "@/components/site/EventDescription";
 import Footer from "@/components/site/Footer";
 import SiteHeader from "@/components/site/SiteHeader";
 import StandingsTable from "@/components/site/StandingsTable";
@@ -104,10 +106,12 @@ function EventFacts({ event, past }: { event: TournamentEvent; past: boolean }) 
       rows={[
         { label: "Starts", value: `${formatDate(event.startsAt)}, ${formatTime(event.startsAt)}` },
         { label: "Structure", value: STRUCTURES[event.structure].label },
-        {
-          label: "Rounds",
-          value: `${event.rounds} · ${event.matchFormat} · ${event.roundLimitDays}-day round deadline${event.topCut ? ` · Top ${event.topCut}` : ""}`,
-        },
+        event.structure === "double-elim"
+          ? { label: "Format", value: `${event.matchFormat} · ${event.roundLimitDays}-day deadline` }
+          : {
+              label: "Rounds",
+              value: `${event.rounds} · ${event.matchFormat} · ${event.roundLimitDays}-day round deadline${event.topCut ? ` · Top ${event.topCut}` : ""}`,
+            },
         {
           label: "Seats",
           value:
@@ -247,6 +251,8 @@ async function FeaturedEventPage({
     <main className="section" id="main">
       <Wrap>
         <PageHeading tab="Results" title={event.name} action={saveAction} />
+        <EventBanner event={event} />
+        <EventDescription event={event} />
 
         <div className="signup">
           <div className="signup__main">
@@ -313,6 +319,8 @@ function OngoingEventPage({
     <main className="section" id="main">
       <Wrap>
         <PageHeading tab="Tournament" title={event.name} action={saveAction} />
+        <EventBanner event={event} />
+        <EventDescription event={event} />
 
         <div className="signup">
           <div className="signup__main">
@@ -412,6 +420,8 @@ function UpcomingEventPage({
     <main className="section" id="main">
       <Wrap>
         <PageHeading tab="Tournament" title={event.name} action={saveAction} />
+        <EventBanner event={event} />
+        <EventDescription event={event} />
 
         <div className="signup">
           <div className="signup__main">

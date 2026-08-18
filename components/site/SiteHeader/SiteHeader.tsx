@@ -14,7 +14,6 @@ const nav = [
   { n: "04", label: "Leaderboard", href: "/leaderboard" },
   { n: "05", label: "Banlist", href: "/banlist" },
   { n: "06", label: "Rulings", href: "/rulings" },
-  { n: "07", label: "Format", href: "/#format" },
 ];
 
 export default async function SiteHeader() {
