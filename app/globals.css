@@ -281,14 +281,6 @@ input[type="number"]::-webkit-inner-spin-button {
   text-wrap: pretty;
 }
 
-.prose {
-  display: grid;
-  gap: 20px;
-  max-width: 62ch;
-  color: #c6c4d2;
-  text-wrap: pretty;
-}
-
 /* =========================================================
    4. BLOCKS
    ========================================================= */
@@ -1700,4 +1692,11 @@ input:read-only {
   cursor: not-allowed;
   pointer-events: none;
   outline: none;
+}
+
+.event__description {
+  line-height: 1.2;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
