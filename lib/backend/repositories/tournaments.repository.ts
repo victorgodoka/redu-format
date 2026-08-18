@@ -10,6 +10,8 @@ export type TournamentDraft = Omit<
 type TournamentRow = RowDataPacket & {
   slug: string;
   name: string;
+  description: string | null;
+  banner_url: string | null;
   starts_at: string;
   started_at: string | null;
   finished_at: string | null;
@@ -44,6 +46,8 @@ function rowToTournament(row: TournamentRow): TournamentEvent {
   return {
     slug: row.slug,
     name: row.name,
+    description: row.description,
+    bannerUrl: row.banner_url,
     startsAt: fromMysqlDatetime(row.starts_at),
     startedAt: fromMysqlDatetimeMs(row.started_at),
     finishedAt: fromMysqlDatetimeMs(row.finished_at),
@@ -78,7 +82,7 @@ export class TournamentsRepository {
 
   async findAll(): Promise<TournamentEvent[]> {
     const [rows] = await this.pool.query<TournamentRow[]>(
-      `SELECT t.slug, t.name, t.starts_at, t.started_at, t.finished_at, t.status, t.cancelled_at,
+      `SELECT t.slug, t.name, t.description, t.banner_url, t.starts_at, t.started_at, t.finished_at, t.status, t.cancelled_at,
               t.structure, t.rounds, t.top_cut, t.match_format,
               t.round_limit_days, t.engine, t.seat_cap, t.entry_type, t.entry_amount_minor, t.entry_currency,
               t.host, t.signup_url, ${TAKEN_SUBQUERY}
@@ -91,7 +95,7 @@ export class TournamentsRepository {
 
   async findBySlug(slug: string): Promise<TournamentEvent | null> {
     const [rows] = await this.pool.query<TournamentRow[]>(
-      `SELECT t.slug, t.name, t.starts_at, t.started_at, t.finished_at, t.status, t.cancelled_at,
+      `SELECT t.slug, t.name, t.description, t.banner_url, t.starts_at, t.started_at, t.finished_at, t.status, t.cancelled_at,
               t.structure, t.rounds, t.top_cut, t.match_format,
               t.round_limit_days, t.engine, t.seat_cap, t.entry_type, t.entry_amount_minor, t.entry_currency,
               t.host, t.signup_url, ${TAKEN_SUBQUERY}
@@ -155,12 +159,14 @@ export class TournamentsRepository {
     const [entryType, entryAmountMinor, entryCurrency] = entryColumns(draft.entry);
     await this.pool.query(
       `INSERT INTO tournaments
-        (id, slug, name, starts_at, structure, rounds, top_cut, match_format, round_limit_days, engine, seat_cap, entry_type, entry_amount_minor, entry_currency, host, signup_url)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        (id, slug, name, description, banner_url, starts_at, structure, rounds, top_cut, match_format, round_limit_days, engine, seat_cap, entry_type, entry_amount_minor, entry_currency, host, signup_url)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id,
         slug,
         draft.name,
+        draft.description ?? null,
+        draft.bannerUrl ?? null,
         toMysqlDatetime(draft.startsAt),
         draft.structure,
         draft.rounds,
@@ -182,12 +188,14 @@ export class TournamentsRepository {
     const [entryType, entryAmountMinor, entryCurrency] = entryColumns(draft.entry);
     const [result] = await this.pool.query<ResultSetHeader>(
       `UPDATE tournaments SET
-        name = ?, starts_at = ?, structure = ?, rounds = ?, top_cut = ?, match_format = ?,
+        name = ?, description = ?, banner_url = ?, starts_at = ?, structure = ?, rounds = ?, top_cut = ?, match_format = ?,
         round_limit_days = ?, engine = ?, seat_cap = ?, entry_type = ?, entry_amount_minor = ?,
         entry_currency = ?, host = ?, signup_url = ?
        WHERE slug = ? AND deleted_at IS NULL`,
       [
         draft.name,
+        draft.description ?? null,
+        draft.bannerUrl ?? null,
         toMysqlDatetime(draft.startsAt),
         draft.structure,
         draft.rounds,

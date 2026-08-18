@@ -12,6 +12,7 @@ import {
   type Engine,
   type Structure,
 } from "@/lib/events";
+import { isHttpUrl } from "@/lib/safe-url";
 import {
   cancelTournament,
   createTournament,
@@ -30,6 +31,13 @@ const MATCH_FORMATS = ["Bo1", "Bo3"] as const;
 function readDraft(form: FormData): TournamentDraft | { error: string } {
   const name = String(form.get("name") ?? "").trim();
   if (!name) return { error: "Name is required." };
+
+  const description = String(form.get("description") ?? "").trim() || null;
+
+  const bannerUrl = String(form.get("bannerUrl") ?? "").trim() || null;
+  if (bannerUrl && !isHttpUrl(bannerUrl)) {
+    return { error: "Banner image URL must be a valid http(s) link." };
+  }
 
   const date = String(form.get("startsAtDate") ?? "");
   const time = String(form.get("startsAtTime") ?? "");
@@ -100,6 +108,8 @@ function readDraft(form: FormData): TournamentDraft | { error: string } {
 
   return {
     name,
+    description,
+    bannerUrl,
     startsAt: startsAt.toISOString(),
     structure,
     rounds,

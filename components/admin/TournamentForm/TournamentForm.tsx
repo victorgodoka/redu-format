@@ -7,6 +7,7 @@ import FormGroup from "@/components/ui/FormGroup";
 import Input from "@/components/ui/Input";
 import Label from "@/components/ui/Label";
 import Select from "@/components/ui/Select";
+import Textarea from "@/components/ui/Textarea";
 import {
   ENGINES,
   recommendedTopCut,
@@ -182,6 +183,30 @@ export default function TournamentForm({
 
       <FormField label="Name" htmlFor="name" full>
         <Input id="name" name="name" type="text" defaultValue={tournament?.name} required />
+      </FormField>
+
+      <FormField
+        label="Banner image URL"
+        htmlFor="bannerUrl"
+        full
+        hint="Shown at the top of the tournament page. Leave blank for none."
+      >
+        <Input
+          id="bannerUrl"
+          name="bannerUrl"
+          type="url"
+          defaultValue={tournament?.bannerUrl ?? undefined}
+          placeholder="https://..."
+        />
+      </FormField>
+
+      <FormField
+        label="Description"
+        htmlFor="description"
+        full
+        hint="Optional. **bold** and *italic* are supported; a blank line starts a new paragraph."
+      >
+        <Textarea id="description" name="description" rows={6} defaultValue={tournament?.description ?? undefined} />
       </FormField>
 
       <FormField label="Starts on" htmlFor="startsAtDate">

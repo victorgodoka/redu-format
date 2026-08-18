@@ -56,10 +56,12 @@ function EventCard({
         </h2>
         <p className={styles.meta}>
           <span className={styles.tag}>{STRUCTURES[event.structure].label}</span>
-          <span>{event.rounds} rounds</span>
+          {event.structure === "double-elim" ? null : <span>{event.rounds} rounds</span>}
           {event.topCut ? <span>Top {event.topCut}</span> : null}
           <span>{event.matchFormat}</span>
-          <span>{event.roundLimitDays}-day round deadline</span>
+          <span>
+            {event.roundLimitDays}-day {event.structure === "double-elim" ? "deadline" : "round deadline"}
+          </span>
         </p>
         <p className={styles.host}>
           {event.host} · {formatEntry(event.entry)}
