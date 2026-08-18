@@ -33,6 +33,16 @@ function rowToParticipant(row: RegistrationRow): Participant {
   };
 }
 
+/** A registration as it stands even after it ended badly - what a DQ'd or dropped player has to be shown instead of a blank page. */
+export type SignupRecord = {
+  registrationId: string;
+  deckId: string | null;
+  deckName: string;
+  droppedAt: string | null;
+  disqualifiedAt: string | null;
+  dqReason: string | null;
+};
+
 export type PublicSignup = {
   registrationId: string;
   deckId: string | null;
@@ -159,6 +169,32 @@ export class RegistrationsRepository {
           deckName: row.deck_name,
           paymentStatus: row.payment_status,
           proofUrl: row.proof_url,
+        }
+      : null;
+  }
+
+  /**
+   * Same row as findPublicSignup, but without the "still in" filter: a player
+   * who dropped or was disqualified is exactly who most needs to be told what
+   * happened, and findPublicSignup deliberately hides them.
+   */
+  async findSignupRecord(slug: string, playerId: string): Promise<SignupRecord | null> {
+    const [rows] = await this.pool.query<RowDataPacket[]>(
+      `SELECT r.id, r.deck_id, r.deck_name, r.dropped_at, r.disqualified_at, r.dq_reason FROM registrations r
+       JOIN tournaments t ON t.id = r.tournament_id
+       WHERE t.slug = ? AND r.player_id = ? AND r.source = 'public_signup'
+       LIMIT 1`,
+      [slug, playerId],
+    );
+    const row = rows[0];
+    return row
+      ? {
+          registrationId: row.id,
+          deckId: row.deck_id,
+          deckName: row.deck_name,
+          droppedAt: fromMysqlDatetime(row.dropped_at),
+          disqualifiedAt: fromMysqlDatetime(row.disqualified_at),
+          dqReason: row.dq_reason,
         }
       : null;
   }

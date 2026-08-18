@@ -781,6 +781,16 @@ input[type="number"]::-webkit-inner-spin-button {
   );
 }
 
+/* The dashboard's current-round cards: one per live tournament, side by side
+   on a wide screen and stacked on a narrow one. */
+.dashboard-rounds {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  align-items: start;
+  margin-bottom: clamp(24px, 4vw, 40px);
+}
+
 /* Bracket trees are wider than the column on small screens: they scroll in
    their own box rather than pushing the page sideways. */
 .bracket-scroll {

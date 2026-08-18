@@ -979,6 +979,76 @@ export async function getMyCurrentMatch(slug: string, registrationId: string): P
   };
 }
 
+/**
+ * What this player is doing in the round that's open right now. "match" is
+ * the only state with something to report; the other three exist so a player
+ * is never left staring at an empty page wondering whether the site forgot
+ * about them:
+ *
+ * - `bye` - they drew the odd seat this round: an automatic win, no duel, no
+ *   report.
+ * - `waiting` - they're still in, but have no pairing in this round (their
+ *   duel is settled and the round hasn't turned over yet, or the bracket
+ *   hasn't paired them for the next phase).
+ * - `out` - they dropped, were auto-dropped, or were knocked out.
+ */
+export type MyRoundState = "match" | "bye" | "waiting" | "out";
+
+export type MyRoundView = {
+  state: MyRoundState;
+  round: number;
+  phase: RoundPhase;
+  roundLabel: string;
+  /** Reporting is closed for this round - true for every state, since the lock is a property of the round, not of one player. */
+  locked: boolean;
+  nextRoundAt: string | null;
+  /** Only set for `state: "match"`. */
+  match: MyMatchView | null;
+};
+
+/**
+ * The player's whole current-round picture, for the event page and the
+ * dashboard alike - both render it through components/site/MyRound. Null when
+ * they aren't in this bracket at all (never registered, or the tournament has
+ * no bracket yet).
+ */
+export async function getMyRound(slug: string, registrationId: string): Promise<MyRoundView | null> {
+  const { tournaments, matchDeadlines } = repos();
+  const [tournamentId, event] = await Promise.all([tournaments.findIdBySlug(slug), tournaments.findBySlug(slug)]);
+  if (!tournamentId || !event) return null;
+
+  const engine = await loadEngine(tournamentId);
+  if (!engine) return null;
+
+  const player = engine.getPlayers().find((p) => p.getId() === registrationId);
+  if (!player) return null;
+
+  const round = engine.getRoundNumber();
+  const clock = clockFor(event, engine, await matchDeadlines.getTrackingMap(tournamentId));
+  const base = {
+    round,
+    ...describeRound(engine, round),
+    locked: clock.locked,
+    nextRoundAt: clock.nextRoundAt,
+    match: null,
+  };
+
+  const active = engine
+    .getMatches()
+    .find((m) => m.isActive() && (m.getPlayer1().id === registrationId || m.getPlayer2().id === registrationId));
+  if (active) {
+    return { ...base, state: "match", match: await getMyCurrentMatch(slug, registrationId) };
+  }
+
+  const thisRound = player
+    .getMatches()
+    .map((m) => engine.getMatch(m.id))
+    .filter((m) => m.getRoundNumber() === round);
+  if (thisRound.some((m) => m.isBye())) return { ...base, state: "bye" };
+  if (!player.isActive()) return { ...base, state: "out" };
+  return { ...base, state: "waiting" };
+}
+
 export type MyMatchHistoryEntry = {
   round: number;
   phase: RoundPhase;

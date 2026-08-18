@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import AdminList, { AdminRow } from "@/components/admin/AdminList";
 import StatBar from "@/components/admin/StatBar";
 import DeckList from "@/components/site/DeckList";
+import MyRound from "@/components/site/MyRound";
 import Footer from "@/components/site/Footer";
 import SiteHeader from "@/components/site/SiteHeader";
 import Button from "@/components/ui/Button";
@@ -13,8 +14,12 @@ import Tab from "@/components/ui/Tab";
 import Wrap from "@/components/ui/Wrap";
 import { deckLegality, fetchProfile, getSession } from "@/lib/auth";
 import { findPlayerIdByToken } from "@/lib/backend/services/player.service";
-import { listSavedSlugsForPlayer, listSignupsForPlayer } from "@/lib/backend/services/registration.service";
-import { getPlacingsForPlayer } from "@/lib/backend/services/results.service";
+import {
+  findMyRegistrationId,
+  listSavedSlugsForPlayer,
+  listSignupsForPlayer,
+} from "@/lib/backend/services/registration.service";
+import { closeOverdueMatches, getMyRound, getPlacingsForPlayer } from "@/lib/backend/services/results.service";
 import { Card } from "@/lib/cards";
 import { DEFAULT_AVATAR } from "@/lib/nexus-parse";
 import { formatDate, formatTime, isPast } from "@/lib/events";
@@ -93,6 +98,28 @@ export default async function DashboardPage() {
       (a, b) => new Date(b.event.startsAt).getTime() - new Date(a.event.startsAt).getTime(),
     );
 
+  /**
+   * Reporting has to be reachable from here, not only from the tournament
+   * page: these are the rounds the player actually has open right now, with
+   * the same card (report buttons, bye, waiting, locked) the event page uses.
+   * Each tournament is settled first so a round whose timer already ran out
+   * shows as locked rather than as still open.
+   */
+  const liveRounds = playerId
+    ? (
+        await Promise.all(
+          yourEvents
+            .filter(({ event }) => event.status === "running")
+            .map(async ({ event }) => {
+              await closeOverdueMatches(event.slug).catch(() => null);
+              const registrationId = await findMyRegistrationId(event.slug, playerId);
+              const round = registrationId ? await getMyRound(event.slug, registrationId) : null;
+              return round ? { event, round } : null;
+            }),
+        )
+      ).filter((r) => r !== null)
+    : [];
+
   const savedEvents = savedSlugs
     .map((slug) => allEvents.find((e) => e.slug === slug))
     .filter((e) => e !== undefined)
@@ -163,6 +190,23 @@ export default async function DashboardPage() {
               </>
             }
           />
+
+          {liveRounds.length > 0 ? (
+            <>
+              <h2 className="section__subtitle">Your current rounds</h2>
+              <div className="dashboard-rounds">
+                {liveRounds.map(({ event, round }) => (
+                  <MyRound
+                    key={event.slug}
+                    slug={event.slug}
+                    round={round}
+                    eventName={event.name}
+                    href={`/events/${event.slug}`}
+                  />
+                ))}
+              </div>
+            </>
+          ) : null}
 
           <div className="section__grid">
             <div className="section__content">

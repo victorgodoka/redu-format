@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import AdminList, { AdminRow } from "@/components/admin/AdminList";
 import Bracket from "@/components/site/Bracket";
 import EventBanner from "@/components/site/EventBanner";
+import MyRound from "@/components/site/MyRound";
 import ParticipantsPanel from "@/components/site/ParticipantsPanel";
 import TournamentBracket from "@/components/site/TournamentBracket";
 import EventDescription from "@/components/site/EventDescription";
@@ -22,18 +23,22 @@ import Tab from "@/components/ui/Tab";
 import Wrap from "@/components/ui/Wrap";
 import { fetchProfile, getSession } from "@/lib/auth";
 import { findPlayerIdByToken } from "@/lib/backend/services/player.service";
-import { findMySignup, listSavedSlugsForPlayer } from "@/lib/backend/services/registration.service";
+import {
+  findMySignup,
+  findMySignupRecord,
+  listSavedSlugsForPlayer,
+} from "@/lib/backend/services/registration.service";
 import {
   closeOverdueMatches,
   eliminatedRegistrationIds,
   getBracketView,
-  getMyCurrentMatch,
   getMyMatchHistory,
+  getMyRound,
   getPlacingsForPlayer,
   getPlacingsWithTiebreak,
   type BracketView,
   type MyMatchHistoryEntry,
-  type MyMatchView,
+  type MyRoundView,
 } from "@/lib/backend/services/results.service";
 import {
   FEATURED_EVENT,
@@ -51,7 +56,6 @@ import { TO_DISCORD_URL } from "@/lib/site";
 import { getTournament, listPublicParticipants, type PublicParticipant } from "@/lib/tournaments";
 import { YCS_PROVIDENCE_2012_BRACKET, YCS_PROVIDENCE_2012_DECKS } from "@/lib/ycs-providence-2012";
 import { saveTournamentAction, unsaveTournamentAction } from "../saved-actions";
-import { submitMatchReportAction } from "./report-actions";
 
 export async function generateMetadata({
   params,
@@ -132,35 +136,6 @@ function EventFacts({ event, past }: { event: TournamentEvent; past: boolean }) 
         { label: "Host", value: `${event.host} · ${formatEntry(event.entry)}` },
       ]}
     />
-  );
-}
-
-/**
- * What a player sees instead of the report buttons once the round is locked.
- * Never a disabled button with no explanation: it says the round closed, and
- * where to go if that looks wrong. The backend rejects a late report anyway
- * (see submitMatchReport) - this is the human half of the same rule.
- */
-function RoundLockedNotice({ nextRoundAt }: { nextRoundAt: string | null }) {
-  return (
-    <Notice variant="warn">
-      <Tab>Reporting closed</Tab>
-      <Lede>
-        This round is locked - the round timer ran out, so results can no longer be submitted or
-        changed for it.
-        {nextRoundAt
-          ? ` The next round is scheduled to start ${formatDate(nextRoundAt)} at ${formatTime(nextRoundAt)}.`
-          : " A Tournament Organizer will start the next round."}
-      </Lede>
-      <Lede>
-        Think this is wrong - your duel finished in time, or the result on file is not what
-        happened? Contact a Tournament Organizer in a tournament channel on our Discord and they
-        will sort it out.
-      </Lede>
-      <a className="btn btn--solid" href={TO_DISCORD_URL} target="_blank" rel="noopener noreferrer">
-        Contact a Tournament Organizer
-      </a>
-    </Notice>
   );
 }
 
@@ -396,7 +371,7 @@ async function FeaturedEventPage({
 function OngoingEventPage({
   event,
   registeredDeck,
-  myMatch,
+  myRound,
   myHistory,
   participants,
   view,
@@ -405,12 +380,12 @@ function OngoingEventPage({
 }: {
   event: TournamentEvent;
   registeredDeck: { name: string; main: number; extra: number; side: number } | undefined;
-  myMatch: MyMatchView | null;
+  myRound: MyRoundView | null;
   myHistory: MyMatchHistoryEntry[];
   participants: PublicParticipant[];
   view: BracketView | null;
-  /** This visitor's own DQ, if they have one - the page must say so plainly, not just grey out the controls. */
-  disqualified: PublicParticipant | null;
+  /** This visitor's own disqualification reason, if they have one - the page must say so plainly, not just grey out the controls. */
+  disqualified: string | null;
   saveAction: ReactNode;
 }) {
   return (
@@ -430,8 +405,7 @@ function OngoingEventPage({
                 <Tab>Disqualified</Tab>
                 <h2 className="notice__title">You are out of this tournament</h2>
                 <Lede>
-                  {disqualified.reason ??
-                    "Your deck no longer matches the list locked in when this tournament started."}
+                  {disqualified}
                 </Lede>
                 <Lede>
                   Decks are frozen for the whole event, so this was applied automatically and takes
@@ -448,62 +422,7 @@ function OngoingEventPage({
               </Notice>
             ) : null}
 
-            {myMatch ? (
-              <Notice variant={myMatch.phase === "topCut" ? "done" : undefined}>
-                <Tab>{myMatch.roundLabel} · Your duel</Tab>
-                <h2 className="notice__title">vs {myMatch.opponentName ?? "TBD"}</h2>
-                {myMatch.phase === "topCut" ? (
-                  <Lede>You made Top Cut - this is single elimination from here, no more Swiss cushion.</Lede>
-                ) : null}
-                {myMatch.deadlineAt ? (
-                  <Lede>
-                    Round closes {formatDate(myMatch.deadlineAt)} at {formatTime(myMatch.deadlineAt)}.
-                  </Lede>
-                ) : null}
-                {myMatch.roomHash ? (
-                  <a
-                    className="btn btn--solid"
-                    href={`https://duelingnexus.com/duel/NA-${myMatch.roomHash}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    Open the duel room
-                  </a>
-                ) : null}
-                {myMatch.disputed ? (
-                  <Lede>
-                    You and your opponent reported different results - a staff member will step in to
-                    sort it out.
-                  </Lede>
-                ) : myMatch.myReport ? (
-                  <Lede>
-                    You reported <b>{myMatch.myReport}</b>.{" "}
-                    {myMatch.opponentReported
-                      ? "Reconciling with your opponent's report."
-                      : "Waiting on your opponent to report too."}
-                  </Lede>
-                ) : myMatch.locked ? null : (
-                  <Lede>Report your result once the duel is over.</Lede>
-                )}
-                {myMatch.locked ? null : (
-                  <form action={submitMatchReportAction} className="admin-row__actions">
-                    <input type="hidden" name="slug" value={event.slug} />
-                    <input type="hidden" name="matchId" value={myMatch.matchId} />
-                    <Button variant="solid" type="submit" name="result" value="win">
-                      I won
-                    </Button>
-                    <Button type="submit" name="result" value="loss">
-                      I lost
-                    </Button>
-                    <Button variant="quiet" type="submit" name="result" value="draw">
-                      Draw
-                    </Button>
-                  </form>
-                )}
-              </Notice>
-            ) : null}
-
-            {myMatch?.locked ? <RoundLockedNotice nextRoundAt={myMatch.nextRoundAt} /> : null}
+            {myRound && !disqualified ? <MyRound slug={event.slug} round={myRound} /> : null}
 
             <MatchHistory history={myHistory} />
           </div>
@@ -649,14 +568,17 @@ export default async function EventDetailPage({
 
   const session = await getSession();
   const playerId = session.token ? await findPlayerIdByToken(session.token) : null;
-  const [profile, signup, savedSlugs, placings] = await Promise.all([
+  const [profile, signup, signupRecord, savedSlugs, placings] = await Promise.all([
     session.token ? fetchProfile(session.token) : null,
     playerId ? findMySignup(slug, playerId) : null,
+    // Reads the registration even after a drop or a disqualification, which is
+    // exactly when the player most needs the page to explain itself.
+    playerId ? findMySignupRecord(slug, playerId) : null,
     playerId ? listSavedSlugsForPlayer(playerId) : Promise.resolve<string[]>([]),
     playerId ? getPlacingsForPlayer(playerId) : Promise.resolve(new Map<string, { place: number; points: number }>()),
   ]);
   const registeredDeck = profile?.decks.find((d) => d.id === signup?.deckId);
-  const myRegistrationId = signup?.registrationId ?? null;
+  const myRegistrationId = signup?.registrationId ?? signupRecord?.registrationId ?? null;
   const isSaved = savedSlugs.includes(slug);
   const saveAction = session.token ? <SaveToggle slug={slug} isSaved={isSaved} /> : undefined;
 
@@ -674,10 +596,12 @@ export default async function EventDetailPage({
     slug,
     view ? eliminatedRegistrationIds(view) : undefined,
   );
-  const disqualified =
-    participants.find((p) => p.id === myRegistrationId && p.status === "disqualified") ?? null;
+  const disqualified = signupRecord?.disqualifiedAt
+    ? (signupRecord.dqReason ??
+      "Your deck no longer matches the list locked in when this tournament started.")
+    : null;
 
-  const myMatch = !finished && myRegistrationId ? await getMyCurrentMatch(slug, myRegistrationId) : null;
+  const myRound = !finished && myRegistrationId ? await getMyRound(slug, myRegistrationId) : null;
   const myHistory = myRegistrationId && (finished || past) ? await getMyMatchHistory(slug, myRegistrationId) : [];
 
   return (
@@ -698,7 +622,7 @@ export default async function EventDetailPage({
         <OngoingEventPage
           event={event}
           registeredDeck={registeredDeck}
-          myMatch={myMatch}
+          myRound={myRound}
           myHistory={myHistory}
           participants={participants}
           view={view}

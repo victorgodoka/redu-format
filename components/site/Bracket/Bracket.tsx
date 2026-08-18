@@ -61,7 +61,7 @@ export function Bracket({ rounds }: { rounds: readonly BracketRound[] }) {
       {rounds.map((round, i) => {
         const isLast = i === rounds.length - 1;
         return (
-          <div className={styles.col} key={round.label}>
+          <div className={styles.col} key={`${round.label}__${i}`}>
             <p className={styles.label}>{round.label}</p>
             <div className={styles.round}>
               {isLast

@@ -10,7 +10,10 @@ Um membro da Staff cria o torneio preenchendo:
 - **Estrutura**: Suíço, Eliminação Simples ou Eliminação Dupla.
 - **Número de rodadas** (só relevante pra Suíço - eliminação define isso sozinha pelo tamanho do campo).
 - **Formato de partida**: Bo1 (melhor de 1) ou Bo3 (melhor de 3). Vale pra todas as rodadas do torneio, incluindo Eliminação Simples/Dupla e o Top Cut - não existe uma configuração separada só pra final.
-- **Prazo de rodada**: quantos dias uma rodada fica aberta antes de ser fechada automaticamente (padrão: 2 dias). Isso não é um cronômetro de duelo - é o tempo que os jogadores têm pra se organizar e duelar, já que ninguém joga no exato instante em que a rodada abre.
+- **Duração**: define como uma rodada termina. São dois modos:
+  - **Padrão (mesmo dia)** - o modo default de todo torneio novo. Cada rodada dura um tempo fixo em minutos (padrão: 50). Quando esse tempo acaba, a rodada é **trancada** (ninguém reporta mais nada nela) e começa um período de limpeza de X minutos (padrão: 10) pra Staff corrigir o que precisar. Acabada a limpeza, a próxima rodada é gerada sozinha - e a Staff pode adiantar isso a qualquer momento depois do tranco.
+  - **Longa duração (vários dias)** - pra torneios em que pode passar um ou mais dias entre rodadas. A rodada tranca quando todos reportam ou quando o **prazo de rodada** (em dias, padrão: 2) vence, e aí o torneio **espera**: a próxima rodada só existe quando um moderador gerar. Nunca é automático.
+- **Prazo de rodada**: só no modo de longa duração - quantos dias uma rodada fica aberta antes de ser fechada automaticamente (padrão: 2 dias). Isso não é um cronômetro de duelo - é o tempo que os jogadores têm pra se organizar e duelar, já que ninguém joga no exato instante em que a rodada abre.
 - **Engine**: onde os duelos acontecem. Hoje só existe a opção Dueling Nexus.
 - **Vagas**: um número fixo ou "ilimitado".
 - **Entrada**: grátis ou paga (com valor e moeda).
@@ -39,6 +42,15 @@ Se o jogador já estava inscrito e escolhe outro deck, isso **substitui** o deck
 Enquanto o torneio não começou, o jogador pode voltar e trocar de deck a qualquer momento, ou cancelar a inscrição (ver seção 6). Um jogador também pode "salvar" um torneio pra acompanhar sem se inscrever ainda.
 
 Depois que o torneio começa, o deck fica travado pro torneio inteiro - não existe troca de deck entre rodadas, nem side deck entre os duelos de uma partida Bo3. O mesmo deck vale do primeiro ao último duelo.
+
+### Deck travado e desclassificação
+
+Mudar o deck **antes** do torneio começar é livre e não gera aviso nenhum. No instante em que a Staff inicia o bracket, a lista que cada jogador tem naquele momento é congelada - é essa lista, e só ela, que vale pro torneio inteiro.
+
+- Enquanto o jogador tiver torneio em andamento, cada visita ao site checa o deck dele na Dueling Nexus contra a lista congelada (no máximo uma checagem a cada 30 minutos por inscrição, e sempre lendo o registro do torneio e a Nexus - nunca nada que venha do navegador).
+- Qualquer diferença é **desclassificação imediata** (DQ). Não existe aviso prévio nem prazo pra desfazer: detectou, desclassificou.
+- O jogador recebe um alerta dizendo que foi desclassificado e por quê, o DQ fica registrado na inscrição, e ele aparece como **Desclassificado** na lista de participantes e no painel da Staff.
+- A checagem vale pra todos os torneios em andamento do jogador ao mesmo tempo, cada um contra a própria lista congelada.
 
 A única exceção é a Staff corrigir manualmente o deck de um jogador - por exemplo, se a inscrição foi feita com o deck errado por engano. Isso é uma ação excepcional, feita à mão pela Staff, e fica registrada no audit log.
 
@@ -129,7 +141,14 @@ Se o prazo (em dias) da rodada terminar antes de uma partida ser resolvida:
   - Na **Eliminação Simples, Eliminação Dupla, e no Top Cut** (seção 11), um double loss não é possível - o bracket exige que alguém avance pra fase seguinte. Nesses casos o sistema declara um vencedor arbitrariamente (hoje, sempre quem está na posição "jogador 1" daquela partida).
   - Esse é um caso raro e sempre pode ser corrigido depois por um membro da Staff, dentro da janela de correção descrita no item 6 acima.
 
-Assim que todas as partidas de uma rodada suíça estiverem decididas (por report, por decisão da Staff, ou por prazo vencido), a próxima rodada é gerada automaticamente.
+### Rodada trancada
+
+Vencido o tempo da rodada (o cronômetro de minutos no modo padrão, o prazo em dias no modo de longa duração), a rodada fica **trancada**: os botões de report somem e o servidor recusa qualquer report atrasado - não adianta recarregar a página, voltar no histórico ou forjar o formulário, porque quem decide é o horário gravado no banco, não o navegador. No lugar dos botões, o jogador vê o motivo e o link do Discord pra falar com um Tournament Organizer.
+
+Depois disso:
+
+- **Modo padrão (mesmo dia)**: passa o período de limpeza e a próxima rodada é gerada automaticamente. Um moderador pode gerar antes, sem esperar o resto da limpeza.
+- **Modo de longa duração**: o torneio fica parado nesse estado até um moderador gerar a próxima rodada. Nunca sozinho.
 
 ## 8. Byes, novamente
 

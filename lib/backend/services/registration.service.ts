@@ -2,7 +2,7 @@ import type { DeckSnapshot } from "../../deck-diff.ts";
 import type { EntryFee } from "../../events.ts";
 import { isHttpUrl } from "../../safe-url.ts";
 import { getPool } from "../db/client.ts";
-import { RegistrationsRepository, type PublicSignup } from "../repositories/registrations.repository.ts";
+import { RegistrationsRepository, type PublicSignup, type SignupRecord } from "../repositories/registrations.repository.ts";
 import { SavedTournamentsRepository } from "../repositories/saved-tournaments.repository.ts";
 import { dropFromStartedTournament, hasBracket } from "./results.service.ts";
 import { setParticipantPayment, type PaymentStatus } from "./tournament.service.ts";
@@ -91,6 +91,11 @@ export async function findSignupDeckId(slug: string, playerId: string): Promise<
 export async function findMyRegistrationId(slug: string, playerId: string): Promise<string | null> {
   const signup = await repos().registrations.findPublicSignup(slug, playerId);
   return signup?.registrationId ?? null;
+}
+
+/** The signup row even if it ended in a drop or a disqualification - what the event page reads to tell the player so. */
+export async function findMySignupRecord(slug: string, playerId: string): Promise<SignupRecord | null> {
+  return repos().registrations.findSignupRecord(slug, playerId);
 }
 
 /** The full signup row (registration id, deck, payment status) - what the signup page needs to decide which drop UI to show. */

@@ -29,4 +29,7 @@ export async function submitMatchReportAction(form: FormData) {
   }
 
   revalidatePath(`/events/${slug}`);
+  // The same card is rendered on the dashboard (components/site/MyRound), so
+  // both places have to reflect the report.
+  revalidatePath("/dashboard");
 }
