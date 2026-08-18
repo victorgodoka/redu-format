@@ -68,6 +68,34 @@ export const STRUCTURES: Record<Structure, { label: string; short: string }> = {
   "double-elim": { label: "Double Elimination", short: "Double elim" },
 };
 
+export type FeaturedEvent = {
+  slug: string;
+  name: string;
+  winner: string;
+  community: string;
+  players: number;
+  format: string;
+  winningDeck: string;
+  /** Date-only ISO, so it reads the same regardless of viewer timezone. */
+  date: string;
+};
+
+/**
+ * Historical highlight, permanently pinned as the Hall of Fame - not a row in
+ * the tournaments table, so it never gets bumped by whatever real tournament
+ * finishes next.
+ */
+export const FEATURED_EVENT: FeaturedEvent = {
+  slug: "ycs-providence-2012",
+  name: "YCS Providence 2012",
+  winner: "Chris LeBlanc",
+  community: "Konami",
+  players: 1154,
+  format: "Wind-Up",
+  winningDeck: "Karakuri Geargia",
+  date: "2012-10-22",
+};
+
 export function formatEntry(entry: EntryFee): string {
   if (entry.type === "free") return "Free entry";
   return new Intl.NumberFormat("en-US", {

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import AdminPageHead from "@/components/admin/AdminPageHead";
+import CopyLinkButton from "@/components/admin/CopyLinkButton";
 import DeleteButton from "@/components/admin/DeleteButton";
 import StatBar from "@/components/admin/StatBar";
 import TournamentForm from "@/components/admin/TournamentForm";
@@ -34,6 +35,7 @@ export default async function EditTournamentPage({
       <StatBar
         actions={
           <>
+            <CopyLinkButton path={`/events/${tournament.slug}`} />
             <Button href={`/admin/tournaments/${tournament.slug}/participants`}>
               Manage participants
             </Button>

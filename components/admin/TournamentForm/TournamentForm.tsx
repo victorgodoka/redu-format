@@ -273,16 +273,18 @@ export default function TournamentForm({
         </Select>
       </FormField>
 
-      <FormField label="Rounds" htmlFor="rounds">
-        <Input
-          id="rounds"
-          name="rounds"
-          type="number"
-          min={1}
-          defaultValue={tournament?.rounds ?? 5}
-          required
-        />
-      </FormField>
+      {structure === "swiss" ? (
+        <FormField label="Rounds" htmlFor="rounds">
+          <Input
+            id="rounds"
+            name="rounds"
+            type="number"
+            min={1}
+            defaultValue={tournament?.rounds ?? 5}
+            required
+          />
+        </FormField>
+      ) : null}
 
       <FormField label="Match format" htmlFor="matchFormat">
         {isEditing && tournament ? (

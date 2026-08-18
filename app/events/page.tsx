@@ -14,8 +14,7 @@ import Wrap from "@/components/ui/Wrap";
 import { getSession } from "@/lib/auth";
 import { findPlayerIdByToken } from "@/lib/backend/services/player.service";
 import { listSavedSlugsForPlayer, listSignupsForPlayer } from "@/lib/backend/services/registration.service";
-import { getPlacings } from "@/lib/backend/services/results.service";
-import { isFinished, queryEvents, type EventQuery } from "@/lib/events";
+import { queryEvents, type EventQuery } from "@/lib/events";
 import { listTournaments } from "@/lib/tournaments";
 import { saveTournamentAction, unsaveTournamentAction } from "./saved-actions";
 
@@ -91,17 +90,7 @@ export default async function EventsPage({
     getSession(),
   ]);
 
-  // Pinned above the filtered list: whichever tournament finished most
-  // recently, so the highlight always reflects a real result, not mock data.
-  const featured = tournaments
-    .filter(isFinished)
-    .sort((a, b) => new Date(b.finishedAt!).getTime() - new Date(a.finishedAt!).getTime())[0] ?? null;
-  const featuredWinner = featured
-    ? ((await getPlacings(featured.slug)).find((p) => p.place === 1)?.displayName ?? null)
-    : null;
-
-  const allEvents = tournaments.filter((t) => t.slug !== featured?.slug);
-  const { items, page, pages, total } = queryEvents(allEvents, query, now);
+  const { items, page, pages, total } = queryEvents(tournaments, query, now);
 
   const playerId = session.token ? await findPlayerIdByToken(session.token) : null;
   const [signups, savedSlugs] = playerId
@@ -120,7 +109,7 @@ export default async function EventsPage({
 
           {/* Pinned outside the filtered/paginated list, so it is always the
               first thing on the page regardless of query params. */}
-          {featured ? <FeaturedEventCard event={featured} winnerName={featuredWinner} /> : null}
+          <FeaturedEventCard />
 
           {/* GET form: filters live in the URL, so results are shareable and
               the page works with JavaScript disabled. */}
@@ -176,11 +165,7 @@ export default async function EventsPage({
 
           {items.length === 0 && query.structure === "all" && query.when === "upcoming" && query.seats === "all" ? (
             <EmptyState
-              message={
-                featured
-                  ? "No upcoming tournaments right now - check back soon, or see what just wrapped up above."
-                  : "No upcoming tournaments right now. Check back soon."
-              }
+              message="No upcoming tournaments right now - check back soon, or see what just wrapped up above."
               action={<Button href="/events?when=all">See past events</Button>}
             />
           ) : items.length === 0 ? (

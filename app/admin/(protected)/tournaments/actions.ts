@@ -50,11 +50,15 @@ function readDraft(form: FormData): TournamentDraft | { error: string } {
   const engine = String(form.get("engine") ?? "") as Engine;
   if (!(engine in ENGINES)) return { error: "Pick an engine." };
 
-  const rounds = Number(form.get("rounds"));
-  const roundLimitDays = Number(form.get("roundLimitDays"));
-  if (!Number.isInteger(rounds) || rounds <= 0) {
+  // Rounds only means anything for Swiss - elimination brackets size
+  // themselves from the field, same as startBracket() already treats it
+  // (results.service.ts always passes rounds: 0 for non-Swiss structures).
+  const rounds = structure === "swiss" ? Number(form.get("rounds")) : 0;
+  if (structure === "swiss" && (!Number.isInteger(rounds) || rounds <= 0)) {
     return { error: "Rounds must be a positive whole number." };
   }
+
+  const roundLimitDays = Number(form.get("roundLimitDays"));
   if (!Number.isInteger(roundLimitDays) || roundLimitDays <= 0) {
     return { error: "Round deadline must be a positive whole number of days." };
   }

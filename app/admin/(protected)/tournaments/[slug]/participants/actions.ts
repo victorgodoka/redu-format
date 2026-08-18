@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { recordAction } from "@/lib/audit-log";
 import { dropFromStartedTournament, hasBracket } from "@/lib/backend/services/results.service";
 import { getAdminSession } from "@/lib/auth/session";
+import { NEXUS_DECK_INFO_URL } from "@/lib/nexus-parse";
 import { isHttpUrl } from "@/lib/safe-url";
 import {
   addParticipant,
@@ -13,8 +14,6 @@ import {
   setParticipantDeck,
   setParticipantPayment,
 } from "@/lib/tournaments";
-
-const NEXUS_DECK_INFO = "https://duelingnexus.com/api/get-deck-info.php";
 
 /**
  * Confirms a Dueling Nexus deck UUID is real and public before it's stored -
@@ -26,7 +25,7 @@ async function verifyDeckUuid(uuid: string): Promise<{ ok: true } | { ok: false;
 
   let payload: unknown;
   try {
-    const res = await fetch(`${NEXUS_DECK_INFO}?uuid=${encodeURIComponent(uuid)}`, {
+    const res = await fetch(`${NEXUS_DECK_INFO_URL}?uuid=${encodeURIComponent(uuid)}`, {
       cache: "no-store",
       signal: AbortSignal.timeout(8000),
     });

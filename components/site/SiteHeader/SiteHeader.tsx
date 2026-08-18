@@ -2,6 +2,7 @@ import Link from "next/link";
 import SkipLink from "@/components/ui/SkipLink";
 import Wrap from "@/components/ui/Wrap";
 import { fetchProfile, getSession } from "@/lib/auth";
+import { FEATURED_EVENT } from "@/lib/events";
 import { DEFAULT_AVATAR } from "@/lib/nexus-parse";
 import AccountChip from "./AccountChip";
 import styles from "./SiteHeader.module.css";
@@ -9,11 +10,11 @@ import styles from "./SiteHeader.module.css";
 const nav = [
   { n: "01", label: "Home", href: "/" },
   { n: "02", label: "Events", href: "/events" },
-  { n: "03", label: "Leaderboard", href: "/leaderboard" },
-  { n: "04", label: "Banlist", href: "/banlist" },
-  { n: "05", label: "Rulings", href: "/rulings" },
-  { n: "06", label: "Format", href: "/#format" },
-  { n: "07", label: "Community", href: "/#community" },
+  { n: "03", label: "Hall of Fame", href: `/events/${FEATURED_EVENT.slug}#decklists` },
+  { n: "04", label: "Leaderboard", href: "/leaderboard" },
+  { n: "05", label: "Banlist", href: "/banlist" },
+  { n: "06", label: "Rulings", href: "/rulings" },
+  { n: "07", label: "Format", href: "/#format" },
 ];
 
 export default async function SiteHeader() {

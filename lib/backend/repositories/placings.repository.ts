@@ -37,9 +37,11 @@ export class PlacingsRepository {
     }
   }
 
-  async listForTournament(tournamentId: string): Promise<(Placing & { displayName: string })[]> {
+  async listForTournament(
+    tournamentId: string,
+  ): Promise<(Placing & { displayName: string; deckId: string | null; deckName: string })[]> {
     const [rows] = await this.pool.query<RowDataPacket[]>(
-      `SELECT p.registration_id, p.place, p.points, p.ranking_points, r.display_name
+      `SELECT p.registration_id, p.place, p.points, p.ranking_points, r.display_name, r.deck_id, r.deck_name
        FROM tournament_placings p
        JOIN registrations r ON r.id = p.registration_id
        WHERE p.tournament_id = ?
@@ -52,6 +54,8 @@ export class PlacingsRepository {
       points: Number(r.points),
       rankingPoints: Number(r.ranking_points),
       displayName: r.display_name,
+      deckId: r.deck_id,
+      deckName: r.deck_name,
     }));
   }
 

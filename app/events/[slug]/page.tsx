@@ -3,8 +3,11 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import AdminList, { AdminRow } from "@/components/admin/AdminList";
+import Bracket from "@/components/site/Bracket";
 import Footer from "@/components/site/Footer";
 import SiteHeader from "@/components/site/SiteHeader";
+import StandingsTable from "@/components/site/StandingsTable";
+import TopDeckList, { type StandingsDeck } from "@/components/site/TopDeckList";
 import Button from "@/components/ui/Button";
 import FactsList from "@/components/ui/FactsList";
 import Lede from "@/components/ui/Lede";
@@ -18,12 +21,13 @@ import { findMySignup, listSavedSlugsForPlayer } from "@/lib/backend/services/re
 import {
   getMyCurrentMatch,
   getMyMatchHistory,
-  getPlacings,
   getPlacingsForPlayer,
+  getPlacingsWithTiebreak,
   type MyMatchHistoryEntry,
   type MyMatchView,
 } from "@/lib/backend/services/results.service";
 import {
+  FEATURED_EVENT,
   formatDate,
   formatEntry,
   formatTime,
@@ -33,7 +37,9 @@ import {
   STRUCTURES,
   type TournamentEvent,
 } from "@/lib/events";
+import { fetchDeckArt } from "@/lib/nexus-parse";
 import { getTournament } from "@/lib/tournaments";
+import { YCS_PROVIDENCE_2012_BRACKET, YCS_PROVIDENCE_2012_DECKS } from "@/lib/ycs-providence-2012";
 import { saveTournamentAction, unsaveTournamentAction } from "../saved-actions";
 import { submitMatchReportAction } from "./report-actions";
 
@@ -43,6 +49,22 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
+
+  if (slug === FEATURED_EVENT.slug) {
+    const description = `Results, bracket and Top 8 decklists from ${FEATURED_EVENT.name}.`;
+    return {
+      title: `${FEATURED_EVENT.name} | REDU Format`,
+      description,
+      alternates: { canonical: `/events/${FEATURED_EVENT.slug}` },
+      openGraph: {
+        type: "website",
+        url: `/events/${FEATURED_EVENT.slug}`,
+        siteName: "REDU Format",
+        title: `${FEATURED_EVENT.name} | REDU Format`,
+        description,
+      },
+    };
+  }
 
   const event = await getTournament(slug);
   if (!event) return {};
@@ -126,6 +148,60 @@ function MatchHistory({ history }: { history: MyMatchHistoryEntry[] }) {
   );
 }
 
+/** The permanently pinned historical highlight - not a DB row, so it's rendered from static data instead of going through getTournament(). */
+function HallOfFamePage() {
+  return (
+    <main className="section" id="main">
+      <Wrap>
+        <PageHeading tab="Hall of Fame" title={FEATURED_EVENT.name} />
+
+        <div className="results-stack">
+          <FactsList
+            rows={[
+              { label: "Date", value: formatDate(FEATURED_EVENT.date) },
+              { label: "Winner", value: FEATURED_EVENT.winner },
+              { label: "Community", value: FEATURED_EVENT.community },
+              { label: "Players", value: FEATURED_EVENT.players.toLocaleString("en-GB") },
+              { label: "Format", value: FEATURED_EVENT.format },
+              { label: "Winning deck", value: FEATURED_EVENT.winningDeck },
+            ]}
+          />
+
+          <div>
+            <h2 className="section__subtitle">Bracket</h2>
+            <Bracket rounds={YCS_PROVIDENCE_2012_BRACKET} />
+          </div>
+
+          <div>
+            <h2 className="section__subtitle" id="decklists">
+              Top decks
+            </h2>
+            <TopDeckList decks={YCS_PROVIDENCE_2012_DECKS} />
+          </div>
+        </div>
+      </Wrap>
+    </main>
+  );
+}
+
+/** How many top placements get the full Hall of Fame deck-card treatment, instead of just a line in the standings list. */
+const TOP_DECK_LIMIT = 8;
+
+function ordinal(n: number): string {
+  const rem100 = n % 100;
+  if (rem100 >= 11 && rem100 <= 13) return `${n}th`;
+  switch (n % 10) {
+    case 1:
+      return `${n}st`;
+    case 2:
+      return `${n}nd`;
+    case 3:
+      return `${n}rd`;
+    default:
+      return `${n}th`;
+  }
+}
+
 /** Any tournament with completeBracket() run - results are frozen, so this is a read-only recap, not a live signup/match page. */
 async function FeaturedEventPage({
   event,
@@ -140,8 +216,32 @@ async function FeaturedEventPage({
   myHistory: MyMatchHistoryEntry[];
   saveAction: ReactNode;
 }) {
-  const placings = await getPlacings(event.slug);
+  const placings = await getPlacingsWithTiebreak(event.slug);
   const winner = placings.find((p) => p.place === 1);
+
+  // Fetched live from Dueling Nexus by the deck UUID stored at signup - the
+  // player's account may have deleted or hidden the deck since, so a failed
+  // fetch still shows the placement, just without art/decklist.
+  const topDecks: StandingsDeck[] = await Promise.all(
+    placings
+      .filter((p) => p.place <= TOP_DECK_LIMIT && p.deckId)
+      .map(async (p) => {
+        const art = await fetchDeckArt(p.deckId!);
+        return {
+          id: p.deckId!,
+          archetype: p.deckName,
+          place: `${ordinal(p.place)} Place`,
+          player: p.displayName,
+          cover: art?.coverId ?? undefined,
+          main: art?.main,
+          extra: art?.extra,
+          side: art?.side,
+          unavailable: art
+            ? undefined
+            : "This deck is private or doesn't exist anymore. Please contact administration.",
+        };
+      }),
+  );
 
   return (
     <main className="section" id="main">
@@ -165,18 +265,7 @@ async function FeaturedEventPage({
 
             <Notice>
               <Tab>Final standings</Tab>
-              <AdminList as="ol">
-                {placings.map((p) => (
-                  <AdminRow key={p.registrationId}>
-                    <AdminRow.Main>
-                      <span className="admin-row__title">
-                        #{p.place} · {p.displayName}
-                      </span>
-                      <span className="admin-row__meta">{p.points} pts</span>
-                    </AdminRow.Main>
-                  </AdminRow>
-                ))}
-              </AdminList>
+              <StandingsTable rows={placings} />
             </Notice>
           </div>
 
@@ -192,6 +281,15 @@ async function FeaturedEventPage({
             />
           </aside>
         </div>
+
+        {topDecks.length > 0 ? (
+          <div className="results-fullwidth">
+            <h2 className="section__subtitle" id="decklists">
+              Top decks
+            </h2>
+            <TopDeckList decks={topDecks} />
+          </div>
+        ) : null}
       </Wrap>
     </main>
   );
@@ -368,6 +466,16 @@ export default async function EventDetailPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
+
+  if (slug === FEATURED_EVENT.slug) {
+    return (
+      <>
+        <SiteHeader />
+        <HallOfFamePage />
+        <Footer />
+      </>
+    );
+  }
 
   const event = await getTournament(slug);
   if (!event) notFound();

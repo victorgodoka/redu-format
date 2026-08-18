@@ -1,6 +1,8 @@
 /** Nexus serves avatars from its own uploads, or from ygopro.online for default ones. */
 const AVATAR_HOSTS = new Set(["duelingnexus.com", "ygopro.online"]);
 
+export const NEXUS_DECK_INFO_URL = "https://duelingnexus.com/api/get-deck-info.php";
+
 /** Nexus's own default avatar. Fallback whenever a profile's avatar 404s. */
 export const DEFAULT_AVATAR = "https://ygopro.online/assets/profile/Avatars/0.jpg";
 
@@ -26,7 +28,7 @@ export type NexusDeckLists = {
  * than an absent key. Splitting that naively yields [""] and counts as 1, so
  * the blanks are filtered before anything is measured.
  */
-function cardIds(value: unknown): number[] {
+export function cardIds(value: unknown): number[] {
   if (typeof value !== "string") return [];
   return value
     .split(",")
@@ -77,6 +79,48 @@ export function parseDeckList(raw: unknown): NexusDeckLists | null {
     main: cardIds(deck.main_deck),
     extra: cardIds(deck.extra_deck),
     side: cardIds(deck.side_deck),
+  };
+}
+
+export type NexusDeckArt = {
+  main: number[];
+  extra: number[];
+  side: number[];
+  coverId: number | null;
+};
+
+/**
+ * Live-fetches a public deck's full card lists and cover art by its Dueling
+ * Nexus UUID - used for standings pages, where there's no session token to
+ * read a signed-in player's own profile through. Returns null if the deck is
+ * private, deleted, or Nexus is unreachable.
+ */
+export async function fetchDeckArt(uuid: string): Promise<NexusDeckArt | null> {
+  let payload: unknown;
+  try {
+    const res = await fetch(`${NEXUS_DECK_INFO_URL}?uuid=${encodeURIComponent(uuid)}`, {
+      cache: "no-store",
+      signal: AbortSignal.timeout(8000),
+    });
+    payload = await res.json();
+  } catch {
+    return null;
+  }
+
+  if (typeof payload !== "object" || payload === null || (payload as { success?: unknown }).success !== true) {
+    return null;
+  }
+
+  const deck = payload as Record<string, unknown>;
+  const main = cardIds(deck.main_deck);
+  // `cover` is the 0-based index of the chosen cover card within main_deck, same as parseDeck().
+  const cover = typeof deck.cover === "number" ? deck.cover : 0;
+
+  return {
+    main,
+    extra: cardIds(deck.extra_deck),
+    side: cardIds(deck.side_deck),
+    coverId: main[cover] ?? main[0] ?? null,
   };
 }
 

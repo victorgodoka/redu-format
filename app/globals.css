@@ -665,9 +665,34 @@ input[type="number"]::-webkit-inner-spin-button {
   margin-top: 8px;
 }
 
+.signup__main {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
 .signup__side {
   display: grid;
   gap: 16px;
+}
+
+/* --- finished-tournament results: Hall of Fame and any completed real
+   tournament share this rhythm, so headings never sit flush against the
+   block above/below them (h1-h3 reset to margin:0 in the base styles) --- */
+
+.results-stack {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(28px, 4vw, 44px);
+}
+
+.results-fullwidth {
+  margin-top: clamp(28px, 4vw, 48px);
+}
+
+.results-stack .section__subtitle,
+.results-fullwidth .section__subtitle {
+  margin-bottom: 20px;
 }
 
 .profile-card {
@@ -991,6 +1016,16 @@ input[type="number"]::-webkit-inner-spin-button {
 
 .deck__list summary:hover {
   color: var(--c-accent);
+}
+
+/* shown instead of the decklist when a live-fetched deck is private/deleted */
+.deck__unavailable {
+  margin: 0 16px 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--c-line-soft);
+  color: var(--c-muted);
+  font-size: 13px;
+  font-style: italic;
 }
 
 .deck__actions {

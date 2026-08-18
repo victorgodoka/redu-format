@@ -288,19 +288,16 @@ function opponentsOf(engine: EngineTournament, registrationId: string): string[]
  * 2-3-3-3 split are used since this is a ranking score, not a display
  * string - safe for any realistic round count.
  */
+/** Average match-win% across a set of registration ids - 0 for an empty set (no opponents played yet). */
+function avgMatchWinPercent(engine: EngineTournament, ids: string[]): number {
+  return ids.length ? ids.reduce((sum, id) => sum + matchWinPercent(engine, id), 0) / ids.length : 0;
+}
+
 function officialTiebreakScore(engine: EngineTournament, registrationId: string, points: number): number {
   const opponentIds = opponentsOf(engine, registrationId);
-  const oppWinPct = opponentIds.length
-    ? opponentIds.reduce((sum, id) => sum + matchWinPercent(engine, id), 0) / opponentIds.length
-    : 0;
+  const oppWinPct = avgMatchWinPercent(engine, opponentIds);
   const oppOppWinPct = opponentIds.length
-    ? opponentIds.reduce((sum, id) => {
-        const oppOpponentIds = opponentsOf(engine, id);
-        const avg = oppOpponentIds.length
-          ? oppOpponentIds.reduce((s, oid) => s + matchWinPercent(engine, oid), 0) / oppOpponentIds.length
-          : 0;
-        return sum + avg;
-      }, 0) / opponentIds.length
+    ? opponentIds.reduce((sum, id) => sum + avgMatchWinPercent(engine, opponentsOf(engine, id)), 0) / opponentIds.length
     : 0;
 
   const lossRoundsSquaredSum = engine
@@ -723,6 +720,45 @@ export async function getPlacings(slug: string) {
   const tournamentId = await repos().tournaments.findIdBySlug(slug);
   if (!tournamentId) return [];
   return repos().placings.listForTournament(tournamentId);
+}
+
+export type PlacingWithTiebreak = Awaited<ReturnType<typeof getPlacings>>[number] & {
+  wins: number;
+  losses: number;
+  draws: number;
+  /** 0-1, same figures that decided this placement - see officialTiebreakScore. */
+  omw: number;
+  oomw: number;
+};
+
+/**
+ * Final standings enriched with the win/loss record and OMW%/OOMW% figures
+ * that actually decided the placements - recomputed from the persisted
+ * bracket state rather than stored alongside it, so they can never drift
+ * from what officialTiebreakScore used at completion time.
+ */
+export async function getPlacingsWithTiebreak(slug: string): Promise<PlacingWithTiebreak[]> {
+  const placings = await getPlacings(slug);
+  if (placings.length === 0) return [];
+
+  const tournamentId = await repos().tournaments.findIdBySlug(slug);
+  const engine = tournamentId ? await loadEngine(tournamentId) : null;
+  if (!engine) return placings.map((p) => ({ ...p, wins: 0, losses: 0, draws: 0, omw: 0, oomw: 0 }));
+
+  return placings.map((p) => {
+    const matches = engine.getPlayers().find((pl) => pl.getId() === p.registrationId)?.getMatches() ?? [];
+    const wins = matches.filter((m) => m.win > m.loss).length;
+    const losses = matches.filter((m) => m.loss > m.win).length;
+    const draws = matches.length - wins - losses;
+
+    const opponentIds = opponentsOf(engine, p.registrationId);
+    const omw = avgMatchWinPercent(engine, opponentIds);
+    const oomw = opponentIds.length
+      ? opponentIds.reduce((sum, id) => sum + avgMatchWinPercent(engine, opponentsOf(engine, id)), 0) / opponentIds.length
+      : 0;
+
+    return { ...p, wins, losses, draws, omw, oomw };
+  });
 }
 
 export async function getLeaderboard(limit = 50) {

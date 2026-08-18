@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import AdminPageHead from "@/components/admin/AdminPageHead";
+import CopyLinkButton from "@/components/admin/CopyLinkButton";
 import DeleteButton from "@/components/admin/DeleteButton";
 import TournamentList from "@/components/admin/TournamentList";
 import Badge from "@/components/ui/Badge";
@@ -61,7 +62,8 @@ export default async function AdminTournamentsPage() {
             <>
               <Button href={`/admin/tournaments/${t.slug}`}>Edit</Button>
               <Button href={`/admin/tournaments/${t.slug}/participants`}>Participants</Button>
-              <Button href={`/admin/tournaments/new?copyFrom=${t.slug}`}>Copy</Button>
+              <Button href={`/admin/tournaments/new?copyFrom=${t.slug}`}>Duplicate</Button>
+              <CopyLinkButton path={`/events/${t.slug}`} />
               <DeleteButton
                 action={deleteTournamentAction}
                 hidden={{ slug: t.slug }}

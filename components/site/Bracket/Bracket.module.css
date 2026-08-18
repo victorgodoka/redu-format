@@ -1,0 +1,120 @@
+/* pure-CSS connectors, no JS measuring */
+
+.bracket {
+  --bracket-gutter: clamp(24px, 3.5vw, 48px);
+  display: flex;
+  align-items: stretch;
+  gap: var(--bracket-gutter);
+  overflow-x: auto;
+  padding-bottom: 8px;
+}
+
+.col {
+  display: flex;
+  flex-direction: column;
+  min-width: 220px;
+}
+
+.label {
+  flex: 0 0 auto;
+  margin: 0 0 14px;
+  font-family: var(--f-mono);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--c-muted);
+}
+
+.round {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.pair {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+/* trunk line joining a pair's two match centres, landing exactly on the
+   next round's match, which sits at the pair's own vertical centre */
+.pair::after {
+  content: "";
+  position: absolute;
+  right: calc(-1 * var(--bracket-gutter));
+  top: 25%;
+  height: 50%;
+  width: 2px;
+  background: var(--c-line);
+}
+
+.match {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  position: relative;
+  padding-block: 3px;
+}
+
+/* stub reaching the round boundary, where the next pair's trunk picks it up */
+.pair .match::after {
+  content: "";
+  position: absolute;
+  right: calc(-1 * var(--bracket-gutter));
+  top: 50%;
+  width: var(--bracket-gutter);
+  height: 2px;
+  background: var(--c-line);
+}
+
+.side {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 12px;
+  border: 1px solid var(--c-line);
+  background: var(--c-panel);
+  font-family: var(--f-mono);
+  font-size: 12px;
+}
+
+.sideWin {
+  border-color: color-mix(in srgb, var(--c-accent) 45%, var(--c-line));
+}
+
+.seed {
+  min-width: 1.4em;
+  font-size: 10px;
+  color: var(--c-muted);
+}
+
+.player {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--c-muted);
+}
+
+.sideWin .player {
+  color: var(--c-text);
+}
+
+.score {
+  min-width: 1.6em;
+  padding: 2px 8px;
+  border-radius: 3px;
+  background: var(--c-line);
+  color: var(--c-muted);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.scoreWin {
+  background: var(--c-accent);
+  color: #16130c;
+}

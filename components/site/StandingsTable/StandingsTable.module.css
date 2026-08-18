@@ -1,0 +1,50 @@
+/* wide on small screens, scrolls in its own box rather than the page */
+.wrap {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.table th,
+.table td {
+  padding: 11px 18px;
+  text-align: left;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--c-line-soft);
+}
+
+.table th {
+  font-family: var(--f-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--c-muted);
+  border-bottom: 1px solid var(--c-line);
+}
+
+.table td {
+  font-size: 14px;
+}
+
+.table td:first-child,
+.table th:first-child {
+  padding-left: 22px;
+}
+
+.table td:last-child,
+.table th:last-child {
+  padding-right: 22px;
+}
+
+.table tbody tr:hover {
+  background: color-mix(in srgb, var(--c-accent) 6%, transparent);
+}
+
+.winner td:first-child,
+.winner td:nth-child(2) {
+  color: var(--c-accent);
+}
