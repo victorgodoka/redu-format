@@ -5,7 +5,6 @@ import { getPool } from "../db/client.ts";
 import { RegistrationsRepository, type WatchedDeck } from "../repositories/registrations.repository.ts";
 import { notify } from "./notifications.service.ts";
 
-export const DECK_MISMATCH = "deck.mismatch";
 export const DECK_DQ = "deck.disqualified";
 
 /** A player is only policed while a tournament they're in is actually being played. */
