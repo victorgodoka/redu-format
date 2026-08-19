@@ -660,3 +660,88 @@ test("dropping someone who never made it into the bracket still marks the regist
   await dropFromStartedTournament(tournament.slug, latecomer.id);
   assert.ok((await listParticipants(tournament.slug)).find((p) => p.id === latecomer.id)!.droppedAt);
 });
+
+test("double elimination: the bracket keeps taking reports after round one - its rounds are a graph, not a lockstep clock", async () => {
+  const tournament = await createTournament({
+    ...swissDraft,
+    name: "Double Elim Cup",
+    structure: "double-elim",
+    rounds: 0,
+    topCut: null,
+  });
+  await seatFourViaAdmin(tournament.slug);
+  const event = (await getTournament(tournament.slug))!;
+  await startBracket(tournament.slug, event);
+
+  // Settle the whole winners round one, which is the only round the engine's
+  // own round counter ever moves to in an elimination bracket.
+  for (const m of (await getBracketView(tournament.slug))!.matches.filter((m) => m.active && !m.bye)) {
+    await enterMatchResult(tournament.slug, m.id, 1, 0);
+  }
+
+  const after = (await getBracketView(tournament.slug))!;
+  assert.equal(
+    after.clock.locked,
+    false,
+    "an elimination bracket with matches still to play is never a locked round",
+  );
+
+  const open = after.matches.filter((m) => m.active && !m.bye && m.player1 && m.player2);
+  assert.ok(open.length > 0, "the losers bracket and winners final opened up");
+
+  // The players who dropped into the losers bracket have to be able to report.
+  const match = open[0];
+  await submitMatchReport(tournament.slug, match.id, match.player1!.registrationId, "win");
+  await submitMatchReport(tournament.slug, match.id, match.player2!.registrationId, "loss");
+  const settled = (await getBracketView(tournament.slug))!.matches.find((m) => m.id === match.id)!;
+  assert.equal(settled.hasResult, true, "both sides agreed, so the match resolved");
+});
+
+test("double elimination names every match by bracket side, and the grand final reset when it happens", async () => {
+  const tournament = await createTournament({
+    ...swissDraft,
+    name: "Bracket Labels Cup",
+    structure: "double-elim",
+    rounds: 0,
+    topCut: null,
+  });
+  await seatFourViaAdmin(tournament.slug);
+  const event = (await getTournament(tournament.slug))!;
+  await startBracket(tournament.slug, event);
+
+  const built = (await getBracketView(tournament.slug))!;
+  assert.deepEqual(
+    [...new Set(built.matches.map((m) => m.bracket))].sort(),
+    ["grand-final", "losers", "winners"],
+    "the whole graph is classified by bracket side, not left as bare round numbers",
+  );
+  assert.equal(
+    built.matches.some((m) => /^Round \d+$/.test(m.label)),
+    false,
+    'a double-elim match never reads as "Round 5" - that number is a bracket half, not a chronological round',
+  );
+  assert.ok(built.matches.some((m) => m.label === "Winners Final"));
+  assert.ok(built.matches.some((m) => m.label === "Grand Final"));
+  assert.equal(
+    built.matches.some((m) => m.label === "Grand Final Reset"),
+    false,
+    "the reset only exists once it is actually forced",
+  );
+
+  // Play the bracket out with the losers-bracket finalist taking the grand
+  // final, which is what forces the reset match into existence.
+  for (let guard = 0; guard < 12; guard++) {
+    const open = (await getBracketView(tournament.slug))!.matches.filter(
+      (m) => m.active && !m.bye && m.player1 && m.player2,
+    );
+    if (open.length === 0) break;
+    for (const m of open) {
+      const grandFinal = m.bracket === "grand-final";
+      await enterMatchResult(tournament.slug, m.id, grandFinal ? 0 : 1, grandFinal ? 1 : 0);
+    }
+  }
+
+  const reset = (await getBracketView(tournament.slug))!.matches.find((m) => m.label === "Grand Final Reset");
+  assert.ok(reset, "losing the grand final gave the undefeated finalist their first loss, so a reset match exists");
+  assert.equal(reset.bracket, "grand-final");
+});

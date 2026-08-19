@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/cron/round-deadlines",
-      "schedule": "*/5 * * * *"
+      "schedule": "0 12 * * *"
     }
   ]
 }

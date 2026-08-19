@@ -22,9 +22,18 @@ const TOP_CUT_MATCH_BONUS = 5;
 
 export type BracketPlayer = { registrationId: string; name: string; win: number; loss: number; draw: number };
 
+/**
+ * Which half of a double-elimination bracket a match belongs to. null for
+ * every other format, where there is only one bracket to be in.
+ */
+export type MatchBracket = "winners" | "losers" | "grand-final" | null;
+
 export type BracketMatch = {
   id: string;
   round: number;
+  bracket: MatchBracket;
+  /** Human name for this match's round - "Winners Round 2", "Losers Final", "Grand Final Reset", "Round 3". */
+  label: string;
   active: boolean;
   bye: boolean;
   hasResult: boolean;
@@ -166,6 +175,83 @@ function doubleLossPenalty(engine: EngineTournament, registrationId: string): nu
   return count * engine.getScoring().draw;
 }
 
+/**
+ * Reads the winners/losers structure straight off the match graph the engine
+ * builds when a double-elimination bracket starts, rather than off round
+ * numbers (which interleave the two halves: with 8 players the winners rounds
+ * are 1-3, the grand final is 4, and the losers rounds are 5-8).
+ *
+ * The graph says it plainly. Every match carries where its winner and its
+ * loser go next:
+ * - a loser who still has somewhere to go is dropping out of the winners
+ *   bracket, so `path.loss !== null` means this is a winners match;
+ * - in the losers bracket a loss is elimination, so `path.loss === null`
+ *   while `path.win` still points somewhere;
+ * - the grand final is the one match with nowhere to send either player.
+ *
+ * The library adds a second grand-final match when the losers-bracket player
+ * wins it (both sides then have one loss) - that is the reset, and it is the
+ * later of the two by match number.
+ */
+function eliminationRounds(engine: EngineTournament): Map<number, { phase: RoundPhase; roundLabel: string }> {
+  const labels = new Map<number, { phase: RoundPhase; roundLabel: string }>();
+  if (engine.getStageOne().format !== "double-elimination") return labels;
+
+  const rounds = (side: (path: { win: string | null; loss: string | null }) => boolean) =>
+    [
+      ...new Set(
+        engine
+          .getMatches()
+          .filter((m) => side(m.getPath()))
+          .map((m) => m.getRoundNumber()),
+      ),
+    ].sort((a, b) => a - b);
+
+  const winners = rounds((path) => path.loss !== null);
+  const losers = rounds((path) => path.loss === null && path.win !== null);
+  const finals = rounds((path) => path.loss === null && path.win === null);
+
+  winners.forEach((round, i) => {
+    labels.set(round, {
+      phase: "winners",
+      roundLabel: i === winners.length - 1 ? "Winners Final" : `Winners Round ${i + 1}`,
+    });
+  });
+  losers.forEach((round, i) => {
+    labels.set(round, {
+      phase: "losers",
+      roundLabel: i === losers.length - 1 ? "Losers Final" : `Losers Round ${i + 1}`,
+    });
+  });
+  for (const round of finals) labels.set(round, { phase: "grandFinal", roundLabel: "Grand Final" });
+
+  return labels;
+}
+
+/** Bracket side per match id, plus the grand-final reset, which shares its round number with the grand final itself. */
+function eliminationMatches(engine: EngineTournament): Map<string, { bracket: MatchBracket; label: string }> {
+  const byMatch = new Map<string, { bracket: MatchBracket; label: string }>();
+  const rounds = eliminationRounds(engine);
+  if (rounds.size === 0) return byMatch;
+
+  const finals = engine
+    .getMatches()
+    .filter((m) => m.getPath().win === null && m.getPath().loss === null)
+    .sort((a, b) => a.getMatchNumber() - b.getMatchNumber());
+
+  for (const match of engine.getMatches()) {
+    const round = rounds.get(match.getRoundNumber());
+    if (!round) continue;
+    const bracket: MatchBracket =
+      round.phase === "winners" ? "winners" : round.phase === "losers" ? "losers" : "grand-final";
+    // A second grand final only exists when the losers-bracket player took the
+    // first one off the (until then) undefeated finalist - the reset.
+    const isReset = bracket === "grand-final" && finals.length > 1 && match.getId() !== finals[0].getId();
+    byMatch.set(match.getId(), { bracket, label: isReset ? "Grand Final Reset" : round.roundLabel });
+  }
+  return byMatch;
+}
+
 function toStageOneFormat(structure: Structure): "swiss" | "single-elimination" | "double-elimination" {
   if (structure === "single-elim") return "single-elimination";
   if (structure === "double-elim") return "double-elimination";
@@ -201,6 +287,8 @@ function toView(
     reportsByMatch.get(r.matchId)!.push(r);
   }
 
+  const eliminationLabels = eliminationMatches(engine);
+
   const matches: BracketMatch[] = engine.getMatches().map((m) => {
     const p1 = m.getPlayer1();
     const p2 = m.getPlayer2();
@@ -210,9 +298,12 @@ function toView(
         : null;
     const matchReports = reportsByMatch.get(m.getId()) ?? [];
     const matchTracking = tracking.get(m.getId());
+    const elimination = eliminationLabels.get(m.getId());
     return {
       id: m.getId(),
       round: m.getRoundNumber(),
+      bracket: elimination?.bracket ?? null,
+      label: elimination?.label ?? describeRound(engine, m.getRoundNumber()).roundLabel,
       active: m.isActive(),
       bye: m.isBye(),
       // A double loss (see resolveOverdueMatch) leaves every win/loss/draw field
@@ -253,31 +344,64 @@ function toView(
 }
 
 /**
+ * What "the round in progress" actually means, which is not the same thing in
+ * both formats:
+ *
+ * - Swiss pairs a whole round at once and advances in lockstep, so it is every
+ *   match carrying the engine's current round number.
+ * - An elimination bracket (a whole single/double-elim event, or a Top Cut)
+ *   builds its entire match graph up front and advances one match at a time as
+ *   results come in - `getRoundNumber()` stays on the first round for the whole
+ *   event, and a double-elim bracket's round numbers interleave the winners and
+ *   losers halves rather than running in chronological order. There, the round
+ *   in progress is simply whatever is open right now.
+ */
+function currentRoundMatches(engine: EngineTournament): ReturnType<EngineTournament["getMatches"]> {
+  if (engine.isElimination()) return engine.getMatches().filter((m) => m.isActive());
+  const round = engine.getRoundNumber();
+  return engine.getMatches().filter((m) => m.getRoundNumber() === round);
+}
+
+/**
  * The deadline that governs the round in progress: the latest of its own
  * matches' deadlines, so a Staff extension of one match holds the whole round
- * open rather than locking it out from under them. Null when the round has no
- * tracked match (nothing has opened yet).
+ * open rather than locking it out from under them. Null when nothing is open
+ * (the bracket hasn't started, or has run out of matches).
  */
 function currentRoundDeadline(
   engine: EngineTournament,
   tracking: Map<string, MatchTracking>,
   cutoffMs: number,
 ): Date | null {
-  const round = engine.getRoundNumber();
-  const deadlines = engine
-    .getMatches()
-    .filter((m) => m.getRoundNumber() === round)
+  const deadlines = currentRoundMatches(engine)
     .map((m) => tracking.get(m.getId()))
     .filter((t): t is MatchTracking => t !== undefined)
     .map((t) => effectiveDeadline(t, cutoffMs).getTime());
   return deadlines.length ? new Date(Math.max(...deadlines)) : null;
 }
 
-/** True once nothing in the current round is still open to report. */
+/**
+ * True once nothing in the current round is still open to report. Swiss only:
+ * in an elimination bracket "no open match" means the next one hasn't been
+ * paired yet (or the bracket is over), never that reporting should close - each
+ * match is governed by its own deadline instead.
+ */
 function roundFullyResolved(engine: EngineTournament): boolean {
+  if (engine.isElimination()) return false;
   const round = engine.getRoundNumber();
   const matches = engine.getMatches().filter((m) => m.getRoundNumber() === round);
   return matches.length > 0 && matches.every((m) => !m.isActive());
+}
+
+/** Whether this specific match is past its own deadline - the check that governs an elimination bracket, where matches open and close independently. */
+function matchIsOverdue(
+  matchId: string,
+  tracking: Map<string, MatchTracking>,
+  cutoffMs: number,
+  now: Date = new Date(),
+): boolean {
+  const t = tracking.get(matchId);
+  return t !== undefined && now.getTime() >= effectiveDeadline(t, cutoffMs).getTime();
 }
 
 /**
@@ -647,7 +771,12 @@ export async function submitMatchReport(
   // the moment its persisted deadline passes, whether or not the cron has run
   // and whatever the browser believes.
   const tracking = await matchDeadlines.getTrackingMap(tournamentId);
-  if (clockFor(event, engine, tracking).locked) throw new Error(ROUND_LOCKED_MESSAGE);
+  // Two ways a report is too late: the round itself is locked (Swiss, where a
+  // round closes as a block), or this match's own deadline has passed (an
+  // elimination bracket, where each match runs on its own clock).
+  if (clockFor(event, engine, tracking).locked || matchIsOverdue(matchId, tracking, roundCutoffMs(event))) {
+    throw new Error(ROUND_LOCKED_MESSAGE);
+  }
 
   const match = engine.getMatch(matchId);
   if (!match.isActive()) throw new Error("This match isn't open for reporting");
@@ -901,7 +1030,7 @@ export async function getPlacingsForPlayer(playerId: string): Promise<Map<string
   return new Map(rows.map((r) => [r.slug, { place: r.place, points: r.points }]));
 }
 
-export type RoundPhase = "swiss" | "topCut";
+export type RoundPhase = "swiss" | "topCut" | "winners" | "losers" | "grandFinal";
 
 /**
  * Doc section 11: Top Cut rounds are numbered right after Swiss ones by the
@@ -910,6 +1039,11 @@ export type RoundPhase = "swiss" | "topCut";
  * Cut (Quarterfinal, Semifinal, Final) instead of just the next number.
  */
 function describeRound(engine: EngineTournament, roundNumber: number): { phase: RoundPhase; roundLabel: string } {
+  // A double-elimination bracket has no "round N of the tournament" to speak
+  // of - every round belongs to one half of the bracket or is the grand final.
+  const elimination = eliminationRounds(engine).get(roundNumber);
+  if (elimination) return elimination;
+
   const stageOneRounds = engine.getStageOne().rounds;
   if (roundNumber <= stageOneRounds) {
     return { phase: "swiss", roundLabel: `Round ${roundNumber}` };
@@ -982,7 +1116,7 @@ export async function getMyCurrentMatch(slug: string, registrationId: string): P
     disputed: Boolean(mine && theirs && !reportsAgree(mine.result, theirs.result)),
     deadlineAt,
     roomHash: matchTracking?.roomHash ?? null,
-    locked: clock.locked,
+    locked: clock.locked || matchIsOverdue(match.getId(), tracking, roundCutoffMs(event)),
     nextRoundAt: clock.nextRoundAt,
   };
 }

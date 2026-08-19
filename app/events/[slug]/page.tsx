@@ -139,9 +139,30 @@ function EventFacts({ event, past }: { event: TournamentEvent; past: boolean }) 
   );
 }
 
-/** Round timer/lock state, straight off the persisted deadlines - the same numbers the server enforces. */
+/**
+ * Round timer/lock state, straight off the persisted deadlines - the same
+ * numbers the server enforces. An elimination bracket has no lockstep round to
+ * report on: it advances one match at a time, so it gets a count of what is
+ * still being played instead of a round clock.
+ */
 function RoundStatus({ view }: { view: BracketView }) {
   const { clock } = view;
+  const bracketFormat = view.format !== "swiss" || view.status === "stage-two";
+
+  if (bracketFormat) {
+    const open = view.matches.filter((m) => m.active && !m.bye).length;
+    return (
+      <Notice>
+        <Tab>Bracket</Tab>
+        <Lede>
+          {open === 0
+            ? "Every match on the board is settled - the next ones open as the bracket resolves."
+            : `${open} match${open === 1 ? "" : "es"} being played right now. Each one runs on its own clock; the next match opens as soon as both its players are decided.`}
+        </Lede>
+      </Notice>
+    );
+  }
+
   return (
     <Notice>
       <Tab>Round {view.round}</Tab>

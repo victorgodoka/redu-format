@@ -15,34 +15,42 @@ function score(match: BracketMatch): { p1: string; p2: string } | null {
   return { p1: String(match.player1?.win ?? 0), p2: String(match.player2?.win ?? 0) };
 }
 
-function toTree(rounds: number[], matches: BracketMatch[]): BracketRound[] {
+function toMatchNode(m: BracketMatch) {
+  const s = score(m);
+  return {
+    id: m.id,
+    sides: [
+      {
+        name: m.player1?.name ?? "TBD",
+        score: s?.p1,
+        winner: m.hasResult && (m.player1?.win ?? 0) > (m.player2?.win ?? 0),
+      },
+      {
+        name: m.bye ? "Bye" : (m.player2?.name ?? "TBD"),
+        score: s?.p2,
+        winner: m.hasResult && (m.player2?.win ?? 0) > (m.player1?.win ?? 0),
+      },
+    ] as const,
+  };
+}
+
+/**
+ * Columns for one bracket. Double-elimination matches carry their own round
+ * name (Winners Round 2, Losers Final, ...) off the match graph; anything else
+ * is a plain single-elimination tree, where the round's size is what names it.
+ */
+function toTree(matches: BracketMatch[], named: boolean): BracketRound[] {
+  const rounds = [...new Set(matches.map((m) => m.round))].sort((a, b) => a - b);
   return rounds.map((round) => {
     const inRound = matches.filter((m) => m.round === round);
     return {
-      label: cutLabel(inRound.length),
-      matches: inRound.map((m) => {
-        const s = score(m);
-        return {
-          id: m.id,
-          sides: [
-            {
-              name: m.player1?.name ?? "TBD",
-              score: s?.p1,
-              winner: m.hasResult && (m.player1?.win ?? 0) > (m.player2?.win ?? 0),
-            },
-            {
-              name: m.bye ? "Bye" : (m.player2?.name ?? "TBD"),
-              score: s?.p2,
-              winner: m.hasResult && (m.player2?.win ?? 0) > (m.player1?.win ?? 0),
-            },
-          ] as const,
-        };
-      }),
+      label: named ? inRound[0].label : cutLabel(inRound.length),
+      matches: inRound.map(toMatchNode),
     };
   });
 }
 
-function MatchRow({ match }: { match: BracketMatch }) {
+function MatchRow({ match, showLabel }: { match: BracketMatch; showLabel?: boolean }) {
   const s = score(match);
   return (
     <AdminRow className="bracket">
@@ -51,6 +59,7 @@ function MatchRow({ match }: { match: BracketMatch }) {
           {match.player1?.name ?? "TBD"} vs {match.bye ? "Bye" : (match.player2?.name ?? "TBD")}
         </span>
         <span className="admin-row__meta">
+          {showLabel ? `${match.label} · ` : ""}
           {match.bye
             ? "Automatic win"
             : s
@@ -64,16 +73,60 @@ function MatchRow({ match }: { match: BracketMatch }) {
   );
 }
 
+function Tree({ title, matches, named }: { title: string; matches: BracketMatch[]; named: boolean }) {
+  if (matches.length === 0) return null;
+  return (
+    <section>
+      <h3 className="section__subtitle">{title}</h3>
+      <div className="bracket-scroll">
+        <Bracket rounds={toTree(matches, named)} />
+      </div>
+    </section>
+  );
+}
+
 /**
- * The public, full-width view of a bracket. Swiss rounds are a plain list per
- * round (they are not a tree - pairings are recomputed every round), while an
- * elimination stage - a whole single/double-elim event, or the Top Cut after
- * Swiss - renders as the actual bracket tree.
+ * The public, full-width view of a bracket, drawn the way the format actually
+ * works:
+ *
+ * - Swiss rounds are a list per round (pairings are recomputed every round, so
+ *   there is no tree to draw).
+ * - Double elimination is two trees plus the grand final, never one numeric
+ *   sequence: its round numbers interleave the winners and losers halves, so
+ *   ordering matches by round alone puts a losers-bracket duel in the middle
+ *   of the winners bracket.
+ * - Anything else (single elim, or the Top Cut after Swiss) is one tree.
  */
 export default function TournamentBracket({ view }: { view: BracketView }) {
-  const rounds = [...new Set(view.matches.map((m) => m.round))].sort((a, b) => a - b);
-  const swissRounds = rounds.filter((r) => view.format === "swiss" && r <= view.stageOneRounds);
-  const cutRounds = rounds.filter((r) => !swissRounds.includes(r));
+  const doubleElim = view.format === "double-elim";
+  const swissRounds = [...new Set(view.matches.filter((m) => view.format === "swiss" && m.round <= view.stageOneRounds).map((m) => m.round))].sort(
+    (a, b) => a - b,
+  );
+
+  if (doubleElim) {
+    const winners = view.matches.filter((m) => m.bracket === "winners");
+    const losers = view.matches.filter((m) => m.bracket === "losers");
+    const grandFinal = view.matches.filter((m) => m.bracket === "grand-final");
+
+    return (
+      <>
+        <Tree title="Winners bracket" matches={winners} named />
+        <Tree title="Losers bracket" matches={losers} named />
+        {grandFinal.length > 0 ? (
+          <section>
+            <h3 className="section__subtitle">Grand Final</h3>
+            <AdminList>
+              {grandFinal.map((m) => (
+                <MatchRow key={m.id} match={m} showLabel />
+              ))}
+            </AdminList>
+          </section>
+        ) : null}
+      </>
+    );
+  }
+
+  const cutMatches = view.matches.filter((m) => !swissRounds.includes(m.round));
 
   return (
     <>
@@ -93,16 +146,11 @@ export default function TournamentBracket({ view }: { view: BracketView }) {
         </section>
       ))}
 
-      {cutRounds.length > 0 ? (
-        <section>
-          <h3 className="section__subtitle">
-            {view.format === "swiss" ? "Top Cut" : "Bracket"}
-          </h3>
-          <div className="bracket-scroll">
-            <Bracket rounds={toTree(cutRounds, view.matches)} />
-          </div>
-        </section>
-      ) : null}
+      <Tree
+        title={view.format === "swiss" ? "Top Cut" : "Bracket"}
+        matches={cutMatches}
+        named={false}
+      />
     </>
   );
 }

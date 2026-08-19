@@ -71,6 +71,12 @@ export default function MyRound({
   href?: string;
 }) {
   const heading = eventName ? `${eventName} · ${round.roundLabel}` : round.roundLabel;
+  /**
+   * An elimination bracket has no scheduled next round: matches open one at a
+   * time as their feeders resolve, so promising a start time would be a lie.
+   */
+  const bracketFormat =
+    round.phase === "winners" || round.phase === "losers" || round.phase === "grandFinal" || round.phase === "topCut";
   const link = href ? (
     <Link className="btn" href={href}>
       Open tournament
@@ -86,7 +92,7 @@ export default function MyRound({
           Odd number of duelists, so you sit this round out with an automatic win - there is no duel
           to play and nothing to report. It counts as a win for {round.roundLabel}, not for the next
           one.
-          {round.nextRoundAt ? ` The next round starts ${at(round.nextRoundAt)}.` : ""}
+          {!bracketFormat && round.nextRoundAt ? ` The next round starts ${at(round.nextRoundAt)}.` : ""}
         </Lede>
         {link}
       </Notice>
@@ -98,15 +104,18 @@ export default function MyRound({
       <Notice>
         <Tab>{heading}</Tab>
         <h2 className="notice__title">
-          {round.settled ? "Your duel this round is settled" : "No duel for you right now"}
+          {round.settled ? "Your duel is settled" : "No duel for you right now"}
         </h2>
         <Lede>
           {round.settled
             ? `You ${verb(round.settled.result)} ${round.settled.score}${
                 round.settled.opponentName ? ` vs ${round.settled.opponentName}` : ""
-              } in ${round.roundLabel}. Waiting on the other tables before the round turns over.`
-            : "You are still in the tournament, but you are not paired in this round - the next pairing is still to come. Your next duel appears here the moment it is made."}
-          {round.nextRoundAt ? ` Next round starts ${at(round.nextRoundAt)}.` : ""}
+              } in ${round.roundLabel}.`
+            : "You are still in the tournament, but you are not paired right now."}{" "}
+          {bracketFormat
+            ? "Your next opponent is whoever wins their own match, so this fills in as the bracket resolves."
+            : "Waiting on the other tables before the round turns over."}
+          {!bracketFormat && round.nextRoundAt ? ` Next round starts ${at(round.nextRoundAt)}.` : ""}
         </Lede>
         {link}
       </Notice>
@@ -132,11 +141,15 @@ export default function MyRound({
 
   return (
     <>
-      <Notice variant={match.phase === "topCut" ? "done" : undefined}>
+      <Notice variant={match.phase === "topCut" || match.phase === "grandFinal" ? "done" : undefined}>
         <Tab>{heading} · Your duel</Tab>
         <h2 className="notice__title">vs {match.opponentName ?? "TBD"}</h2>
         {match.phase === "topCut" ? (
           <Lede>You made Top Cut - this is single elimination from here, no more Swiss cushion.</Lede>
+        ) : match.phase === "losers" ? (
+          <Lede>You are in the losers bracket - one more loss and you are out.</Lede>
+        ) : match.phase === "grandFinal" ? (
+          <Lede>Grand Final. Win this and the tournament is yours.</Lede>
         ) : null}
         {match.deadlineAt ? <Lede>Round closes {at(match.deadlineAt)}.</Lede> : null}
         {match.roomHash ? (

@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { getSession } from "@/lib/auth";
 import { findPlayerIdByToken } from "@/lib/backend/services/player.service";
 import { findMyRegistrationId } from "@/lib/backend/services/registration.service";
-import { submitMatchReport } from "@/lib/backend/services/results.service";
+import { closeOverdueMatches, submitMatchReport } from "@/lib/backend/services/results.service";
 
 const RESULTS = ["win", "loss", "draw"] as const;
 
@@ -27,6 +27,13 @@ export async function submitMatchReportAction(form: FormData) {
   } catch {
     return;
   }
+
+  // The deploy target only allows one cron run a day (see the cron route), so
+  // round transitions ride on requests as well: reporting is the most frequent
+  // thing that happens during a live tournament, which makes it the best place
+  // to notice that the round it belongs to has since locked or run out its
+  // cleanup window. Best-effort - the report itself already landed.
+  await closeOverdueMatches(slug).catch(() => null);
 
   revalidatePath(`/events/${slug}`);
   // The same card is rendered on the dashboard (components/site/MyRound), so

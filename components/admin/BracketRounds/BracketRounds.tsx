@@ -27,17 +27,34 @@ export default function BracketRounds({
   /** Rendered between the rounds and the standings/final-results list (e.g. "generate next round"). */
   actions?: ReactNode;
 }) {
-  const rounds = [...new Set(view.matches.map((m) => m.round))].sort((a, b) => a - b);
+  /**
+   * Double elimination numbers its rounds by bracket half, not chronologically
+   * (winners 1-3, grand final 4, losers 5-8 for an 8-player field), so the
+   * rounds are ordered by the side they belong to and titled with the name the
+   * match itself carries - never a bare "Round 5" that reads like it comes
+   * after the grand final.
+   */
+  const SIDE_ORDER = { winners: 0, losers: 1, "grand-final": 2 } as const;
+  const rounds = [...new Set(view.matches.map((m) => m.round))].sort((a, b) => {
+    const side = (round: number) => {
+      const bracket = view.matches.find((m) => m.round === round)?.bracket;
+      return bracket ? SIDE_ORDER[bracket] : 0;
+    };
+    return side(a) - side(b) || a - b;
+  });
+  const titleFor = (round: number) =>
+    view.matches.find((m) => m.round === round)?.label ?? `Round ${round}`;
 
   return (
     <>
       <p className="lede">
-        Status: {view.status} · Round {view.round}
+        Status: {view.status}
+        {view.format === "double-elim" ? "" : ` · Round ${view.round}`}
       </p>
 
       {rounds.map((round) => (
         <div key={round}>
-          <h2 className="section__subtitle">Round {round}</h2>
+          <h2 className="section__subtitle">{titleFor(round)}</h2>
           <AdminList>
             {view.matches
               .filter((m) => m.round === round)
