@@ -1,6 +1,9 @@
 import type { ReactNode } from "react";
 import AdminList, { AdminRow } from "@/components/admin/AdminList";
 import MatchResultForm from "@/components/admin/MatchResultForm";
+import Button from "@/components/ui/Button";
+import Countdown from "@/components/site/Countdown";
+import { dismissNoShowAdminAction } from "@/app/admin/(protected)/tournaments/[slug]/bracket/actions";
 import type {
   BracketPlayer,
   BracketView,
@@ -59,7 +62,7 @@ export default function BracketRounds({
             {view.matches
               .filter((m) => m.round === round)
               .map((match) => (
-                <AdminRow key={match.id} className="bracket">
+                <AdminRow key={match.id} className={`bracket${match.noShow ? " no-show" : ""}`}>
                   <AdminRow.Main>
                     <span className="admin-row__title">
                       {match.player1?.name ?? "TBD"} vs {match.player2?.name ?? "Bye"}
@@ -71,20 +74,37 @@ export default function BracketRounds({
                         {match.player1?.win ?? 0}-{match.player2?.win ?? 0}
                         {(match.player1?.draw ?? 0) > 0 ? ` (${match.player1?.draw} draws)` : ""}
                       </span>
-                    ) : match.disputed ? (
+                    ) : match.reports.length >= 1 ? (
                       <span className="admin-row__meta">
-                        Disputed - both players reported and disagree, needs a mod
-                      </span>
-                    ) : match.reports.length === 1 ? (
-                      <span className="admin-row__meta">
+                        Reported by{" "}
                         {match.player1?.registrationId === match.reports[0].registrationId
                           ? match.player1?.name
                           : match.player2?.name}{" "}
-                        reported {match.reports[0].result} · waiting on the other side
+                        · {match.reports[0].winnerGames}-{match.reports[0].loserGames}
+                      </span>
+                    ) : match.active && match.deadlineAt ? (
+                      <span className="admin-row__meta">
+                        Awaiting result · <Countdown to={match.deadlineAt} fallback="open" /> left
                       </span>
                     ) : (
                       <span className="admin-row__meta">Awaiting result</span>
                     )}
+                    {match.noShow ? (
+                      <span className="no-show__label">
+                        No-Show Report
+                        {match.noShow.autoResolvesAt ? (
+                          <>
+                            {" · decides in "}
+                            <Countdown to={match.noShow.autoResolvesAt} fallback="soon" urgentUnder={120} />
+                          </>
+                        ) : (
+                          " · waiting on you"
+                        )}
+                      </span>
+                    ) : null}
+                    {match.contested ? (
+                      <span className="no-show__label">Result contested - a player asked for a review</span>
+                    ) : null}
                     {match.roomHash ? (
                       <a
                         className="admin-row__meta"
@@ -97,11 +117,22 @@ export default function BracketRounds({
                     ) : null}
                   </AdminRow.Main>
 
+                  {match.noShow ? (
+                    <AdminRow.Actions>
+                      <form action={dismissNoShowAdminAction}>
+                        <input type="hidden" name="slug" value={slug} />
+                        <input type="hidden" name="matchId" value={match.id} />
+                        <Button type="submit">Dismiss no-show</Button>
+                      </form>
+                    </AdminRow.Actions>
+                  ) : null}
+
                   {!match.bye && match.player1 && match.player2 && view.status !== "complete" ? (
                     <MatchResultForm
                       slug={slug}
                       matchId={match.id}
                       hasResult={match.hasResult}
+                      winningGames={view.winningGames}
                       player1={{
                         name: match.player1.name,
                         defaultValue: match.hasResult

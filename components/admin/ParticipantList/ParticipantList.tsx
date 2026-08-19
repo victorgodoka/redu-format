@@ -19,6 +19,8 @@ export default function ParticipantList({
   editParticipantDeckAction,
   overrideParticipantDeckAction,
   removeParticipantAction,
+  disqualifyParticipantAction,
+  reinstateParticipantAction,
 }: {
   slug: string;
   participants: Participant[];
@@ -29,6 +31,8 @@ export default function ParticipantList({
   editParticipantDeckAction: FormAction;
   overrideParticipantDeckAction: FormAction;
   removeParticipantAction: FormAction;
+  disqualifyParticipantAction: FormAction;
+  reinstateParticipantAction: FormAction;
 }) {
   return (
     <AdminList className="participants">
@@ -141,6 +145,26 @@ export default function ParticipantList({
                 <Button type="submit">Edit deck</Button>
               </form>
             )}
+            {p.disqualifiedAt ? (
+              <form action={reinstateParticipantAction}>
+                <input type="hidden" name="slug" value={slug} />
+                <input type="hidden" name="participantId" value={p.id} />
+                <Button type="submit">Undo disqualification</Button>
+              </form>
+            ) : started ? (
+              <details className="admin-row__override">
+                <summary className="admin-row__meta">Disqualify</summary>
+                <form action={disqualifyParticipantAction} className="payment-controls__confirm">
+                  <input type="hidden" name="slug" value={slug} />
+                  <input type="hidden" name="participantId" value={p.id} />
+                  <input type="text" name="reason" placeholder="Reason (the player sees this)" required />
+                  <Button variant="danger" type="submit">
+                    Disqualify
+                  </Button>
+                </form>
+              </details>
+            ) : null}
+
             {p.droppedAt || p.disqualifiedAt ? null : (
               <DeleteButton
                 action={removeParticipantAction}

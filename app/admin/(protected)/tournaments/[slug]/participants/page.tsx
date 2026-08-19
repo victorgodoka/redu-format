@@ -12,8 +12,10 @@ import {
   addParticipantAction,
   confirmPaymentAction,
   contestPaymentAction,
+  disqualifyParticipantAction,
   editParticipantDeckAction,
   overrideParticipantDeckAction,
+  reinstateParticipantAction,
   removeParticipantAction,
 } from "./actions";
 
@@ -76,6 +78,8 @@ export default async function ParticipantsPage({
           editParticipantDeckAction={editParticipantDeckAction}
           overrideParticipantDeckAction={overrideParticipantDeckAction}
           removeParticipantAction={removeParticipantAction}
+          disqualifyParticipantAction={disqualifyParticipantAction}
+          reinstateParticipantAction={reinstateParticipantAction}
         />
       )}
     </>

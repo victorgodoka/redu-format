@@ -21,7 +21,10 @@ export type AdminAction =
   | "bracket.round"
   | "bracket.result"
   | "bracket.complete"
-  | "bracket.extend_round";
+  | "bracket.extend_round"
+  | "bracket.no_show_dismissed"
+  | "participant.disqualify"
+  | "participant.reinstate";
 
 export const ADMIN_ACTIONS: readonly AdminAction[] = [
   "admin.login",
@@ -44,6 +47,9 @@ export const ADMIN_ACTIONS: readonly AdminAction[] = [
   "bracket.result",
   "bracket.complete",
   "bracket.extend_round",
+  "bracket.no_show_dismissed",
+  "participant.disqualify",
+  "participant.reinstate",
 ];
 
 export type AuditLogEntry = {

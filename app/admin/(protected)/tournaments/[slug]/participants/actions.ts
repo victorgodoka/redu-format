@@ -3,7 +3,12 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { recordAction } from "@/lib/audit-log";
-import { dropFromStartedTournament, hasBracket } from "@/lib/backend/services/results.service";
+import {
+  disqualifyRegistration,
+  dropFromStartedTournament,
+  hasBracket,
+  reinstateRegistration,
+} from "@/lib/backend/services/results.service";
 import { getAdminSession } from "@/lib/auth/session";
 import { NEXUS_DECK_INFO_URL } from "@/lib/nexus-parse";
 import { isHttpUrl } from "@/lib/safe-url";
@@ -248,4 +253,59 @@ export async function removeParticipantAction(form: FormData) {
   }
 
   revalidatePath(`/admin/tournaments/${slug}/participants`);
+}
+
+/**
+ * A moderator disqualifying someone by hand - the same machinery the deck
+ * lock and the two-no-show rule use: recorded on the registration with a
+ * reason, out of the bracket, and the player is told why. Reversible via
+ * reinstateParticipantAction.
+ */
+export async function disqualifyParticipantAction(form: FormData) {
+  const slug = String(form.get("slug") ?? "");
+  const participantId = String(form.get("participantId") ?? "");
+  const reason = String(form.get("reason") ?? "").trim();
+  if (!slug || !participantId) return;
+  if (!reason) errorRedirect(slug, "A disqualification needs a reason - the player is told what it says.");
+
+  const before = (await listParticipants(slug)).find((p) => p.id === participantId);
+  if (!before) return;
+
+  const who = await actor();
+  await disqualifyRegistration(slug, participantId, reason, who.actorDisplayName);
+
+  await recordAction({
+    ...who,
+    action: "participant.disqualify",
+    target: slug,
+    detail: `Disqualified "${before.name}" from "${slug}": ${reason}`,
+  });
+
+  revalidatePath(`/admin/tournaments/${slug}/participants`);
+  revalidatePath(`/admin/tournaments/${slug}/bracket`);
+  revalidatePath(`/events/${slug}`);
+}
+
+/** Undoes a disqualification. Matches conceded while they were out stay as they are - correct those individually. */
+export async function reinstateParticipantAction(form: FormData) {
+  const slug = String(form.get("slug") ?? "");
+  const participantId = String(form.get("participantId") ?? "");
+  if (!slug || !participantId) return;
+
+  const before = (await listParticipants(slug)).find((p) => p.id === participantId);
+  if (!before) return;
+
+  const who = await actor();
+  await reinstateRegistration(slug, participantId);
+
+  await recordAction({
+    ...who,
+    action: "participant.reinstate",
+    target: slug,
+    detail: `Reinstated "${before.name}" in "${slug}" (was: ${before.dqReason ?? "disqualified"})`,
+  });
+
+  revalidatePath(`/admin/tournaments/${slug}/participants`);
+  revalidatePath(`/admin/tournaments/${slug}/bracket`);
+  revalidatePath(`/events/${slug}`);
 }

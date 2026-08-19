@@ -1,5 +1,7 @@
 import Bracket, { type BracketRound } from "@/components/site/Bracket";
+import Countdown from "@/components/site/Countdown";
 import AdminList, { AdminRow } from "@/components/admin/AdminList";
+import { formatDate, formatTime } from "@/lib/events";
 import type { BracketMatch, BracketView } from "@/lib/backend/services/results.service";
 
 /** Elimination round names read off the size of the round itself - a 1-match round is the final, whatever number the engine gave it. */
@@ -13,6 +15,26 @@ function cutLabel(matchCount: number): string {
 function score(match: BracketMatch): { p1: string; p2: string } | null {
   if (!match.hasResult) return null;
   return { p1: String(match.player1?.win ?? 0), p2: String(match.player2?.win ?? 0) };
+}
+
+/** What a match is doing right now, in one line: the score if it is done, its clock if it is live. */
+function MatchState({ match }: { match: BracketMatch }) {
+  const s = score(match);
+  if (match.bye) return <>Automatic win</>;
+  if (s) return <>{`${s.p1}-${s.p2}`}</>;
+  if (match.active && match.deadlineAt) {
+    return (
+      <>
+        In progress ·{" "}
+        <Countdown
+          to={match.deadlineAt}
+          fallback={`closes ${formatDate(match.deadlineAt)} ${formatTime(match.deadlineAt)}`}
+        />{" "}
+        left
+      </>
+    );
+  }
+  return <>{match.active ? "In progress" : "Waiting on its players"}</>;
 }
 
 function toMatchNode(m: BracketMatch) {
@@ -51,23 +73,28 @@ function toTree(matches: BracketMatch[], named: boolean): BracketRound[] {
 }
 
 function MatchRow({ match, showLabel }: { match: BracketMatch; showLabel?: boolean }) {
-  const s = score(match);
   return (
-    <AdminRow className="bracket">
+    <AdminRow className={`bracket${match.noShow ? " no-show" : ""}`}>
       <AdminRow.Main>
         <span className="admin-row__title">
           {match.player1?.name ?? "TBD"} vs {match.bye ? "Bye" : (match.player2?.name ?? "TBD")}
         </span>
         <span className="admin-row__meta">
           {showLabel ? `${match.label} · ` : ""}
-          {match.bye
-            ? "Automatic win"
-            : s
-              ? `${s.p1}-${s.p2}`
-              : match.disputed
-                ? "Disputed - waiting on a Tournament Organizer"
-                : "In progress"}
+          <MatchState match={match} />
         </span>
+        {match.noShow ? (
+          <span className="no-show__label">
+            No-Show Report
+            {match.noShow.autoResolvesAt ? (
+              <>
+                {" · decides in "}
+                <Countdown to={match.noShow.autoResolvesAt} fallback="soon" urgentUnder={120} />
+              </>
+            ) : null}
+          </span>
+        ) : null}
+        {match.contested ? <span className="no-show__label">Result contested</span> : null}
       </AdminRow.Main>
     </AdminRow>
   );

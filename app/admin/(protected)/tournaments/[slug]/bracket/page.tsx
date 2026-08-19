@@ -18,10 +18,13 @@ export const metadata: Metadata = {
 
 export default async function BracketPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<{ error?: string }>;
 }) {
   const { slug } = await params;
+  const { error } = await searchParams;
 
   const tournament = await getTournament(slug);
   if (!tournament) notFound();
@@ -49,6 +52,12 @@ export default async function BracketPage({
         title={`${tournament.name} · Bracket`}
         back={{ href: `/admin/tournaments/${slug}`, label: "← Back to tournament" }}
       />
+
+      {error ? (
+        <p role="alert" className="form__error">
+          {error}
+        </p>
+      ) : null}
 
       {view && view.status !== "complete" ? (
         <p className="lede">

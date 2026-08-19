@@ -4,6 +4,7 @@ import type { ExportedTournamentValues } from "tournament-organizer/interfaces";
 import type { Structure, TournamentEvent } from "../../events.ts";
 import { getPool } from "../db/client.ts";
 import { MatchDeadlinesRepository, type MatchTracking } from "../repositories/match-deadlines.repository.ts";
+import { MatchFlagsRepository, type MatchFlag } from "../repositories/match-flags.repository.ts";
 import { MatchReportsRepository, type MatchReport, type MatchResult } from "../repositories/match-reports.repository.ts";
 import { PlacingsRepository, type Placing } from "../repositories/placings.repository.ts";
 import { TournamentBracketsRepository } from "../repositories/tournament-brackets.repository.ts";
@@ -19,6 +20,20 @@ export const ROUND_LOCKED_MESSAGE =
 
 /** Winning a top cut (stage two) match is worth this many extra leaderboard points, on top of the normal match score. */
 const TOP_CUT_MATCH_BONUS = 5;
+
+/** How long into a match before its players can call a no-show on each other. */
+export const NO_SHOW_AVAILABLE_AFTER_MS = 3 * 60 * 1000;
+
+/** How long an unanswered no-show stands before it hands the match to whoever called it. Same-day tournaments only. */
+export const NO_SHOW_GRACE_MS = 5 * 60 * 1000;
+
+/** Two no-shows that stuck and you are out of the tournament. */
+const NO_SHOW_DQ_LIMIT = 2;
+
+/** Games the winner needs, by match format - there are no draws, so a series always has one. */
+export function winningGames(matchFormat: "Bo1" | "Bo3"): number {
+  return matchFormat === "Bo3" ? 2 : 1;
+}
 
 export type BracketPlayer = { registrationId: string; name: string; win: number; loss: number; draw: number };
 
@@ -43,10 +58,19 @@ export type BracketMatch = {
   deadlineAt: string | null;
   /** The Dueling Nexus room hash (`duelingnexus.com/duel/NA-{hash}`), or null for a bye/not-yet-paired match. */
   roomHash: string | null;
-  /** Self-reports currently on file for this match - normally 0 or 1 while waiting, briefly 2 when they disagree. */
-  reports: { registrationId: string; result: MatchResult }[];
-  /** Both sides reported, but their reports don't reconcile - needs a mod to enter the real result. */
-  disputed: boolean;
+  /** Who called this match, and with what score. One report settles it, so this is normally 0 or 1 entries. */
+  reports: { registrationId: string; result: MatchResult; winnerGames: number; loserGames: number }[];
+  /** The series score as played, e.g. "2-1" - null until the match is settled. */
+  score: string | null;
+  /** An open no-show call on this match: the bracket shows it in red until it is dismissed or it decides the match. */
+  noShow: {
+    reporterRegistrationId: string;
+    targetRegistrationId: string | null;
+    /** When the accused loses automatically. Null in a long-duration tournament, which waits for a moderator. */
+    autoResolvesAt: string | null;
+  } | null;
+  /** A player asked a moderator to look at the result on file. */
+  contested: boolean;
 };
 
 export type BracketStanding = {
@@ -64,6 +88,8 @@ export type BracketView = {
   stageOneRounds: number;
   /** Timer/lock state of the round in progress, derived from persisted deadlines. */
   clock: RoundClock;
+  /** Games that win a series here - 2 in a Bo3, 1 in a Bo1. There are no draws. */
+  winningGames: number;
   format: Structure;
   topCutFormat: "single-elimination" | "double-elimination" | "stepladder" | null;
   matches: BracketMatch[];
@@ -79,6 +105,7 @@ function repos() {
     registrations: new RegistrationsRepository(pool),
     matchReports: new MatchReportsRepository(pool),
     matchDeadlines: new MatchDeadlinesRepository(pool),
+    matchFlags: new MatchFlagsRepository(pool),
   };
 }
 
@@ -99,22 +126,26 @@ async function syncMatchDeadlines(tournamentId: string, engine: EngineTournament
   await repos().matchDeadlines.ensureActiveSince(tournamentId, activeMatchIds, new Date(), () => generateNexusRoomHash());
 }
 
-function reportsAgree(a: MatchResult, b: MatchResult): boolean {
-  if (a === "draw" || b === "draw") return a === "draw" && b === "draw";
-  // One win + one loss agree on who won; both win or both loss are a conflict.
-  return a !== b;
-}
-
-/** Enters the real result from a single honored report - used both when both sides' reports agree, and when only one side ever reported and the deadline forces a call. */
-function enterFromReport(engine: EngineTournament, matchId: string, reporterId: string, result: MatchResult): void {
-  if (result === "draw") {
-    engine.enterResult(matchId, 0, 0, 1);
-    return;
-  }
+/**
+ * Writes a settled series into the engine from one side's point of view.
+ * There are no draws here: somebody won, and the games say how comfortably.
+ */
+function enterFromReport(
+  engine: EngineTournament,
+  matchId: string,
+  reporterId: string,
+  reporterWon: boolean,
+  winnerGames = 1,
+  loserGames = 0,
+): void {
   const reporterIsP1 = engine.getMatch(matchId).getPlayer1().id === reporterId;
-  const reporterWon = result === "win";
   const p1Won = reporterIsP1 ? reporterWon : !reporterWon;
-  engine.enterResult(matchId, p1Won ? 1 : 0, p1Won ? 0 : 1, 0);
+  engine.enterResult(
+    matchId,
+    p1Won ? winnerGames : loserGames,
+    p1Won ? loserGames : winnerGames,
+    0,
+  );
 }
 
 /**
@@ -137,18 +168,30 @@ function resolveOverdueMatch(
   engine: EngineTournament,
   match: ReturnType<EngineTournament["getMatch"]>,
   reports: MatchReport[],
+  noShow?: MatchFlag,
 ): { absentIds: string[]; presentIds: string[] } {
   const p1Id = match.getPlayer1().id!;
   const p2Id = match.getPlayer2().id!;
   const p1Report = reports.find((r) => r.registrationId === p1Id);
   const p2Report = reports.find((r) => r.registrationId === p2Id);
 
+  // Nobody reported a result, but somebody did say their opponent never
+  // turned up - the round closing is what finally settles that call.
+  if (!p1Report && !p2Report && noShow) {
+    enterFromReport(engine, match.getId(), noShow.reporterRegistrationId, true);
+    const absent = noShow.targetRegistrationId;
+    return {
+      absentIds: absent ? [absent] : [],
+      presentIds: [noShow.reporterRegistrationId],
+    };
+  }
+
   if (p1Report && !p2Report) {
-    enterFromReport(engine, match.getId(), p1Id, p1Report.result);
+    enterFromReport(engine, match.getId(), p1Id, p1Report.result === "win", p1Report.winnerGames, p1Report.loserGames);
     return { absentIds: [p2Id], presentIds: [p1Id] };
   }
   if (p2Report && !p1Report) {
-    enterFromReport(engine, match.getId(), p2Id, p2Report.result);
+    enterFromReport(engine, match.getId(), p2Id, p2Report.result === "win", p2Report.winnerGames, p2Report.loserGames);
     return { absentIds: [p1Id], presentIds: [p2Id] };
   }
   if (engine.isElimination()) {
@@ -157,7 +200,7 @@ function resolveOverdueMatch(
     engine.enterResult(match.getId(), 0, 0, 0);
     match.set({ meta: { doubleLoss: true } });
   }
-  // Both reported (but disputed, never reconciled) - both showed up, neither is "absent".
+  // Both reported - both showed up, neither is "absent".
   // Neither reported - nobody showed up, both are.
   return p1Report && p2Report ? { absentIds: [], presentIds: [p1Id, p2Id] } : { absentIds: [p1Id, p2Id], presentIds: [] };
 }
@@ -278,6 +321,7 @@ function toView(
   event: TournamentEvent,
   tracking: Map<string, MatchTracking>,
   reports: MatchReport[],
+  flags: MatchFlag[] = [],
 ): BracketView {
   const playersById = new Map(engine.getPlayers().map((p) => [p.getId(), p]));
   const cutoffMs = roundCutoffMs(event);
@@ -288,6 +332,11 @@ function toView(
   }
 
   const eliminationLabels = eliminationMatches(engine);
+  const flagsByMatch = new Map<string, MatchFlag[]>();
+  for (const f of flags) {
+    if (!flagsByMatch.has(f.matchId)) flagsByMatch.set(f.matchId, []);
+    flagsByMatch.get(f.matchId)!.push(f);
+  }
 
   const matches: BracketMatch[] = engine.getMatches().map((m) => {
     const p1 = m.getPlayer1();
@@ -313,8 +362,24 @@ function toView(
       player2: toBracketPlayer(p2),
       deadlineAt: matchTracking ? effectiveDeadline(matchTracking, cutoffMs).toISOString() : null,
       roomHash: matchTracking?.roomHash ?? null,
-      reports: matchReports.map((r) => ({ registrationId: r.registrationId, result: r.result })),
-      disputed: matchReports.length === 2 && !reportsAgree(matchReports[0].result, matchReports[1].result),
+      reports: matchReports.map((r) => ({
+        registrationId: r.registrationId,
+        result: r.result,
+        winnerGames: r.winnerGames,
+        loserGames: r.loserGames,
+      })),
+      score: m.hasEnded() && !m.isBye() ? `${p1.win}-${p2.win}` : null,
+      noShow: (() => {
+        const flag = flagsByMatch.get(m.getId())?.find((f) => f.kind === "no_show");
+        return flag
+          ? {
+              reporterRegistrationId: flag.reporterRegistrationId,
+              targetRegistrationId: flag.targetRegistrationId,
+              autoResolvesAt: flag.autoResolvesAt?.toISOString() ?? null,
+            }
+          : null;
+      })(),
+      contested: Boolean(flagsByMatch.get(m.getId())?.some((f) => f.kind === "contest")),
     };
   });
 
@@ -336,6 +401,7 @@ function toView(
     round: engine.getRoundNumber(),
     stageOneRounds: engine.getStageOne().rounds,
     clock: clockFor(event, engine, tracking),
+    winningGames: winningGames(event.matchFormat),
     format: event.structure,
     topCutFormat: stageTwoFormat,
     matches,
@@ -561,12 +627,13 @@ export async function getBracketView(slug: string): Promise<BracketView | null> 
   const engine = await loadEngine(tournamentId);
   if (!engine) return null;
 
-  const [tracking, reports] = await Promise.all([
+  const [tracking, reports, flags] = await Promise.all([
     matchDeadlines.getTrackingMap(tournamentId),
     matchReports.listForTournament(tournamentId),
+    repos().matchFlags.listOpen(tournamentId),
   ]);
 
-  return toView(engine, event, tracking, reports);
+  return toView(engine, event, tracking, reports, flags);
 }
 
 /**
@@ -655,7 +722,7 @@ export async function generateNextRound(slug: string): Promise<void> {
  * Admin override: enters or replaces a result directly, regardless of what
  * (if anything) players have self-reported for this match - clearing those
  * reports afterward so a stale disagreement doesn't linger once a mod has
- * settled it. This is also how a disputed match gets resolved.
+ * settled it. This is also how a contested result gets put right.
  *
  * The round-lock only applies to *correcting* a match that already has a
  * result - once any match in a later round has been paired off the back of
@@ -685,10 +752,24 @@ export async function enterMatchResult(
   // elimination-bracket progression the old result already caused, so the
   // correction propagates forward cleanly instead of double-advancing anyone.
   if (match.hasEnded()) {
-    const nextRoundStarted = engine
-      .getMatches()
-      .some((m) => m.getRoundNumber() > match.getRoundNumber() && m.isPaired());
-    if (nextRoundStarted) {
+    // What makes a correction unsafe is a *downstream* result, not a bigger
+    // round number. In a double-elimination bracket the round numbers run
+    // winners-then-losers, so "any higher round is paired" was true from the
+    // first round onward and blocked every correction in the event. The graph
+    // says it properly: this result feeds the matches at path.win/path.loss,
+    // and only once one of those has been played is rewriting it unsafe.
+    const downstream = [match.getPath().win, match.getPath().loss]
+      .filter((id): id is string => id !== null)
+      .map((id) => engine.getMatch(id));
+    const decided = downstream.find((m) => m.hasEnded());
+    if (decided) {
+      throw new Error(
+        "This match already fed a later one that has been played - correct that result first, then come back to this.",
+      );
+    }
+    // Swiss has no such graph: its pairings are recomputed, so the guard is
+    // still "has the round moved on".
+    if (!engine.isElimination() && engine.getRoundNumber() > match.getRoundNumber()) {
       throw new Error("This match's round has already closed - the next round has started, so its result can no longer be changed.");
     }
     engine.clearResult(matchId);
@@ -749,17 +830,22 @@ export async function dropFromStartedTournament(slug: string, registrationId: st
 }
 
 /**
- * Player self-report. A match resolves the moment both sides' reports agree;
- * if they conflict (both claim win, both claim loss, or a draw mismatched
- * against a win/loss) it's left disputed for a mod to resolve via
- * enterMatchResult - the round can't advance past it until then, since it
- * still shows up as an unresolved active match.
+ * Player self-report, and the only thing needed to settle a duel: one side
+ * says who won and with what score, and the match is done. The other side
+ * does not have to confirm anything - they see the report, and if it is wrong
+ * they raise it with a moderator (contestMatchResult), who can rewrite the
+ * result freely.
+ *
+ * There are no draws: a series always has a winner. `winnerGames`/`loserGames`
+ * are the series score (2-1 in a Bo3, 1-0 in a Bo1).
  */
 export async function submitMatchReport(
   slug: string,
   matchId: string,
   registrationId: string,
-  result: MatchResult,
+  won: boolean,
+  winnerGames?: number,
+  loserGames = 0,
 ): Promise<void> {
   const { tournaments, matchReports, matchDeadlines } = repos();
   const [tournamentId, event] = await Promise.all([tournaments.findIdBySlug(slug), tournaments.findBySlug(slug)]);
@@ -784,18 +870,71 @@ export async function submitMatchReport(
   const p2Id = match.getPlayer2().id;
   if (registrationId !== p1Id && registrationId !== p2Id) throw new Error("You're not in this match");
 
-  await matchReports.submit(tournamentId, matchId, registrationId, result);
+  // A series can only be won by the format's game count, and the loser can
+  // never have matched it - anything else is a typed-in impossibility.
+  const needed = winningGames(event.matchFormat);
+  const winner = winnerGames ?? needed;
+  if (winner !== needed || loserGames < 0 || loserGames >= needed) {
+    throw new Error(`A ${event.matchFormat} series is won ${needed}-0${needed > 1 ? ` or ${needed}-${needed - 1}` : ""}`);
+  }
 
-  const reports = await matchReports.listForMatch(matchId);
-  const mine = reports.find((r) => r.registrationId === registrationId)!;
-  const theirs = reports.find((r) => r.registrationId !== registrationId);
-  if (!theirs || !reportsAgree(mine.result, theirs.result)) return;
+  await matchReports.submit(tournamentId, matchId, registrationId, won ? "win" : "loss", winner, loserGames);
 
-  enterFromReport(engine, matchId, registrationId, mine.result);
+  // One report settles it. The record of who called it stays on the row so the
+  // other player can see it and contest it if it is wrong.
+  enterFromReport(engine, matchId, registrationId, won, winner, loserGames);
   await persistEngine(tournamentId, engine);
-  await matchReports.clearForMatch(matchId);
   await repos().registrations.resetAbsences([p1Id, p2Id].filter((id): id is string => id !== null));
+  // Reporting is showing up: any no-show call on this match is moot now.
+  await repos().matchFlags.dismiss(matchId, "no_show", "result reported");
   await syncMatchDeadlines(tournamentId, engine);
+}
+
+/**
+ * The other player disagrees with the result on file. Nothing changes in the
+ * bracket - it flags the match and hands a moderator everything they need to
+ * rule on it, since a moderator can rewrite any result.
+ */
+export async function contestMatchResult(slug: string, matchId: string, registrationId: string): Promise<void> {
+  const { tournaments, matchReports, matchFlags } = repos();
+  const [tournamentId, event] = await Promise.all([tournaments.findIdBySlug(slug), tournaments.findBySlug(slug)]);
+  if (!tournamentId || !event) throw new Error(`Tournament "${slug}" does not exist`);
+  const engine = await loadEngine(tournamentId);
+  if (!engine) throw new Error(`Tournament "${slug}" has no bracket yet`);
+
+  const match = engine.getMatch(matchId);
+  const p1Id = match.getPlayer1().id;
+  const p2Id = match.getPlayer2().id;
+  if (registrationId !== p1Id && registrationId !== p2Id) throw new Error("You're not in this match");
+
+  await matchFlags.raise({
+    tournamentId,
+    matchId,
+    kind: "contest",
+    reporterRegistrationId: registrationId,
+    targetRegistrationId: null,
+    autoResolvesAt: null,
+  });
+
+  const nameOf = (id: string | null) => engine.getPlayers().find((p) => p.getId() === id)?.getName() ?? "?";
+  const report = (await matchReports.listForMatch(matchId))[0];
+  const label = eliminationMatches(engine).get(matchId)?.label ?? describeRound(engine, match.getRoundNumber()).roundLabel;
+
+  await notifyAdmins({
+    kind: "match.contested",
+    title: `Result contested - ${nameOf(registrationId)} in ${event.name}`,
+    body: [
+      `Tournament: ${event.name} (${slug}), ${event.structure}, ${event.matchFormat}`,
+      `Round: ${label}`,
+      `Players: ${nameOf(p1Id)} vs ${nameOf(p2Id)}`,
+      `Contested by: ${nameOf(registrationId)}`,
+      report
+        ? `Result on file: ${nameOf(report.registrationId)} reported a ${report.result} at ${report.winnerGames}-${report.loserGames}`
+        : "Result on file: none - nobody has reported this match",
+      `Manage: /admin/tournaments/${slug}/bracket`,
+    ].join("\n"),
+    fingerprint: `contest|${matchId}|${registrationId}`,
+  });
 }
 
 /**
@@ -810,6 +949,11 @@ export async function closeOverdueMatches(slug: string): Promise<{ resolved: num
   const { tournaments, matchDeadlines, matchReports } = repos();
   const [tournamentId, event] = await Promise.all([tournaments.findIdBySlug(slug), tournaments.findBySlug(slug)]);
   if (!tournamentId || !event) return { resolved: 0, advanced: false };
+
+  // A no-show whose grace ran out decides its match before anything else is
+  // measured - it may be what closes the round, so it runs before the engine
+  // is read.
+  await resolveDueNoShows(new Date(), tournamentId);
 
   const engine = await loadEngine(tournamentId);
   if (!engine || engine.getStatus() === "setup" || engine.getStatus() === "complete") {
@@ -835,9 +979,17 @@ export async function closeOverdueMatches(slug: string): Promise<{ resolved: num
     if (!reportsByMatch.has(r.matchId)) reportsByMatch.set(r.matchId, []);
     reportsByMatch.get(r.matchId)!.push(r);
   }
+  const openFlags = await repos().matchFlags.listOpen(tournamentId);
 
   for (const match of overdue) {
-    const { absentIds, presentIds } = resolveOverdueMatch(engine, match, reportsByMatch.get(match.getId()) ?? []);
+    const noShow = openFlags.find((f) => f.kind === "no_show" && f.matchId === match.getId());
+    const { absentIds, presentIds } = resolveOverdueMatch(
+      engine,
+      match,
+      reportsByMatch.get(match.getId()) ?? [],
+      noShow,
+    );
+    if (noShow) await repos().matchFlags.resolve(match.getId(), "no_show");
     await matchReports.clearForMatch(match.getId());
     await repos().registrations.resetAbsences(presentIds);
 
@@ -1070,8 +1222,20 @@ export type MyMatchView = {
   roundLabel: string;
   opponentName: string | null;
   myReport: MatchResult | null;
-  opponentReported: boolean;
-  disputed: boolean;
+  /** The score on file, from whoever reported: e.g. "2-1". Null while nothing is reported. */
+  reportedScore: string | null;
+  /** True when the report on file is the opponent's, so this player is the one who can contest it. */
+  reportedByOpponent: boolean;
+  /** A moderator has been asked to look at this result. */
+  contested: boolean;
+  /** How many games win the series in this tournament - 2 for Bo3, 1 for Bo1. */
+  winningGames: number;
+  /** An open no-show call on this match, and who it names. */
+  noShow: { byMe: boolean; againstMe: boolean; autoResolvesAt: string | null } | null;
+  /** The no-show button only appears a few minutes in - this is when it does. */
+  noShowAvailableAt: string | null;
+  /** Whether that moment has arrived, decided here rather than by whatever clock the browser has. */
+  canReportNoShow: boolean;
   deadlineAt: string | null;
   roomHash: string | null;
   /** Reporting is closed for this round - the UI must say why, and the server rejects a report regardless. */
@@ -1100,6 +1264,10 @@ export async function getMyCurrentMatch(slug: string, registrationId: string): P
   const reports = await matchReports.listForMatch(match.getId());
   const mine = reports.find((r) => r.registrationId === registrationId);
   const theirs = reports.find((r) => r.registrationId !== registrationId);
+  const onFile = mine ?? theirs;
+
+  const flags = (await repos().matchFlags.listOpen(tournamentId)).filter((f) => f.matchId === match.getId());
+  const noShowFlag = flags.find((f) => f.kind === "no_show");
 
   const tracking = await matchDeadlines.getTrackingMap(tournamentId);
   const matchTracking = tracking.get(match.getId());
@@ -1112,8 +1280,23 @@ export async function getMyCurrentMatch(slug: string, registrationId: string): P
     ...describeRound(engine, match.getRoundNumber()),
     opponentName: opponent?.getName() ?? null,
     myReport: mine?.result ?? null,
-    opponentReported: Boolean(theirs),
-    disputed: Boolean(mine && theirs && !reportsAgree(mine.result, theirs.result)),
+    reportedScore: onFile ? `${onFile.winnerGames}-${onFile.loserGames}` : null,
+    reportedByOpponent: Boolean(theirs) && !mine,
+    contested: Boolean(flags.find((f) => f.kind === "contest")),
+    winningGames: winningGames(event.matchFormat),
+    noShow: noShowFlag
+      ? {
+          byMe: noShowFlag.reporterRegistrationId === registrationId,
+          againstMe: noShowFlag.targetRegistrationId === registrationId,
+          autoResolvesAt: noShowFlag.autoResolvesAt?.toISOString() ?? null,
+        }
+      : null,
+    noShowAvailableAt: matchTracking
+      ? new Date(matchTracking.activeSince.getTime() + NO_SHOW_AVAILABLE_AFTER_MS).toISOString()
+      : null,
+    canReportNoShow: Boolean(
+      matchTracking && !noShowFlag && Date.now() - matchTracking.activeSince.getTime() >= NO_SHOW_AVAILABLE_AFTER_MS,
+    ),
     deadlineAt,
     roomHash: matchTracking?.roomHash ?? null,
     locked: clock.locked || matchIsOverdue(match.getId(), tracking, roundCutoffMs(event)),
@@ -1270,9 +1453,228 @@ export async function getMyMatchHistory(slug: string, registrationId: string): P
 
 /** Test seam. */
 export async function resetResultsData(): Promise<void> {
-  const { brackets, placings, matchReports, matchDeadlines } = repos();
+  const { brackets, placings, matchReports, matchDeadlines, matchFlags } = repos();
   await brackets.clear();
   await placings.clear();
   await matchReports.clear();
   await matchDeadlines.clear();
+  await matchFlags.clear();
+}
+
+// --- No-shows, contests and disqualifications ---------------------------------
+
+/** Sends one alert to every moderator. Thin wrapper so the notification shape stays in one place. */
+async function notifyAdmins(input: { kind: string; title: string; body: string; fingerprint: string }): Promise<void> {
+  const { notify } = await import("./notifications.service.ts");
+  const { createHash } = await import("node:crypto");
+  await notify({
+    id: crypto.randomUUID(),
+    audience: "admin",
+    playerId: null,
+    kind: input.kind,
+    title: input.title,
+    body: input.body,
+    metadata: null,
+    fingerprint: createHash("sha256").update(input.fingerprint).digest("hex"),
+  });
+}
+
+/** Sends one alert to a single player. */
+async function notifyPlayer(
+  registrationId: string,
+  input: { kind: string; title: string; body: string; fingerprint: string },
+): Promise<void> {
+  const playerId = await repos().registrations.findPlayerIdByRegistration(registrationId);
+  if (!playerId) return;
+  const { notify } = await import("./notifications.service.ts");
+  const { createHash } = await import("node:crypto");
+  await notify({
+    id: crypto.randomUUID(),
+    audience: "player",
+    playerId,
+    kind: input.kind,
+    title: input.title,
+    body: input.body,
+    metadata: null,
+    fingerprint: createHash("sha256").update(input.fingerprint).digest("hex"),
+  });
+}
+
+export type NoShowOutcome = "raised" | "too-early" | "already-open" | "not-your-match" | "match-closed";
+
+/**
+ * "My opponent never turned up." Available a few minutes into a match, and it
+ * does not decide anything by itself: it alerts the moderators and the accused
+ * player, and marks the match on the bracket. In a same-day tournament an
+ * unanswered call hands the match over after NO_SHOW_GRACE_MS; a long-duration
+ * one waits for a moderator however long that takes. Either player in the duel
+ * can call it off (dismissNoShow).
+ */
+export async function reportNoShow(slug: string, matchId: string, registrationId: string): Promise<NoShowOutcome> {
+  const { tournaments, matchFlags, matchDeadlines } = repos();
+  const [tournamentId, event] = await Promise.all([tournaments.findIdBySlug(slug), tournaments.findBySlug(slug)]);
+  if (!tournamentId || !event) throw new Error(`Tournament "${slug}" does not exist`);
+  const engine = await loadEngine(tournamentId);
+  if (!engine) throw new Error(`Tournament "${slug}" has no bracket yet`);
+
+  const match = engine.getMatch(matchId);
+  if (!match.isActive()) return "match-closed";
+  const p1Id = match.getPlayer1().id;
+  const p2Id = match.getPlayer2().id;
+  if (registrationId !== p1Id && registrationId !== p2Id) return "not-your-match";
+
+  const tracking = (await matchDeadlines.getTrackingMap(tournamentId)).get(matchId);
+  if (!tracking || Date.now() - tracking.activeSince.getTime() < NO_SHOW_AVAILABLE_AFTER_MS) return "too-early";
+  if (await matchFlags.findOpen(matchId, "no_show")) return "already-open";
+
+  const opponentId = registrationId === p1Id ? p2Id : p1Id;
+  const sameDay = event.durationMode !== "long";
+
+  await matchFlags.raise({
+    tournamentId,
+    matchId,
+    kind: "no_show",
+    reporterRegistrationId: registrationId,
+    targetRegistrationId: opponentId,
+    autoResolvesAt: sameDay ? new Date(Date.now() + NO_SHOW_GRACE_MS) : null,
+  });
+
+  const nameOf = (id: string | null) => engine.getPlayers().find((p) => p.getId() === id)?.getName() ?? "?";
+  const label = eliminationMatches(engine).get(matchId)?.label ?? describeRound(engine, match.getRoundNumber()).roundLabel;
+
+  await notifyAdmins({
+    kind: "match.no_show",
+    title: `No-show reported - ${nameOf(opponentId)} in ${event.name}`,
+    body: [
+      `Tournament: ${event.name} (${slug}), ${event.structure}, ${event.matchFormat}`,
+      `Round: ${label}`,
+      `Players: ${nameOf(p1Id)} vs ${nameOf(p2Id)}`,
+      `Reported by: ${nameOf(registrationId)}`,
+      `Accused of not showing: ${nameOf(opponentId)}`,
+      sameDay
+        ? `Decides itself in ${NO_SHOW_GRACE_MS / 60000} minutes unless someone dismisses it.`
+        : "Waiting on a moderator - a long-duration tournament never decides this on its own.",
+      `Manage: /admin/tournaments/${slug}/bracket`,
+    ].join("\n"),
+    fingerprint: `no_show|${matchId}|${Date.now()}`,
+  });
+
+  if (opponentId) {
+    await notifyPlayer(opponentId, {
+      kind: "match.no_show",
+      title: `${nameOf(registrationId)} reported you as a no-show in ${event.name}`,
+      body:
+        `Your opponent in ${label} says you have not turned up for the duel. ` +
+        (sameDay
+          ? `If nothing happens in the next ${NO_SHOW_GRACE_MS / 60000} minutes, the match is awarded to them. `
+          : "A moderator will look at it. ") +
+        "Open the tournament and report your result, or dismiss the call if you are there. " +
+        "Two no-shows that stand means disqualification.",
+      fingerprint: `no_show_player|${matchId}|${Date.now()}`,
+    });
+  }
+
+  return "raised";
+}
+
+/** Called off by either player in the duel, or by a moderator. The match simply carries on. */
+export async function dismissNoShow(slug: string, matchId: string, by: string): Promise<boolean> {
+  return repos().matchFlags.dismiss(matchId, "no_show", by);
+}
+
+/**
+ * Hands over every same-day match whose no-show call ran out of grace. The
+ * player who was called out loses, and that no-show goes on their record -
+ * two of them and they are disqualified.
+ */
+export async function resolveDueNoShows(now: Date = new Date(), tournamentId?: string): Promise<number> {
+  const { matchFlags, tournaments, registrations } = repos();
+  const due = await matchFlags.listDueNoShows(now, tournamentId);
+  let resolved = 0;
+
+  for (const flag of due) {
+    const slug = await tournaments.findSlugById(flag.tournamentId);
+    if (!slug) continue;
+    const engine = await loadEngine(flag.tournamentId);
+    if (!engine) continue;
+
+    const match = engine.getMatch(flag.matchId);
+    if (!match?.isActive()) {
+      await matchFlags.dismiss(flag.matchId, "no_show", "match already settled");
+      continue;
+    }
+
+    enterFromReport(engine, flag.matchId, flag.reporterRegistrationId, true);
+    await persistEngine(flag.tournamentId, engine);
+    await matchFlags.resolve(flag.matchId, "no_show");
+    await syncMatchDeadlines(flag.tournamentId, engine);
+    resolved++;
+
+    if (!flag.targetRegistrationId) continue;
+    const strikes = await registrations.incrementNoShows(flag.targetRegistrationId);
+    await notifyPlayer(flag.targetRegistrationId, {
+      kind: "match.no_show",
+      title: `You lost a match by no-show`,
+      body:
+        `Nobody answered the no-show call on your duel, so it was awarded to your opponent. ` +
+        `That is no-show ${strikes} of ${NO_SHOW_DQ_LIMIT} - reaching ${NO_SHOW_DQ_LIMIT} means disqualification.`,
+      fingerprint: `no_show_lost|${flag.matchId}`,
+    });
+
+    if (strikes >= NO_SHOW_DQ_LIMIT) {
+      await disqualifyRegistration(slug, flag.targetRegistrationId, `${strikes} no-shows`, "system");
+    }
+  }
+
+  return resolved;
+}
+
+/**
+ * Puts a player out of a tournament for good: recorded on the registration,
+ * removed from the bracket, and they are told why. Used by the two-no-show
+ * rule, by the deck lock, and by a moderator doing it by hand.
+ */
+export async function disqualifyRegistration(
+  slug: string,
+  registrationId: string,
+  reason: string,
+  by: string,
+): Promise<void> {
+  await repos().registrations.markDisqualified(registrationId, reason);
+  await dropFromStartedTournament(slug, registrationId).catch(() => {});
+  await notifyPlayer(registrationId, {
+    kind: "player.disqualified",
+    title: `You have been disqualified`,
+    body:
+      `You are out of this tournament. Reason on file: ${reason}. ` +
+      (by === "system" ? "This was applied automatically. " : `Applied by ${by}. `) +
+      "Contact a Tournament Organizer if you believe this is a mistake.",
+    fingerprint: `dq|${registrationId}`,
+  });
+}
+
+/**
+ * Undoes a disqualification: the flags come off and the player is active in
+ * the bracket again. Matches already conceded while they were out stay as
+ * they are - a moderator can correct those individually.
+ */
+export async function reinstateRegistration(slug: string, registrationId: string): Promise<void> {
+  const tournamentId = await repos().tournaments.findIdBySlug(slug);
+  if (!tournamentId) throw new Error(`Tournament "${slug}" does not exist`);
+
+  await repos().registrations.clearDisqualification(registrationId);
+
+  const engine = await loadEngine(tournamentId);
+  const player = engine?.getPlayers().find((p) => p.getId() === registrationId);
+  if (engine && player) {
+    player.set({ active: true });
+    await persistEngine(tournamentId, engine);
+  }
+
+  await notifyPlayer(registrationId, {
+    kind: "player.disqualified",
+    title: "Your disqualification was lifted",
+    body: "A Tournament Organizer reinstated you - you are back in the tournament.",
+    fingerprint: `dq_undo|${registrationId}|${Date.now()}`,
+  });
 }

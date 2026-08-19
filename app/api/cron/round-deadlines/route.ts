@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { closeAllOverdueMatches } from "@/lib/backend/services/results.service";
+import { closeAllOverdueMatches, resolveDueNoShows } from "@/lib/backend/services/results.service";
 
 /**
  * Vercel Cron target (see vercel.json) - force-closes any match whose round
@@ -20,6 +20,7 @@ export async function GET(request: Request) {
     return new NextResponse("Unauthorized", { status: 401 });
   }
 
+  const noShows = await resolveDueNoShows();
   const results = await closeAllOverdueMatches();
-  return NextResponse.json({ results });
+  return NextResponse.json({ noShows, results });
 }

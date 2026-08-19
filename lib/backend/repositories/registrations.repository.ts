@@ -393,6 +393,33 @@ export class RegistrationsRepository {
     );
   }
 
+  /** The player account behind a registration, for alerts addressed to them. Null for an admin-added row with no account. */
+  async findPlayerIdByRegistration(registrationId: string): Promise<string | null> {
+    const [rows] = await this.pool.query<RowDataPacket[]>(
+      "SELECT player_id FROM registrations WHERE id = ? LIMIT 1",
+      [registrationId],
+    );
+    return rows[0]?.player_id ?? null;
+  }
+
+  /** One more no-show that stuck; returns the new total, which is what the two-strike disqualification reads. */
+  async incrementNoShows(registrationId: string): Promise<number> {
+    await this.pool.query("UPDATE registrations SET no_show_count = no_show_count + 1 WHERE id = ?", [registrationId]);
+    const [rows] = await this.pool.query<RowDataPacket[]>(
+      "SELECT no_show_count FROM registrations WHERE id = ?",
+      [registrationId],
+    );
+    return Number(rows[0]?.no_show_count ?? 0);
+  }
+
+  /** Lifts a disqualification - the drop goes with it, since the player is back in. */
+  async clearDisqualification(registrationId: string): Promise<void> {
+    await this.pool.query(
+      "UPDATE registrations SET disqualified_at = NULL, dq_reason = NULL, dropped_at = NULL WHERE id = ?",
+      [registrationId],
+    );
+  }
+
   /** Records that these registrations were just checked against Dueling Nexus - the throttle's clock, nothing more. */
   async touchDeckChecked(registrationIds: string[]): Promise<void> {
     if (registrationIds.length === 0) return;

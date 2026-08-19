@@ -118,9 +118,9 @@ Cada rodada, para cada dupla pareada:
 
 1. Uma **sala de duelo é criada automaticamente** assim que o pareamento acontece, com as configurações padrão do formato REDU já pré-configuradas (banlist, formato, pontos de vida, mão inicial, etc. - o jogador não escolhe nada disso, só entra na sala). O link da sala aparece na área do jogador.
 2. Os dois jogadores combinam entre si quando vão duelar, dentro do prazo da rodada (o prazo configurado no torneio, contado a partir do momento em que o pareamento foi feito).
-3. Depois do duelo, **cada jogador reporta o próprio resultado** (Venci / Perdi / Empate) na área do evento. Ninguém reporta pelo outro.
-4. **Quando os dois lados concordam** (um diz "venci", o outro diz "perdi"; ou os dois dizem "empate"), o resultado é confirmado automaticamente e a rodada segue.
-5. **Quando os dois lados discordam** (os dois dizem "venci", os dois dizem "perdi", ou um diz "empate" e o outro não), a partida fica marcada como **disputada**. Ninguém mais precisa fazer nada além de esperar - um membro da Staff vai revisar e definir o resultado correto manualmente. Enquanto uma partida estiver disputada, **a próxima rodada não começa** até ela ser resolvida (as outras partidas da rodada podem já ter terminado normalmente).
+3. Depois do duelo, **um dos dois jogadores reporta o resultado** com o placar da série: num Bo3, "Venci 2-0", "Venci 2-1", "Perdi 0-2" ou "Perdi 1-2"; num Bo1 é só Venci / Perdi. **Não existe empate** neste sistema - toda série tem um vencedor.
+4. **Um report basta.** A partida é decidida na hora, e o outro jogador não precisa confirmar nada.
+5. O jogador que não reportou vê o que foi reportado e, se discordar, aperta **"não foi isso que aconteceu"**. Isso não muda nada no bracket: manda um alerta pra Staff com o torneio, a rodada, os dois jogadores, quem reportou, o resultado que está registrado e o link do bracket. A Staff pode reescrever qualquer resultado.
 6. A Staff também pode entrar ou corrigir manualmente o resultado de qualquer partida - inclusive uma que já tinha sido reportada pelos dois jogadores, se precisar corrigir um erro. Isso só vale **enquanto a rodada daquela partida ainda for a rodada corrente** - assim que a próxima rodada é gerada, o resultado fica trancado e não pode mais ser alterado (evita recálculo retroativo de pareamentos e tiebreakers já usados por rodadas seguintes). Toda correção manual - primeira entrada ou alteração - fica registrada no audit log da Staff.
 
 ### O que "Venci / Perdi / Empate" significa numa série Bo3
@@ -133,12 +133,24 @@ Numa partida Bo3 (melhor de três duelos), os dois jogadores duelam entre si for
 
 Isso vale igual pra Bo1 - a única diferença é que a série já termina no primeiro duelo.
 
+### No-show (adversário não apareceu)
+
+Passados **3 minutos** do início da partida, aparece o botão **"Reportar adversário como no-show"** pros dois jogadores da partida.
+
+- Ao ser usado, o sistema alerta a Staff **e o jogador acusado**, e a partida fica marcada em vermelho como **No-Show Report** na lista do bracket.
+- **Torneio de mesmo dia**: se ninguém fizer nada em **5 minutos**, a partida é dada pra quem reportou.
+- **Torneio de longa duração**: nunca decide sozinho - fica esperando a Staff resolver.
+- **Qualquer um dos dois jogadores da partida, ou a Staff, pode dispensar** o no-show ("estamos os dois aqui") e a partida continua normalmente. Reportar o resultado também dispensa.
+- A Staff pode simplesmente definir o resultado da partida a qualquer momento, com ou sem no-show em aberto.
+- **Dois no-shows que se confirmam = desclassificação.** Um no-show dispensado não conta pra nada.
+
 ### Quando o prazo da rodada vence
 
 Se o prazo (em dias) da rodada terminar antes de uma partida ser resolvida:
 
-- Se **só um jogador reportou**, o resultado que ele reportou é aceito como está - o outro lado teve a chance e não reportou.
-- Se **nenhum dos dois reportou** (ou os dois reportaram algo que nunca bateu), o sistema resolve automaticamente pra não travar o torneio:
+- Se **alguém reportou**, a partida já foi decidida naquele momento - o prazo não tem mais nada a resolver nela.
+- Se **ninguém reportou mas existe um no-show em aberto**, a partida vai pra quem reportou o no-show.
+- Se **ninguém reportou nada**, o sistema resolve automaticamente pra não travar o torneio:
   - No **Suíço**, isso é um **double loss**: os dois ficam com **0 pontos** naquela rodada - o silêncio ou a discordância dos dois lados não beneficia ninguém.
   - Na **Eliminação Simples, Eliminação Dupla, e no Top Cut** (seção 11), um double loss não é possível - o bracket exige que alguém avance pra fase seguinte. Nesses casos o sistema declara um vencedor arbitrariamente (hoje, sempre quem está na posição "jogador 1" daquela partida).
   - Esse é um caso raro e sempre pode ser corrigido depois por um membro da Staff, dentro da janela de correção descrita no item 6 acima.
@@ -163,7 +175,7 @@ Isso descreve o bye do **Suíço** especificamente - ele pode se repetir a cada 
 Cada partida vale, pro placar geral do torneio:
 
 - **Vitória**: 3 pontos.
-- **Empate**: 1 ponto.
+- **Empate**: não existe neste sistema.
 - **Derrota**: 0 pontos.
 - **Bye**: conta como uma vitória (3 pontos), sem custo pro adversário (porque não existe adversário naquela rodada).
 

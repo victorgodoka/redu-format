@@ -3,9 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { recordAction } from "@/lib/audit-log";
 import { getAdminSession } from "@/lib/auth/session";
+import { redirect } from "next/navigation";
 import {
   closeOverdueMatches,
   completeBracket,
+  dismissNoShow,
   enterMatchResult,
   extendCurrentRoundDeadline,
   generateNextRound,
@@ -50,43 +52,74 @@ export async function startBracketAction(
   return {};
 }
 
+function bracketError(slug: string, message: string): never {
+  redirect(`/admin/tournaments/${slug}/bracket?error=${encodeURIComponent(message)}`);
+}
+
 /**
- * player1Wins/player2Wins each come in as "1" (win), "0" (loss), or "draw" -
- * the three <option>s the select in the page offers. Only a win/loss split or
- * a matching pair of draws is a coherent match result; anything else (both
- * "Win", one "Draw" paired with the other's "Win", ...) is a no-op rather
- * than a guess at what the admin meant.
+ * A moderator writing the real result: which side won, and the series score.
+ * There are no draws in this system, so the form asks for a winner and a
+ * score rather than a per-player outcome.
+ *
+ * A rejected correction (the match already fed a later one that has been
+ * played) comes back as a message on the page - failing silently is what made
+ * "change result" look broken.
  */
 export async function enterResultAction(form: FormData) {
   const slug = String(form.get("slug") ?? "");
   const matchId = String(form.get("matchId") ?? "");
-  const p1 = String(form.get("player1Wins") ?? "");
-  const p2 = String(form.get("player2Wins") ?? "");
+  const winner = String(form.get("winner") ?? "");
+  const winnerGames = Number(form.get("winnerGames") ?? 1);
+  const loserGames = Number(form.get("loserGames") ?? 0);
   if (!slug || !matchId) return;
-
-  let player1Wins: number;
-  let player2Wins: number;
-  let draws: number;
-  if (p1 === "draw" && p2 === "draw") {
-    [player1Wins, player2Wins, draws] = [0, 0, 1];
-  } else if (p1 === "1" && p2 === "0") {
-    [player1Wins, player2Wins, draws] = [1, 0, 0];
-  } else if (p1 === "0" && p2 === "1") {
-    [player1Wins, player2Wins, draws] = [0, 1, 0];
-  } else {
-    return;
+  if (winner !== "player1" && winner !== "player2") bracketError(slug, "Pick which player won.");
+  if (!Number.isInteger(winnerGames) || !Number.isInteger(loserGames) || loserGames >= winnerGames) {
+    bracketError(slug, "The winner has to have won more games than the loser.");
   }
 
-  await enterMatchResult(slug, matchId, player1Wins, player2Wins, draws);
+  const p1Won = winner === "player1";
+  try {
+    await enterMatchResult(
+      slug,
+      matchId,
+      p1Won ? winnerGames : loserGames,
+      p1Won ? loserGames : winnerGames,
+      0,
+    );
+  } catch (err) {
+    bracketError(slug, err instanceof Error ? err.message : "Could not save that result.");
+  }
 
   await recordAction({
     ...(await actor()),
     action: "bracket.result",
     target: slug,
-    detail: `Reported a match result in "${slug}" (${draws ? "draw" : `${player1Wins}-${player2Wins}`})`,
+    detail: `Entered a match result in "${slug}" (${p1Won ? `${winnerGames}-${loserGames}` : `${loserGames}-${winnerGames}`})`,
   });
 
   revalidatePath(`/admin/tournaments/${slug}/bracket`);
+  revalidatePath(`/events/${slug}`);
+}
+
+/** A moderator calling off a no-show: the match simply carries on. */
+export async function dismissNoShowAdminAction(form: FormData) {
+  const slug = String(form.get("slug") ?? "");
+  const matchId = String(form.get("matchId") ?? "");
+  if (!slug || !matchId) return;
+
+  const who = await actor();
+  const dismissed = await dismissNoShow(slug, matchId, who.actorDisplayName);
+  if (dismissed) {
+    await recordAction({
+      ...who,
+      action: "bracket.no_show_dismissed",
+      target: slug,
+      detail: `Dismissed the no-show report on a match in "${slug}"`,
+    });
+  }
+
+  revalidatePath(`/admin/tournaments/${slug}/bracket`);
+  revalidatePath(`/events/${slug}`);
 }
 
 /**

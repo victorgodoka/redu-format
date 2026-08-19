@@ -144,6 +144,15 @@ export class TournamentsRepository {
     return rows[0]?.id ?? null;
   }
 
+  /** The slug for an internal id - the reverse of findIdBySlug, for jobs that start from a tournament_id. */
+  async findSlugById(id: string): Promise<string | null> {
+    const [rows] = await this.pool.query<RowDataPacket[]>(
+      "SELECT slug FROM tournaments WHERE id = ? AND deleted_at IS NULL LIMIT 1",
+      [id],
+    );
+    return rows[0]?.slug ?? null;
+  }
+
   /** Moves status to `running` and records when. Only valid from `scheduled` - a no-op otherwise (already started, or cancelled). */
   async markStarted(id: string, at: string): Promise<void> {
     await this.pool.query(

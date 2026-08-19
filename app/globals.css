@@ -791,6 +791,36 @@ input[type="number"]::-webkit-inner-spin-button {
   margin-bottom: clamp(24px, 4vw, 40px);
 }
 
+/* Live match clocks: neutral while there is time, red once the last minutes
+   are running, muted once it is over. */
+.countdown {
+  font-family: var(--f-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.countdown[data-state="urgent"] {
+  color: var(--c-danger);
+  font-weight: 600;
+}
+
+.countdown[data-state="over"] {
+  color: var(--c-muted);
+}
+
+/* A match somebody has called a no-show on - it has to be findable at a glance
+   in a long bracket list. */
+.admin-row.no-show {
+  border-color: var(--c-danger);
+}
+
+.no-show__label {
+  color: var(--c-danger);
+  font-family: var(--f-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
 /* Bracket trees are wider than the column on small screens: they scroll in
    their own box rather than pushing the page sideways. */
 .bracket-scroll {

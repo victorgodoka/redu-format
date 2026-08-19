@@ -6,6 +6,12 @@ import { getPool } from "./backend/db/client.ts";
 import { toMysqlDatetimeMs } from "./backend/db/datetime.ts";
 import {
   closeOverdueMatches,
+  contestMatchResult,
+  disqualifyRegistration,
+  dismissNoShow,
+  reinstateRegistration,
+  reportNoShow,
+  resolveDueNoShows,
   completeBracket,
   dropFromStartedTournament,
   enterMatchResult,
@@ -182,38 +188,61 @@ test("swiss with an odd number of players auto-assigns a bye each round, worth a
   );
 });
 
-test("self-report: agreeing reports resolve a match, conflicting reports leave it disputed until a mod steps in", async () => {
-  const tournament = await createTournament({ ...swissDraft, topCut: null });
+test("self-report: one report settles the duel with its score, and the other player can contest it", async () => {
+  const tournament = await createTournament({ ...swissDraft, name: "Self Report Cup", topCut: null });
   await seatFourViaAdmin(tournament.slug);
 
   const event = (await getTournament(tournament.slug))!;
   await startBracket(tournament.slug, event);
 
-  const [agreeMatch, conflictMatch] = (await getBracketView(tournament.slug))!.matches;
+  const [match] = (await getBracketView(tournament.slug))!.matches;
+  const winnerId = match.player1!.registrationId;
+  const loserId = match.player2!.registrationId;
 
-  await submitMatchReport(tournament.slug, agreeMatch.id, agreeMatch.player1!.registrationId, "win");
-  await submitMatchReport(tournament.slug, agreeMatch.id, agreeMatch.player2!.registrationId, "loss");
-  const afterAgree = (await getBracketView(tournament.slug))!.matches.find((m) => m.id === agreeMatch.id)!;
-  assert.equal(afterAgree.hasResult, true);
-  assert.equal(afterAgree.player1!.win, 1);
-  assert.equal(afterAgree.reports.length, 0, "resolved reports are cleared, not left lying around");
+  // Bo1 here, so the only possible score is 1-0 - a Bo3 would report 2-0 or 2-1.
+  await submitMatchReport(tournament.slug, match.id, winnerId, true, 1, 0);
 
-  await submitMatchReport(tournament.slug, conflictMatch.id, conflictMatch.player1!.registrationId, "win");
-  await submitMatchReport(tournament.slug, conflictMatch.id, conflictMatch.player2!.registrationId, "win");
-  const disputed = (await getBracketView(tournament.slug))!.matches.find((m) => m.id === conflictMatch.id)!;
-  assert.equal(disputed.hasResult, false, "a match with two conflicting reports is not auto-resolved");
-  assert.equal(disputed.disputed, true);
-  assert.equal(disputed.reports.length, 2);
+  const settled = (await getBracketView(tournament.slug))!.matches.find((m) => m.id === match.id)!;
+  assert.equal(settled.hasResult, true, "one report is enough - nobody has to confirm it");
+  assert.equal(settled.score, "1-0");
+  assert.equal(settled.player1!.win, 1);
+  assert.equal(settled.player2!.loss, 1);
+  assert.equal(settled.reports.length, 1, "who called it stays on file, for the opponent to see");
 
-  // A mod's direct override resolves it and clears the dispute.
-  await enterMatchResult(tournament.slug, conflictMatch.id, 1, 0);
-  const resolved = (await getBracketView(tournament.slug))!.matches.find((m) => m.id === conflictMatch.id)!;
-  assert.equal(resolved.hasResult, true);
-  assert.equal(resolved.disputed, false);
-  assert.equal(resolved.reports.length, 0);
+  // The player who did not report disagrees: nothing moves in the bracket, but
+  // the match is flagged for a moderator.
+  await contestMatchResult(tournament.slug, match.id, loserId);
+  const contested = (await getBracketView(tournament.slug))!.matches.find((m) => m.id === match.id)!;
+  assert.equal(contested.contested, true);
+  assert.equal(contested.hasResult, true, "contesting does not undo the result - only a moderator does");
 });
 
-test("closeOverdueMatches force-resolves a match past its round deadline, honoring a lone report", async () => {
+test("a Bo3 series records the games that were actually played", async () => {
+  const tournament = await createTournament({
+    ...swissDraft,
+    name: "Bo3 Score Cup",
+    topCut: null,
+    matchFormat: "Bo3",
+  });
+  await seatFourViaAdmin(tournament.slug);
+  const event = (await getTournament(tournament.slug))!;
+  await startBracket(tournament.slug, event);
+
+  const [match] = (await getBracketView(tournament.slug))!.matches;
+  await submitMatchReport(tournament.slug, match.id, match.player1!.registrationId, true, 2, 1);
+
+  const settled = (await getBracketView(tournament.slug))!.matches.find((m) => m.id === match.id)!;
+  assert.equal(settled.score, "2-1");
+
+  // A score that cannot happen in a Bo3 is refused outright.
+  const [, other] = (await getBracketView(tournament.slug))!.matches;
+  await assert.rejects(
+    () => submitMatchReport(tournament.slug, other.id, other.player1!.registrationId, true, 2, 2),
+    /Bo3 series is won/,
+  );
+});
+
+test("closeOverdueMatches force-closes the matches nobody reported - a reported one is already long settled", async () => {
   const tournament = await createTournament({ ...swissDraft, topCut: null, roundLimitDays: 2 });
   await seatFourViaAdmin(tournament.slug);
 
@@ -221,7 +250,12 @@ test("closeOverdueMatches force-resolves a match past its round deadline, honori
   await startBracket(tournament.slug, event);
 
   const [reportedMatch, silentMatch] = (await getBracketView(tournament.slug))!.matches;
-  await submitMatchReport(tournament.slug, reportedMatch.id, reportedMatch.player2!.registrationId, "loss");
+  await submitMatchReport(tournament.slug, reportedMatch.id, reportedMatch.player2!.registrationId, false, 1, 0);
+  assert.equal(
+    (await getBracketView(tournament.slug))!.matches.find((m) => m.id === reportedMatch.id)!.hasResult,
+    true,
+    "one report settles a match immediately - the deadline has nothing left to do with it",
+  );
 
   // Not overdue yet - the deadline job should leave everything untouched.
   assert.deepEqual(await closeOverdueMatches(tournament.slug), { resolved: 0, advanced: false });
@@ -236,27 +270,22 @@ test("closeOverdueMatches force-resolves a match past its round deadline, honori
   ]);
 
   const { resolved } = await closeOverdueMatches(tournament.slug);
-  assert.equal(resolved, 2);
+  assert.equal(resolved, 1, "only the silent match was still open");
 
   const after = (await getBracketView(tournament.slug))!;
   const resolvedReported = after.matches.find((m) => m.id === reportedMatch.id)!;
-  // player2 self-reported a loss with no reply from player1 - honored as-is: player2 lost.
-  assert.equal(resolvedReported.hasResult, true);
+  // player2 said they lost, so player2 lost - that has been true since they said it.
   assert.equal(resolvedReported.player2!.loss, 1);
 
   const resolvedSilent = after.matches.find((m) => m.id === silentMatch.id)!;
   assert.equal(resolvedSilent.hasResult, true, "a fully silent match still gets force-resolved, not left stuck");
   // Swiss has no elimination constraint, so a fully silent match is a genuine
-  // double loss: 0-0, not an arbitrary winner and not the engine's native
-  // "draw" (which would otherwise silently score 1 point for both sides).
+  // double loss: 0-0, not an arbitrary winner and not a draw (which would
+  // otherwise silently score a point for both sides).
   assert.equal(resolvedSilent.player1!.win, 0);
-  assert.equal(resolvedSilent.player1!.loss, 0);
   assert.equal(resolvedSilent.player2!.win, 0);
-  assert.equal(resolvedSilent.player2!.loss, 0);
   const silentP1Standing = after.standings.find((s) => s.registrationId === resolvedSilent.player1!.registrationId)!;
-  const silentP2Standing = after.standings.find((s) => s.registrationId === resolvedSilent.player2!.registrationId)!;
-  assert.equal(silentP1Standing.points, 0, "double loss awards no points, not the engine's default 1-point draw");
-  assert.equal(silentP2Standing.points, 0);
+  assert.equal(silentP1Standing.points, 0, "double loss awards no points");
 
   // Both round-1 matches settled, so the swiss round itself should have advanced.
   assert.equal(after.round, 2);
@@ -346,7 +375,7 @@ test("dropFromStartedTournament: current round becomes a loss for them and an au
   assert.equal(stillPaired, false, "a dropped player is never paired again");
 });
 
-test("closeOverdueMatches auto-drops a player after two consecutive round no-shows, leaving everyone else untouched", async () => {
+test("closeOverdueMatches auto-drops a player after two rounds where their match went entirely unreported", async () => {
   const tournament = await createTournament({ ...swissDraft, topCut: null, roundLimitDays: 2 });
   await seatFourViaAdmin(tournament.slug);
   const event = (await getTournament(tournament.slug))!;
@@ -355,8 +384,12 @@ test("closeOverdueMatches auto-drops a player after two consecutive round no-sho
   const firstRound = (await getBracketView(tournament.slug))!;
   const silentPlayerId = firstRound.matches[0].player1!.registrationId;
 
-  /** Their opponent reports on time; everyone else's match is settled instantly by an admin; only the silent player's side is left hanging past the deadline. */
-  async function noShowOneRound() {
+  /**
+   * One report settles a duel now, so a player only counts as absent when
+   * *nobody* reported their match. Every other table is settled by an admin;
+   * the silent player's is left hanging past the deadline.
+   */
+  async function silentRound() {
     const view = (await getBracketView(tournament.slug))!;
     const mine = view.matches.find(
       (m) =>
@@ -364,15 +397,11 @@ test("closeOverdueMatches auto-drops a player after two consecutive round no-sho
         !m.bye &&
         (m.player1?.registrationId === silentPlayerId || m.player2?.registrationId === silentPlayerId),
     )!;
-    const opponent = mine.player1?.registrationId === silentPlayerId ? mine.player2! : mine.player1!;
-    await submitMatchReport(tournament.slug, mine.id, opponent.registrationId, "win");
 
     for (const m of view.matches.filter((match) => match.active && !match.bye && match.id !== mine.id)) {
       await enterMatchResult(tournament.slug, m.id, 1, 0);
     }
 
-    // The whole round has to be past its deadline for it to lock and advance -
-    // one straggler match doesn't close a round early.
     const pool = getPool();
     const backdated = toMysqlDatetimeMs(new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString());
     await pool.query(
@@ -383,7 +412,7 @@ test("closeOverdueMatches auto-drops a player after two consecutive round no-sho
     await closeOverdueMatches(tournament.slug);
   }
 
-  await noShowOneRound();
+  await silentRound();
   const afterRound1 = (await getBracketView(tournament.slug))!;
   assert.equal(afterRound1.round, 2, "a fully-settled round 1 advances on its own");
   assert.equal(
@@ -392,7 +421,7 @@ test("closeOverdueMatches auto-drops a player after two consecutive round no-sho
     "one missed round alone isn't enough to drop",
   );
 
-  await noShowOneRound();
+  await silentRound();
   const afterRound2 = (await getBracketView(tournament.slug))!;
   assert.equal(afterRound2.standings.find((s) => s.registrationId === silentPlayerId)?.dropped, true);
 });
@@ -584,7 +613,7 @@ test("standard same-day: the round locks on its 50-minute timer, refuses late re
 
   const [match] = locked.matches;
   await assert.rejects(
-    () => submitMatchReport(tournament.slug, match.id, match.player1!.registrationId, "win"),
+    () => submitMatchReport(tournament.slug, match.id, match.player1!.registrationId, true, 1, 0),
     /locked/i,
     "the backend refuses a report in a locked round, not just the UI",
   );
@@ -691,8 +720,7 @@ test("double elimination: the bracket keeps taking reports after round one - its
 
   // The players who dropped into the losers bracket have to be able to report.
   const match = open[0];
-  await submitMatchReport(tournament.slug, match.id, match.player1!.registrationId, "win");
-  await submitMatchReport(tournament.slug, match.id, match.player2!.registrationId, "loss");
+  await submitMatchReport(tournament.slug, match.id, match.player1!.registrationId, true, 1, 0);
   const settled = (await getBracketView(tournament.slug))!.matches.find((m) => m.id === match.id)!;
   assert.equal(settled.hasResult, true, "both sides agreed, so the match resolved");
 });
@@ -744,4 +772,86 @@ test("double elimination names every match by bracket side, and the grand final 
   const reset = (await getBracketView(tournament.slug))!.matches.find((m) => m.label === "Grand Final Reset");
   assert.ok(reset, "losing the grand final gave the undefeated finalist their first loss, so a reset match exists");
   assert.equal(reset.bracket, "grand-final");
+});
+
+test("no-show: opens a few minutes in, can be dismissed, and hands over the match once its grace runs out", async () => {
+  const tournament = await createTournament({ ...swissDraft, name: "No Show Cup", topCut: null });
+  await seatFourViaAdmin(tournament.slug);
+  const event = (await getTournament(tournament.slug))!;
+  await startBracket(tournament.slug, event);
+
+  const [match] = (await getBracketView(tournament.slug))!.matches;
+  const caller = match.player1!.registrationId;
+  const accused = match.player2!.registrationId;
+  const pool = getPool();
+
+  assert.equal(
+    await reportNoShow(tournament.slug, match.id, caller),
+    "too-early",
+    "you cannot call a no-show the second the match opens",
+  );
+
+  // Four minutes in, the button is live.
+  await pool.query("UPDATE match_deadlines SET active_since = ? WHERE match_id = ?", [
+    toMysqlDatetimeMs(new Date(Date.now() - 4 * 60 * 1000).toISOString()),
+    match.id,
+  ]);
+  assert.equal(await reportNoShow(tournament.slug, match.id, caller), "raised");
+
+  const flagged = (await getBracketView(tournament.slug))!.matches.find((m) => m.id === match.id)!;
+  assert.ok(flagged.noShow, "the bracket shows the call");
+  assert.equal(flagged.noShow!.targetRegistrationId, accused);
+  assert.ok(flagged.noShow!.autoResolvesAt, "a same-day tournament gives it a deadline of its own");
+  assert.equal(flagged.hasResult, false, "calling a no-show does not decide anything by itself");
+
+  // Being there is the whole answer to it.
+  await dismissNoShow(tournament.slug, match.id, `player:${accused}`);
+  assert.equal((await getBracketView(tournament.slug))!.matches.find((m) => m.id === match.id)!.noShow, null);
+
+  // Called again, and this time nobody answers it.
+  await reportNoShow(tournament.slug, match.id, caller);
+  await pool.query("UPDATE match_flags SET auto_resolves_at = ? WHERE match_id = ?", [
+    toMysqlDatetimeMs(new Date(Date.now() - 1000).toISOString()),
+    match.id,
+  ]);
+  assert.equal(await resolveDueNoShows(), 1);
+
+  const decided = (await getBracketView(tournament.slug))!.matches.find((m) => m.id === match.id)!;
+  assert.equal(decided.hasResult, true, "the match went to whoever showed up");
+  assert.equal(decided.player1!.win, 1);
+  assert.equal(decided.noShow, null, "the call is settled, not still open");
+
+  const [rows] = await pool.query("SELECT no_show_count FROM registrations WHERE id = ?", [accused]);
+  assert.equal((rows as { no_show_count: number }[])[0].no_show_count, 1, "it goes on their record");
+});
+
+test("a moderator can disqualify a player and undo it", async () => {
+  const tournament = await createTournament({ ...swissDraft, name: "Manual DQ Cup", topCut: null });
+  await seatFourViaAdmin(tournament.slug);
+  const event = (await getTournament(tournament.slug))!;
+  await startBracket(tournament.slug, event);
+
+  const [match] = (await getBracketView(tournament.slug))!.matches;
+  const target = match.player2!.registrationId;
+
+  await disqualifyRegistration(tournament.slug, target, "Playing a deck that was not registered", "Sky");
+
+  const out = (await listParticipants(tournament.slug)).find((p) => p.id === target)!;
+  assert.ok(out.disqualifiedAt);
+  assert.equal(out.dqReason, "Playing a deck that was not registered");
+  assert.equal(
+    (await getBracketView(tournament.slug))!.standings.find((s) => s.registrationId === target)!.dropped,
+    true,
+    "a disqualified player is out of the bracket, not just labelled",
+  );
+
+  await reinstateRegistration(tournament.slug, target);
+  const back = (await listParticipants(tournament.slug)).find((p) => p.id === target)!;
+  assert.equal(back.disqualifiedAt, null);
+  assert.equal(back.droppedAt, null);
+  assert.equal(
+    (await getBracketView(tournament.slug))!.standings.find((s) => s.registrationId === target)!.dropped,
+    false,
+    "and they are active in the bracket again",
+  );
 });
