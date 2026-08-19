@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { after } from "next/server";
 import AdminPageHead from "@/components/admin/AdminPageHead";
 import BracketRounds from "@/components/admin/BracketRounds";
 import StartBracketForm from "@/components/admin/StartBracketForm";
@@ -29,10 +30,11 @@ export default async function BracketPage({
   const tournament = await getTournament(slug);
   if (!tournament) notFound();
 
-  // Settle anything the clock already decided before rendering, so the page
-  // never shows a round the deadline has moved past. The cron does the same
-  // sweep on its own schedule; this only makes the admin view immediate.
-  if (tournament.status === "running") await closeOverdueMatches(slug).catch(() => null);
+  // Settle anything the clock already decided - but *after* the response, not
+  // during the render. Writing results mid-render makes the HTML and the RSC
+  // payload disagree about which matches are settled, which surfaces as a
+  // hydration mismatch in the result form.
+  if (tournament.status === "running") after(() => closeOverdueMatches(slug).catch(() => null));
 
   const view = await getBracketView(slug);
   const placings = view?.status === "complete" ? await getPlacings(slug) : [];

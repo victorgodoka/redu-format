@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { after } from "next/server";
 import AdminList, { AdminRow } from "@/components/admin/AdminList";
 import Bracket from "@/components/site/Bracket";
 import EventBanner from "@/components/site/EventBanner";
@@ -608,9 +609,11 @@ export default async function EventDetailPage({
 
   // Round transitions are driven by persisted deadlines, not by anyone's open
   // tab - but settling them on a visit keeps a locked round from lingering
-  // past its cleanup window between cron sweeps. Best-effort: the page must
-  // render either way.
-  if (event.status === "running") await closeOverdueMatches(slug).catch(() => null);
+  // past its cleanup window between cron sweeps. It runs after the response:
+  // a write in the middle of a render makes the two renders of this page
+  // disagree, and the round lock this page displays comes from the timestamps
+  // either way.
+  if (event.status === "running") after(() => closeOverdueMatches(slug).catch(() => null));
 
   const view = past || finished ? await getBracketView(slug) : null;
   const participants = await listPublicParticipants(

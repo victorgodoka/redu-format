@@ -41,7 +41,7 @@ function EventCard({
   const almost = !full && fillRatio(event) >= ALMOST_FULL;
 
   return (
-    <li className={`${styles.event} panel${past ? ` ${styles.past}` : ""}`}>
+    <li className={`${styles.event} panel${finished ? ` ${styles.past}` : ""}`}>
       {hasBanner && (
         <img
           className="event-list event-banner"
@@ -49,10 +49,12 @@ function EventCard({
           alt=""
         />
       )}
-      <div className="event-wrapper">
+      <div className={styles["event-wrapper"]}>
         <div className={styles.when}>
-          <span className={styles.date}>{formatDate(event.startsAt)}</span>
-          <span className={styles.time}>{formatTime(event.startsAt)}</span>
+          <span className={styles.date}>
+            {formatDate(event.startsAt)}{" "}
+            <span className={styles.time}>{formatTime(event.startsAt)}</span>
+          </span>
           {finished ? (
             <span className={styles.done}>Finished</span>
           ) : past ? (
@@ -61,9 +63,12 @@ function EventCard({
         </div>
 
         <div>
-          <h2 className={styles.name}>
+          <h1 className={styles.name}>
             <Link href={`/events/${event.slug}`}>{event.name}</Link>
-          </h2>
+          </h1>
+          <h3 className={styles.host}>
+            by @{event.host}
+          </h3>
           <p className={styles.meta}>
             <span className={styles.tag}>
               {STRUCTURES[event.structure].label}
@@ -72,16 +77,16 @@ function EventCard({
               <span>{event.rounds} rounds</span>
             )}
             {event.topCut ? <span>Top {event.topCut}</span> : null}
-            <span>{event.matchFormat}</span>
-            <span>
-              {event.roundLimitDays}-day{" "}
-              {event.structure === "double-elim"
-                ? "deadline"
-                : "round deadline"}
-            </span>
-          </p>
-          <p className={styles.host}>
-            {event.host} · {formatEntry(event.entry)}
+            <span className={styles.tag}>{event.matchFormat}</span>
+            <span className={styles.tag}>{formatEntry(event.entry)}</span>
+            {event.durationMode !== "same_day" && (
+              <span>
+                {event.roundLimitDays}-day{" "}
+                {event.structure === "double-elim"
+                  ? "deadline"
+                  : "round deadline"}
+              </span>
+            )}
           </p>
         </div>
 

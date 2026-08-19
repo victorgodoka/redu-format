@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { after } from "next/server";
 import AdminList, { AdminRow } from "@/components/admin/AdminList";
 import StatBar from "@/components/admin/StatBar";
 import DeckList from "@/components/site/DeckList";
@@ -102,8 +103,8 @@ export default async function DashboardPage() {
    * Reporting has to be reachable from here, not only from the tournament
    * page: these are the rounds the player actually has open right now, with
    * the same card (report buttons, bye, waiting, locked) the event page uses.
-   * Each tournament is settled first so a round whose timer already ran out
-   * shows as locked rather than as still open.
+   * A round whose timer already ran out reads as locked here regardless: the
+   * lock comes from the persisted deadline, not from the sweep.
    */
   const liveRounds = playerId
     ? (
@@ -111,7 +112,9 @@ export default async function DashboardPage() {
           yourEvents
             .filter(({ event }) => event.status === "running")
             .map(async ({ event }) => {
-              await closeOverdueMatches(event.slug).catch(() => null);
+              // Settled after the response, never during the render - see the
+              // event page for why a mid-render write breaks hydration.
+              after(() => closeOverdueMatches(event.slug).catch(() => null));
               const registrationId = await findMyRegistrationId(event.slug, playerId);
               const round = registrationId ? await getMyRound(event.slug, registrationId) : null;
               return round ? { event, round } : null;
