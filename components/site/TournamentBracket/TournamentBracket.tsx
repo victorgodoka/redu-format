@@ -21,7 +21,7 @@ function score(match: BracketMatch): { p1: string; p2: string } | null {
 function MatchState({ match }: { match: BracketMatch }) {
   const s = score(match);
   if (match.bye) return <>Automatic win</>;
-  if (s) return <>{`${s.p1}-${s.p2}`}</>;
+  if (s) return <>{`${match.player1?.registrationId === match.reports.find(c => c.result === "win")?.registrationId ? match.player1?.name : match.player2?.name} • ${s.p1}-${s.p2}`}</>;
   if (match.active && match.deadlineAt) {
     return (
       <>
