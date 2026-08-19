@@ -12,6 +12,10 @@ function at(iso: string): string {
   return `${formatDate(iso)} at ${formatTime(iso)}`;
 }
 
+function verb(result: "win" | "loss" | "draw" | "bye"): string {
+  return result === "win" ? "won" : result === "loss" ? "lost" : result === "draw" ? "drew" : "had a bye";
+}
+
 function ContactTO({ children }: { children: React.ReactNode }) {
   return (
     <>
@@ -79,8 +83,9 @@ export default function MyRound({
         <Tab>{heading} · Bye</Tab>
         <h2 className="notice__title">You have a bye this round</h2>
         <Lede>
-          Odd number of duelists, so you sit this one out with an automatic win - there is no duel
-          to play and nothing to report.
+          Odd number of duelists, so you sit this round out with an automatic win - there is no duel
+          to play and nothing to report. It counts as a win for {round.roundLabel}, not for the next
+          one.
           {round.nextRoundAt ? ` The next round starts ${at(round.nextRoundAt)}.` : ""}
         </Lede>
         {link}
@@ -92,11 +97,15 @@ export default function MyRound({
     return (
       <Notice>
         <Tab>{heading}</Tab>
-        <h2 className="notice__title">No duel for you right now</h2>
+        <h2 className="notice__title">
+          {round.settled ? "Your duel this round is settled" : "No duel for you right now"}
+        </h2>
         <Lede>
-          You are still in the tournament, but you are not paired in this round - either your duel
-          is already settled and the round hasn&apos;t turned over yet, or the next pairing is still
-          to come. Nothing to do but wait; your next duel appears here the moment it is paired.
+          {round.settled
+            ? `You ${verb(round.settled.result)} ${round.settled.score}${
+                round.settled.opponentName ? ` vs ${round.settled.opponentName}` : ""
+              } in ${round.roundLabel}. Waiting on the other tables before the round turns over.`
+            : "You are still in the tournament, but you are not paired in this round - the next pairing is still to come. Your next duel appears here the moment it is made."}
           {round.nextRoundAt ? ` Next round starts ${at(round.nextRoundAt)}.` : ""}
         </Lede>
         {link}

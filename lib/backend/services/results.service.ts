@@ -593,7 +593,15 @@ export async function dropFromStartedTournament(slug: string, registrationId: st
   if (engine.getStatus() === "complete") throw new Error("This tournament has already finished");
 
   const player = engine.getPlayers().find((p) => p.getId() === registrationId);
-  if (!player || !player.isActive()) return; // already gone, nothing to do
+  if (!player || !player.isActive()) {
+    // Nothing to take out of the bracket - either they were never in it (added
+    // or registered after it started) or they are already out of it. The
+    // registration still has to be marked, or the drop looks like it did
+    // nothing at all: the row keeps showing as an active participant and
+    // pressing the button again changes nothing.
+    await repos().registrations.markDropped(registrationId);
+    return;
+  }
 
   const activeMatch = engine
     .getMatches()
@@ -1004,6 +1012,14 @@ export type MyRoundView = {
   nextRoundAt: string | null;
   /** Only set for `state: "match"`. */
   match: MyMatchView | null;
+  /**
+   * What this player already has on the board for *this* round - the bye they
+   * were given, or the duel they finished while the round is still open.
+   * Deliberately not folded into the match history: a bye is part of the round
+   * being played, not a past result, and reading it off the history list is
+   * how it ends up looking like it belongs to some other round.
+   */
+  settled: MyMatchHistoryEntry | null;
 };
 
 /**
@@ -1025,12 +1041,24 @@ export async function getMyRound(slug: string, registrationId: string): Promise<
 
   const round = engine.getRoundNumber();
   const clock = clockFor(event, engine, await matchDeadlines.getTrackingMap(tournamentId));
+  // Everything this player has settled in the round that's open right now -
+  // a bye counts, and belongs here rather than in the history list.
+  const thisRound = player
+    .getMatches()
+    .filter((m) => {
+      const match = engine.getMatch(m.id);
+      // Settled only: a duel still being played is the "match" state's business.
+      return match.getRoundNumber() === round && !match.isActive();
+    })
+    .map((m) => toOutcome(engine, m));
+
   const base = {
     round,
     ...describeRound(engine, round),
     locked: clock.locked,
     nextRoundAt: clock.nextRoundAt,
     match: null,
+    settled: thisRound.find((o) => o.result === "bye") ?? thisRound[0] ?? null,
   };
 
   const active = engine
@@ -1040,11 +1068,7 @@ export async function getMyRound(slug: string, registrationId: string): Promise<
     return { ...base, state: "match", match: await getMyCurrentMatch(slug, registrationId) };
   }
 
-  const thisRound = player
-    .getMatches()
-    .map((m) => engine.getMatch(m.id))
-    .filter((m) => m.getRoundNumber() === round);
-  if (thisRound.some((m) => m.isBye())) return { ...base, state: "bye" };
+  if (base.settled?.result === "bye") return { ...base, state: "bye" };
   if (!player.isActive()) return { ...base, state: "out" };
   return { ...base, state: "waiting" };
 }
@@ -1058,7 +1082,35 @@ export type MyMatchHistoryEntry = {
   score: string;
 };
 
-/** Every finished round this player has played in this tournament, oldest first - the "your duels" list on the event page. */
+/** One settled match of this player's, as a row - the same shape whether it is read back as history or as "what you already did this round". */
+function toOutcome(
+  engine: EngineTournament,
+  record: { id: string; opponent: string | null; win: number; loss: number },
+): MyMatchHistoryEntry {
+  const match = engine.getMatch(record.id);
+  const opponent = record.opponent ? engine.getPlayers().find((p) => p.getId() === record.opponent) : undefined;
+  return {
+    round: match.getRoundNumber(),
+    ...describeRound(engine, match.getRoundNumber()),
+    opponentName: opponent?.getName() ?? null,
+    result: match.isBye()
+      ? "bye"
+      : record.win > record.loss
+        ? "win"
+        : record.loss > record.win
+          ? "loss"
+          : "draw",
+    score: `${record.win}-${record.loss}`,
+  };
+}
+
+/**
+ * Every round this player has *finished* in this tournament, oldest first -
+ * the "your duels" list on the event page. Anything in the round currently
+ * being played is left out on purpose, bye included: that belongs to the
+ * current-round card (getMyRound), and listing it here as well makes a bye
+ * read like a result from some other round.
+ */
 export async function getMyMatchHistory(slug: string, registrationId: string): Promise<MyMatchHistoryEntry[]> {
   const tournamentId = await repos().tournaments.findIdBySlug(slug);
   if (!tournamentId) return [];
@@ -1068,28 +1120,18 @@ export async function getMyMatchHistory(slug: string, registrationId: string): P
   const player = engine.getPlayers().find((p) => p.getId() === registrationId);
   if (!player) return [];
 
-  const entries: MyMatchHistoryEntry[] = [];
-  for (const m of player.getMatches()) {
-    const match = engine.getMatch(m.id);
-    if (match.isActive()) continue; // still open - that's getMyCurrentMatch's job, not history
+  // Once the bracket is over there is no round in progress, so nothing is held back.
+  const currentRound = engine.getStatus() === "complete" ? 0 : engine.getRoundNumber();
 
-    const opponent = m.opponent ? engine.getPlayers().find((p) => p.getId() === m.opponent) : undefined;
-    const result: MyMatchHistoryEntry["result"] = match.isBye()
-      ? "bye"
-      : m.win > m.loss
-        ? "win"
-        : m.loss > m.win
-          ? "loss"
-          : "draw";
-    entries.push({
-      round: match.getRoundNumber(),
-      ...describeRound(engine, match.getRoundNumber()),
-      opponentName: opponent?.getName() ?? null,
-      result,
-      score: `${m.win}-${m.loss}`,
-    });
-  }
-  return entries.sort((a, b) => a.round - b.round);
+  return player
+    .getMatches()
+    .filter((m) => {
+      const match = engine.getMatch(m.id);
+      // Still open - that's the current-round card's job, not history.
+      return !match.isActive() && match.getRoundNumber() !== currentRound;
+    })
+    .map((m) => toOutcome(engine, m))
+    .sort((a, b) => a.round - b.round);
 }
 
 /** Test seam. */

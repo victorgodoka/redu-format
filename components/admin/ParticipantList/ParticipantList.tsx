@@ -141,16 +141,18 @@ export default function ParticipantList({
                 <Button type="submit">Edit deck</Button>
               </form>
             )}
-            <DeleteButton
-              action={removeParticipantAction}
-              hidden={{ slug, participantId: p.id }}
-              confirmText={
-                started
-                  ? `Drop ${p.name} from this tournament? Their current match counts as a loss, and they're out for the rest of the event.`
-                  : `Remove ${p.name} from this tournament?`
-              }
-              label={started ? "Drop" : "Remove"}
-            />
+            {p.droppedAt || p.disqualifiedAt ? null : (
+              <DeleteButton
+                action={removeParticipantAction}
+                hidden={{ slug, participantId: p.id }}
+                confirmText={
+                  started
+                    ? `Drop ${p.name} from this tournament? Their current match counts as a loss, and they're out for the rest of the event.`
+                    : `Remove ${p.name} from this tournament?`
+                }
+                label={started ? "Drop" : "Remove"}
+              />
+            )}
           </AdminRow.Actions>
         </AdminRow>
       ))}

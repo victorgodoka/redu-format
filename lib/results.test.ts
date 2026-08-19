@@ -21,7 +21,7 @@ import {
 } from "./backend/services/results.service.ts";
 import { resolvePlayerId } from "./backend/services/player.service.ts";
 import { registerSignup } from "./backend/services/registration.service.ts";
-import { addParticipant, createTournament, getTournament } from "./tournaments.ts";
+import { addParticipant, createTournament, getTournament, listParticipants } from "./tournaments.ts";
 
 test.after(teardownTestDb);
 
@@ -640,4 +640,23 @@ test("long duration: the round locks when the deadline passes but only a moderat
 
   await generateNextRound(tournament.slug);
   assert.equal((await getBracketView(tournament.slug))!.round, 2, "a moderator moves it forward");
+});
+
+test("dropping someone who never made it into the bracket still marks the registration - the button can't be a silent no-op", async () => {
+  const tournament = await createTournament({ ...swissDraft, name: "Late Signup Cup", topCut: null });
+  await seatFourViaAdmin(tournament.slug);
+  const event = (await getTournament(tournament.slug))!;
+  await startBracket(tournament.slug, event);
+
+  // Registered after the field was locked in, so the engine has never heard of
+  // them - exactly the case where the admin's Drop button used to do nothing.
+  const latecomer = await addParticipant(tournament.slug, { name: "Latecomer", deckName: "Wind-Up" });
+  await dropFromStartedTournament(tournament.slug, latecomer.id);
+
+  const row = (await listParticipants(tournament.slug)).find((p) => p.id === latecomer.id)!;
+  assert.ok(row.droppedAt, "the registration is recorded as dropped");
+
+  // And dropping an already-dropped player stays harmless.
+  await dropFromStartedTournament(tournament.slug, latecomer.id);
+  assert.ok((await listParticipants(tournament.slug)).find((p) => p.id === latecomer.id)!.droppedAt);
 });
