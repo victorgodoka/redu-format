@@ -348,7 +348,7 @@ async function FeaturedEventPage({
           </div>
 
           <aside className="signup__side">
-            <Notice>
+            <Notice variant="done">
               <Tab>Final ranking</Tab>
               <StandingsTable rows={placings} />
             </Notice>
@@ -374,7 +374,7 @@ async function FeaturedEventPage({
           </div>
         ) : null}
 
-        {topDecks.length > 0 ? (
+        {event.structure !== "double-elim" && topDecks.length > 0 ? (
           <div className="results-fullwidth">
             <h2 className="section__subtitle" id="decklists">
               Top decks
