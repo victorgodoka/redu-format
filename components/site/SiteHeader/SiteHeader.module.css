@@ -9,11 +9,20 @@
 }
 
 .mark {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   font-family: var(--f-display);
   font-size: 18px;
   font-weight: 700;
   letter-spacing: 0.16em;
   text-transform: uppercase;
+}
+
+.markIcon {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
 }
 
 .nav {

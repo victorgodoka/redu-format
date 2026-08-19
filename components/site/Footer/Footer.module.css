@@ -16,6 +16,12 @@
   gap: 8px 28px;
 }
 
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .footer a,
 .footer p {
   font-family: var(--f-mono);

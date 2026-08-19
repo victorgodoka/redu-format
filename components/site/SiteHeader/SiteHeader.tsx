@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import SkipLink from "@/components/ui/SkipLink";
 import Wrap from "@/components/ui/Wrap";
@@ -59,6 +60,7 @@ export default async function SiteHeader() {
       <Wrap>
         <header className={styles.topbar}>
           <Link className={styles.mark} href="/">
+            <Image src="/logo-icon.png" alt="" width={36} height={36} className={styles.markIcon} priority />
             REDU
           </Link>
 

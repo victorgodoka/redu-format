@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import Panel from "@/components/ui/Panel";
 import Wrap from "@/components/ui/Wrap";
@@ -9,7 +10,10 @@ export default function Footer() {
     <footer className={styles.footer}>
       <Wrap>
         <Panel className={styles.inner}>
-          <p>REDU Format</p>
+          <p className={styles.brand}>
+            <Image src="/logo-icon.png" alt="" width={20} height={20} />
+            REDU Format
+          </p>
           <div className={styles.links}>
             <Link href="/banlist">Banlist</Link>
             <a href="https://duelingnexus.com/home" target="_blank" rel="noopener noreferrer">
