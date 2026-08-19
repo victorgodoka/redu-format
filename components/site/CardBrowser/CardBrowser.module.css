@@ -82,7 +82,7 @@
   margin-top: 18px;
   font-size: 14px;
   line-height: 1.6;
-  color: #c6c4d2;
+  color: var(--c-text-soft);
   /* card text carries meaningful line breaks */
   white-space: pre-line;
 }
@@ -209,7 +209,7 @@
 .cardName {
   font-size: 13px;
   line-height: 1.35;
-  color: #c6c4d2;
+  color: var(--c-text-soft);
   text-wrap: pretty;
   position: absolute;
   bottom: 0;

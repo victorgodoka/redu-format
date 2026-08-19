@@ -64,5 +64,5 @@
 
 .detail {
   white-space: normal;
-  color: #c6c4d2;
+  color: var(--c-text-soft);
 }

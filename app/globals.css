@@ -3,21 +3,29 @@
    ========================================================= */
 
 :root {
-  /* surfaces: one cool-tinted gray family, no warm/cool mixing */
-  --c-bg: #0a0a0f;
-  --c-raise: #101018;
-  --c-panel: #14141d;
-  --c-line: #262633;
-  --c-line-soft: #1c1c26;
+  /* surfaces: navy-blue family lifted from the REDU Format mascot's body
+     colour, one hue, no warm/cool mixing */
+  --c-bg: #070c18;
+  --c-raise: #0c1526;
+  --c-panel: #111d38;
+  --c-line: #2a3d66;
+  --c-line-soft: #182848;
 
   /* ink */
-  --c-text: #e9e9f0;
-  --c-muted: #8e8c9e;
+  --c-text: #eef1f8;
+  --c-text-soft: #c2cbe0;
+  --c-muted: #92a1c4;
 
-  /* single accent + one state colour */
+  /* single accent + one state colour - gold, matching the mascot's coin and
+     the wordmark's outline */
   --c-accent: #d9a441;
   --c-accent-hi: #edbe64;
   --c-danger: #c2483b;
+
+  /* dark text laid over the gold accent (buttons, badges, pager dots) -
+     navy instead of a plain near-black so it reads as part of the same
+     palette instead of a leftover warm brown */
+  --c-ink: #0d1424;
 
   /* type */
   --f-display: var(--font-display), "Geist", system-ui, sans-serif;
@@ -148,7 +156,7 @@ input[type="number"]::-webkit-inner-spin-button {
   z-index: var(--z-nav);
   padding: 12px 20px;
   background: var(--c-accent);
-  color: #16130c;
+  color: var(--c-ink);
 }
 
 .skip-link:focus {
@@ -247,7 +255,7 @@ input[type="number"]::-webkit-inner-spin-button {
 .btn--solid {
   border-color: var(--c-accent);
   background: var(--c-accent);
-  color: #16130c;
+  color: var(--c-ink);
 }
 
 .btn--solid:hover {
@@ -635,11 +643,11 @@ input[type="number"]::-webkit-inner-spin-button {
 .pager__num--on {
   border-color: var(--c-accent);
   background: var(--c-accent);
-  color: #16130c;
+  color: var(--c-ink);
 }
 
 .pager__num--on:hover {
-  color: #16130c;
+  color: var(--c-ink);
 }
 
 /* --- event signup --- */
@@ -1431,6 +1439,85 @@ input[type="number"]::-webkit-inner-spin-button {
   padding: 10px 20px;
 }
 
+/* --- bracket: round grouping + matchup display ---
+   Round labels are frequent (one per round, sometimes 5-8 on a page) so they
+   stay small and functional rather than using the marketing-page
+   .section__subtitle scale - only "Current standings" gets that weight, so
+   it reads as the one heading that matters on the page. */
+
+.bracket-round {
+  margin-top: 36px;
+}
+
+.bracket-round:first-child {
+  margin-top: 0;
+}
+
+.bracket-round__title {
+  margin: 0 0 12px;
+  font-family: var(--f-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--c-muted);
+}
+
+/* two stacked "name + score" rows read as a scoreboard, so the score never
+   has to hide in a meta line the way "2-1" did before */
+.matchup {
+  display: grid;
+  gap: 2px;
+  max-width: 380px;
+}
+
+.matchup__side {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.matchup__name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--c-muted);
+}
+
+.matchup__score {
+  flex: 0 0 auto;
+  font-family: var(--f-mono);
+  font-size: 19px;
+  font-variant-numeric: tabular-nums;
+  color: var(--c-muted);
+}
+
+.matchup__side--winner .matchup__name {
+  font-weight: 600;
+  color: var(--c-text);
+}
+
+.matchup__side--winner .matchup__score {
+  font-weight: 700;
+  color: var(--c-accent);
+}
+
+.matchup__vs {
+  padding-left: 1px;
+  font-family: var(--f-mono);
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--c-muted);
+  opacity: 0.6;
+}
+
+.standings-heading {
+  margin-top: 48px;
+  padding-top: 24px;
+  border-top: 1px solid var(--c-line-soft);
+}
+
 /* --- leaderboard --- */
 
 .leaderboard-row__rank {
@@ -1545,6 +1632,54 @@ input[type="number"]::-webkit-inner-spin-button {
 .payment-controls__confirm .form__group {
   width: 100%;
   grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+/* grid items stretch to fill their column by default - without this the
+   submit button matched the width of the two dropdowns next to it and read
+   as an oversized CTA repeated on every match row */
+.payment-controls__confirm .form__group > .btn {
+  justify-self: start;
+  min-width: 0;
+  padding: 10px 20px;
+}
+
+.extend-round {
+  display: grid;
+  gap: 10px;
+}
+
+.extend-round__label {
+  font-family: var(--f-mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--c-muted);
+}
+
+.extend-round__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.extend-round__row input[type="number"],
+.extend-round__row select {
+  padding: 8px 12px;
+  border: 1px solid var(--c-line);
+  border-radius: 2px;
+  background: var(--c-raise);
+  color: var(--c-text);
+  font-family: var(--f-mono);
+  font-size: 12px;
+}
+
+.extend-round__row input[type="number"] {
+  width: 80px;
+}
+
+.extend-round__row select {
+  width: auto;
 }
 
 .payment-controls__confirm .form__group .form__field {

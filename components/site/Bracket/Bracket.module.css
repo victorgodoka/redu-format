@@ -116,5 +116,5 @@
 
 .scoreWin {
   background: var(--c-accent);
-  color: #16130c;
+  color: var(--c-ink);
 }

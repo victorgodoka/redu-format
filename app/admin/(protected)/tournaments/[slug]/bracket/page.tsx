@@ -43,6 +43,15 @@ export default async function BracketPage({
     ? view.matches.some((m) => m.active && !m.hasResult && !m.bye)
     : false;
 
+  // Named so the extend-deadline control never reads as a bare "extend
+  // round" with no idea which one - double elim can have more than one side
+  // open at once, so this joins every round currently taking reports.
+  const openRoundLabel = view
+    ? [...new Set(view.matches.filter((m) => m.active && !m.hasResult && !m.bye).map((m) => m.round))]
+        .map((r) => view.matches.find((m) => m.round === r)?.label ?? `Round ${r}`)
+        .join(" & ")
+    : "";
+
   // A locked round can always be advanced by hand: in a same-day tournament
   // that just skips the rest of the cleanup window, and in a long-duration one
   // it is the only way the next round ever starts.
@@ -97,17 +106,24 @@ export default async function BracketPage({
               {view.status !== "complete" && hasOpenMatches ? (
                 <StatBar
                   actions={
-                    <form action={extendRoundAction} className="payment-controls__confirm">
+                    <form action={extendRoundAction} className="extend-round">
                       <input type="hidden" name="slug" value={slug} />
-                      <input
-                        type="number"
-                        name="hours"
-                        min={1}
-                        placeholder="Hours"
-                        required
-                        aria-label="Hours to extend the current round's deadline by"
-                      />
-                      <Button type="submit">Extend round deadline</Button>
+                      <span className="extend-round__label">Extend {openRoundLabel} deadline</span>
+                      <div className="extend-round__row">
+                        <input
+                          type="number"
+                          name="amount"
+                          min={1}
+                          placeholder="e.g. 4"
+                          required
+                          aria-label="Amount of time to extend the deadline by"
+                        />
+                        <select name="unit" defaultValue="hours" aria-label="Unit">
+                          <option value="hours">Hours</option>
+                          <option value="days">Days</option>
+                        </select>
+                        <Button type="submit">Extend</Button>
+                      </div>
                     </form>
                   }
                 />

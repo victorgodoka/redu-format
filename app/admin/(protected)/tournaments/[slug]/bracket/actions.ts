@@ -157,15 +157,19 @@ export async function nextRoundAction(form: FormData) {
 }
 
 /**
- * Extends every currently-active match's deadline by the given number of
- * hours - e.g. the duel engine is down. Only touches the round in progress
- * (see extendCurrentRoundDeadline's own doc comment for why that's automatic).
+ * Extends every currently-active match's deadline by the given amount of
+ * time - e.g. the duel engine is down. Accepts hours or days from the form
+ * and converts to the hours the service takes. Only touches the round in
+ * progress (see extendCurrentRoundDeadline's own doc comment for why that's
+ * automatic).
  */
 export async function extendRoundAction(form: FormData) {
   const slug = String(form.get("slug") ?? "");
-  const hours = Number(form.get("hours") ?? "");
-  if (!slug || !Number.isFinite(hours) || hours <= 0) return;
+  const amount = Number(form.get("amount") ?? "");
+  const unit = String(form.get("unit") ?? "hours");
+  if (!slug || !Number.isFinite(amount) || amount <= 0) return;
 
+  const hours = unit === "days" ? amount * 24 : amount;
   const { extended } = await extendCurrentRoundDeadline(slug, hours);
   if (extended === 0) return;
 
@@ -173,7 +177,7 @@ export async function extendRoundAction(form: FormData) {
     ...(await actor()),
     action: "bracket.extend_round",
     target: slug,
-    detail: `Extended the deadline of ${extended} active match(es) in "${slug}" by ${hours}h`,
+    detail: `Extended the deadline of ${extended} active match(es) in "${slug}" by ${amount} ${unit}`,
   });
 
   revalidatePath(`/admin/tournaments/${slug}/bracket`);

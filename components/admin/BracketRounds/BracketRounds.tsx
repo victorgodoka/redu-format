@@ -50,114 +50,130 @@ export default function BracketRounds({
 
   return (
     <>
-      <p className="lede">
-        Status: {view.status}
-        {view.format === "double-elim" ? "" : ` · Round ${view.round}`}
-      </p>
+      {view.status === "complete" ? <p className="lede">Tournament complete.</p> : null}
 
       {rounds.map((round) => (
-        <div key={round}>
-          <h2 className="section__subtitle">{titleFor(round)}</h2>
+        <div key={round} className="bracket-round">
+          <h2 className="bracket-round__title">{titleFor(round)}</h2>
           <AdminList>
             {view.matches
               .filter((m) => m.round === round)
-              .map((match) => (
-                <AdminRow key={match.id} className={`bracket${match.noShow ? " no-show" : ""}`}>
-                  <AdminRow.Main>
-                    <span className="admin-row__title">
-                      {match.player1?.name ?? "TBD"} vs {match.player2?.name ?? "Bye"}
-                    </span>
-                    {match.bye ? (
-                      <span className="admin-row__meta">Bye</span>
-                    ) : match.hasResult ? (
-                      <span className="admin-row__meta">
-                        {match.player1?.win ?? 0}-{match.player2?.win ?? 0}
-                        {(match.player1?.draw ?? 0) > 0 ? ` (${match.player1?.draw} draws)` : ""}
-                      </span>
-                    ) : match.reports.length >= 1 ? (
-                      <span className="admin-row__meta">
-                        Reported by{" "}
-                        {match.player1?.registrationId === match.reports[0].registrationId
-                          ? match.player1?.name
-                          : match.player2?.name}{" "}
-                        · {match.reports[0].winnerGames}-{match.reports[0].loserGames}
-                      </span>
-                    ) : match.active && match.deadlineAt ? (
-                      <span className="admin-row__meta">
-                        Awaiting result · <Countdown to={match.deadlineAt} fallback="open" /> left
-                      </span>
-                    ) : (
-                      <span className="admin-row__meta">Awaiting result</span>
-                    )}
+              .map((match) => {
+                const p1Wins =
+                  match.hasResult && match.player1 && match.player2 && match.player1.win > match.player2.win;
+                const p2Wins =
+                  match.hasResult && match.player1 && match.player2 && match.player2.win > match.player1.win;
+                return (
+                  <AdminRow key={match.id} className={`bracket${match.noShow ? " no-show" : ""}`}>
+                    <AdminRow.Main>
+                      <div className="matchup">
+                        <div className={`matchup__side${p1Wins ? " matchup__side--winner" : ""}`}>
+                          <span className="matchup__name">{match.player1?.name ?? "TBD"}</span>
+                          {match.hasResult ? (
+                            <span className="matchup__score">{match.player1?.win ?? 0}</span>
+                          ) : null}
+                        </div>
+                        <span className="matchup__vs">vs</span>
+                        <div className={`matchup__side${p2Wins ? " matchup__side--winner" : ""}`}>
+                          <span className="matchup__name">{match.bye ? "Bye" : (match.player2?.name ?? "TBD")}</span>
+                          {match.hasResult ? (
+                            <span className="matchup__score">{match.player2?.win ?? 0}</span>
+                          ) : null}
+                        </div>
+                      </div>
+                      {match.bye ? (
+                        <span className="badge badge--neutral">Bye</span>
+                      ) : match.hasResult ? (
+                        <span className="badge badge--positive">
+                          Final{(match.player1?.draw ?? 0) > 0 ? ` · ${match.player1?.draw} draws` : ""}
+                        </span>
+                      ) : match.reports.length >= 1 ? (
+                        <span className="badge badge--neutral">
+                          Reported by{" "}
+                          {match.player1?.registrationId === match.reports[0].registrationId
+                            ? match.player1?.name
+                            : match.player2?.name}{" "}
+                          · {match.reports[0].winnerGames}-{match.reports[0].loserGames}
+                        </span>
+                      ) : match.active && match.deadlineAt ? (
+                        <span className="badge badge--neutral">
+                          Awaiting result · <Countdown to={match.deadlineAt} fallback="open" /> left
+                        </span>
+                      ) : (
+                        <span className="badge badge--neutral">Awaiting result</span>
+                      )}
+                      {match.noShow ? (
+                        <span className="no-show__label">
+                          No-Show Report
+                          {match.noShow.autoResolvesAt ? (
+                            <>
+                              {" · decides in "}
+                              <Countdown to={match.noShow.autoResolvesAt} fallback="soon" urgentUnder={120} />
+                            </>
+                          ) : (
+                            " · waiting on you"
+                          )}
+                        </span>
+                      ) : null}
+                      {match.contested ? (
+                        <span className="no-show__label">Result contested - a player asked for a review</span>
+                      ) : null}
+                      {match.roomHash ? (
+                        <a
+                          className="admin-row__meta"
+                          href={`https://duelingnexus.com/duel/NA-${match.roomHash}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          Room: NA-{match.roomHash}
+                        </a>
+                      ) : null}
+                    </AdminRow.Main>
+
                     {match.noShow ? (
-                      <span className="no-show__label">
-                        No-Show Report
-                        {match.noShow.autoResolvesAt ? (
-                          <>
-                            {" · decides in "}
-                            <Countdown to={match.noShow.autoResolvesAt} fallback="soon" urgentUnder={120} />
-                          </>
-                        ) : (
-                          " · waiting on you"
-                        )}
-                      </span>
+                      <AdminRow.Actions>
+                        <form action={dismissNoShowAdminAction}>
+                          <input type="hidden" name="slug" value={slug} />
+                          <input type="hidden" name="matchId" value={match.id} />
+                          <Button type="submit">Dismiss no-show</Button>
+                        </form>
+                      </AdminRow.Actions>
                     ) : null}
-                    {match.contested ? (
-                      <span className="no-show__label">Result contested - a player asked for a review</span>
-                    ) : null}
-                    {match.roomHash ? (
-                      <a
-                        className="admin-row__meta"
-                        href={`https://duelingnexus.com/duel/NA-${match.roomHash}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        Room: NA-{match.roomHash}
-                      </a>
-                    ) : null}
-                  </AdminRow.Main>
 
-                  {match.noShow ? (
-                    <AdminRow.Actions>
-                      <form action={dismissNoShowAdminAction}>
-                        <input type="hidden" name="slug" value={slug} />
-                        <input type="hidden" name="matchId" value={match.id} />
-                        <Button type="submit">Dismiss no-show</Button>
-                      </form>
-                    </AdminRow.Actions>
-                  ) : null}
-
-                  {!match.bye && match.player1 && match.player2 && view.status !== "complete" ? (
-                    <MatchResultForm
-                      slug={slug}
-                      matchId={match.id}
-                      hasResult={match.hasResult}
-                      winningGames={view.winningGames}
-                      player1={{
-                        name: match.player1.name,
-                        defaultValue: match.hasResult
-                          ? resultOption(match.player1, match.player2)
-                          : "0",
-                      }}
-                      player2={{
-                        name: match.player2.name,
-                        defaultValue: match.hasResult
-                          ? resultOption(match.player2, match.player1)
-                          : "0",
-                      }}
-                    />
-                  ) : null}
-                </AdminRow>
-              ))}
+                    {!match.bye && match.player1 && match.player2 && view.status !== "complete" ? (
+                      <MatchResultForm
+                        slug={slug}
+                        matchId={match.id}
+                        hasResult={match.hasResult}
+                        winningGames={view.winningGames}
+                        player1={{
+                          name: match.player1.name,
+                          defaultValue: match.hasResult
+                            ? resultOption(match.player1, match.player2)
+                            : "0",
+                        }}
+                        player2={{
+                          name: match.player2.name,
+                          defaultValue: match.hasResult
+                            ? resultOption(match.player2, match.player1)
+                            : "0",
+                        }}
+                      />
+                    ) : null}
+                  </AdminRow>
+                );
+              })}
           </AdminList>
         </div>
       ))}
 
       {actions}
 
-      <h2 className="section__subtitle">
-        {view.status === "complete" ? "Final results" : "Current standings"}
-      </h2>
+      <div className="standings-heading">
+        <h2 className="section__subtitle">
+          {view.status === "complete" ? "Final results" : "Current standings"}
+        </h2>
+      </div>
       {view.status === "complete" ? (
         <AdminList as="ol">
           {placings.map((p) => (

@@ -160,7 +160,7 @@
 .problem {
   font-size: 12px;
   line-height: 1.45;
-  color: #c6c4d2;
+  color: var(--c-text-soft);
 }
 
 .problem::before {

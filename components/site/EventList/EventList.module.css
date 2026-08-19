@@ -66,7 +66,7 @@
 .host {
   margin-top: 10px;
   font-size: 13px;
-  color: #a9a7b8;
+  color: var(--c-text-soft);
   display: block;
 }
 

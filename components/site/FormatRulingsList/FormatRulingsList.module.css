@@ -27,7 +27,7 @@
 .body {
   margin-top: 14px;
   max-width: 68ch;
-  color: #c6c4d2;
+  color: var(--c-text-soft);
   text-wrap: pretty;
 }
 
@@ -48,7 +48,7 @@
   font-family: var(--f-mono);
   font-size: 13px;
   line-height: 1.6;
-  color: #c6c4d2;
+  color: var(--c-text-soft);
 }
 
 .exampleLabel {
