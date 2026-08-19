@@ -50,17 +50,19 @@
   color: var(--c-accent);
 }
 
-/* dark ink on gold: light text here measured 1.86:1, well under the 4.5:1 floor */
+/* the site's one primary CTA, so it matches .btn--solid's blue rather than
+   the gold used for secondary accents - dark ink text: light text here
+   measured well under the 4.5:1 floor */
 .linkSignIn {
   padding: 9px 14px;
   border-radius: 999px;
-  background-color: var(--c-accent);
+  background-color: var(--c-primary);
   color: var(--c-ink);
   white-space: nowrap;
 }
 
 .linkSignIn:hover {
-  background-color: var(--c-accent-hi);
+  background-color: var(--c-primary-hi);
   color: var(--c-ink);
 }
 

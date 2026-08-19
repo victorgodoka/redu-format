@@ -16,15 +16,21 @@
   --c-text-soft: #c2cbe0;
   --c-muted: #92a1c4;
 
-  /* single accent + one state colour - gold, matching the mascot's coin and
-     the wordmark's outline */
+  /* primary - the mascot's own body blue, sampled straight from the logo art.
+     Reserved for the one solid/filled CTA per view (.btn--solid, sign in). */
+  --c-primary: #2f87ff;
+  --c-primary-hi: #5da1ff;
+
+  /* secondary/accent - gold, matching the mascot's coin and the wordmark's
+     outline. Everything that isn't the primary CTA: hover states, focus
+     rings, badges, highlights. */
   --c-accent: #d9a441;
   --c-accent-hi: #edbe64;
   --c-danger: #c2483b;
 
-  /* dark text laid over the gold accent (buttons, badges, pager dots) -
-     navy instead of a plain near-black so it reads as part of the same
-     palette instead of a leftover warm brown */
+  /* dark text laid over primary or accent fills (buttons, badges, pager
+     dots) - navy instead of a plain near-black so it reads as part of the
+     same palette instead of a leftover warm brown */
   --c-ink: #0d1424;
 
   /* type */
@@ -253,14 +259,14 @@ input[type="number"]::-webkit-inner-spin-button {
 }
 
 .btn--solid {
-  border-color: var(--c-accent);
-  background: var(--c-accent);
+  border-color: var(--c-primary);
+  background: var(--c-primary);
   color: var(--c-ink);
 }
 
 .btn--solid:hover {
-  border-color: var(--c-accent-hi);
-  background: var(--c-accent-hi);
+  border-color: var(--c-primary-hi);
+  background: var(--c-primary-hi);
 }
 
 .btn:disabled {
