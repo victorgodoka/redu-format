@@ -374,8 +374,6 @@ async function FeaturedEventPage({
           </div>
         ) : null}
 
-        <ParticipantsSection participants={participants} />
-
         {topDecks.length > 0 ? (
           <div className="results-fullwidth">
             <h2 className="section__subtitle" id="decklists">
@@ -480,8 +478,6 @@ function OngoingEventPage({
             <TournamentBracket view={view} />
           </div>
         ) : null}
-
-        <ParticipantsSection participants={participants} />
 
         <div className="results-fullwidth">
           <h2 className="section__subtitle" id="decklists">
