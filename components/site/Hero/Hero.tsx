@@ -4,15 +4,20 @@ import Panel from "@/components/ui/Panel";
 import Wrap from "@/components/ui/Wrap";
 import { DISCORD_URL } from "@/lib/site";
 import styles from "./Hero.module.css";
+import Image from "next/image";
 
 export default function Hero() {
   return (
     <Wrap>
       <Panel as="section" className={styles.hero}>
-        <h1 className={styles.title}>
-          REDU
-          <span>Format</span>
-        </h1>
+        <Image
+          alt="REDU Formato Lettering Logo"
+          src="/lettering_redu.png"
+          width={942}
+          height={419}
+          className={styles.logo}
+          priority
+        />
         <Lede>
           Explore the Zexal-era retro format set in October 2012, with a card
           pool that extends up to the Return of the Duelist set, exclusively

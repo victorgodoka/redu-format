@@ -24,27 +24,10 @@
     radial-gradient(90% 140% at 60% 110%, #1b1b3a, transparent 70%);
 }
 
-.kicker {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 26px;
-  font-family: var(--f-mono);
-  font-size: 11px;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  color: var(--c-muted);
-}
-
-.title {
-  margin-block: 24px 28px;
-  font-size: clamp(56px, 11.5vw, 168px);
-  font-weight: 700;
-  letter-spacing: -0.02em;
-}
-
-.title span {
-  display: block;
-  color: var(--c-accent);
+.logo {
+  width: 100%;
+  height: auto;
+  max-width: 640px;
 }
 
 .actions {
