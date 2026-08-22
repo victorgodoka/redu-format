@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { after } from "next/server";
 import AdminList, { AdminRow } from "@/components/admin/AdminList";
 import Bracket from "@/components/site/Bracket";
+import BracketDownload from "@/components/site/BracketDownload";
 import EventBanner from "@/components/site/EventBanner";
 import MyRound from "@/components/site/MyRound";
 import ParticipantsPanel from "@/components/site/ParticipantsPanel";
@@ -243,7 +244,12 @@ function HallOfFamePage() {
 
           <div>
             <h2 className="section__subtitle">Bracket</h2>
-            <Bracket rounds={YCS_PROVIDENCE_2012_BRACKET} />
+            <BracketDownload
+              filename={`${FEATURED_EVENT.slug}-bracket.png`}
+              champion={FEATURED_EVENT.winner}
+            >
+              <Bracket rounds={YCS_PROVIDENCE_2012_BRACKET} />
+            </BracketDownload>
           </div>
 
           <div>
@@ -370,7 +376,9 @@ async function FeaturedEventPage({
             <h2 className="section__subtitle" id="bracket">
               {view.topCutFormat ? "Top Cut" : "Bracket"}
             </h2>
-            <TournamentBracket view={view} />
+            <BracketDownload filename={`${event.slug}-bracket.png`} champion={winner?.displayName}>
+              <TournamentBracket view={view} />
+            </BracketDownload>
           </div>
         ) : null}
 

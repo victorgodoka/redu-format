@@ -118,3 +118,29 @@
   background: var(--c-accent);
   color: var(--c-ink);
 }
+
+/* below this width the side-by-side round columns don't fit without
+   horizontal scrolling, so stack rounds vertically instead - the connector
+   lines are geometry between columns and don't mean anything stacked, so
+   they're dropped in favour of spacing between matches */
+@media (max-width: 760px) {
+  .bracket {
+    flex-direction: column;
+    overflow-x: visible;
+    gap: 28px;
+  }
+
+  .col {
+    min-width: 0;
+  }
+
+  .round,
+  .pair {
+    gap: 8px;
+  }
+
+  .pair::after,
+  .pair .match::after {
+    display: none;
+  }
+}

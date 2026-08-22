@@ -92,6 +92,13 @@ export default function MatchResultForm({
           {editing ? "Save result" : "Change result"}
         </Button>
       </FormGroup>
+
+      {editing && hasResult ? (
+        <Label className="topcut__toggle">
+          <input type="checkbox" name="confirmRepair" />
+          <span>Changing the winner here also voids any already-played matches it fed - check this to proceed anyway</span>
+        </Label>
+      ) : null}
     </form>
   );
 }

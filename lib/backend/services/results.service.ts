@@ -718,6 +718,37 @@ export async function generateNextRound(slug: string): Promise<void> {
   await enforceTournamentDecks(slug);
 }
 
+function decidedDescendants(engine: EngineTournament, matchId: string): ReturnType<EngineTournament["getMatch"]>[] {
+  const decided: ReturnType<EngineTournament["getMatch"]>[] = [];
+  const seen = new Set<string>([matchId]);
+  const queue = [matchId];
+  while (queue.length > 0) {
+    const path = engine.getMatch(queue.shift()!).getPath();
+    for (const nextId of [path.win, path.loss]) {
+      if (!nextId || seen.has(nextId)) continue;
+      seen.add(nextId);
+      const next = engine.getMatch(nextId);
+      if (next.hasEnded()) {
+        decided.push(next);
+        queue.push(nextId);
+      }
+    }
+  }
+  return decided;
+}
+
+export class RepairConfirmationRequired extends Error {
+  readonly affectedMatchIds: string[];
+
+  constructor(affectedMatchIds: string[]) {
+    super(
+      `Changing the winner here voids ${affectedMatchIds.length} already-played match${affectedMatchIds.length === 1 ? "" : "es"} further into the bracket - whoever really advances hasn't played them yet. Confirm to void ${affectedMatchIds.length === 1 ? "it" : "them"} and proceed.`,
+    );
+    this.name = "RepairConfirmationRequired";
+    this.affectedMatchIds = affectedMatchIds;
+  }
+}
+
 /**
  * Admin override: enters or replaces a result directly, regardless of what
  * (if anything) players have self-reported for this match - clearing those
@@ -732,6 +763,13 @@ export async function generateNextRound(slug: string): Promise<void> {
  * entered at all - those siblings are still fresh, first-time entries for
  * their own round, not late corrections, and must not be blocked by that
  * pairing side effect.
+ *
+ * A correction that keeps the same winner (fixing a 2-0 to a 2-1, say) never
+ * needs any of this: standings and bracket progression both key off which
+ * side won, never the game count, so it's applied directly regardless of what
+ * has happened downstream. A correction that changes the winner after
+ * downstream matches were already played is a repair, not a patch - see
+ * decidedDescendants() and `opts.confirm`.
  */
 export async function enterMatchResult(
   slug: string,
@@ -739,6 +777,7 @@ export async function enterMatchResult(
   player1Wins: number,
   player2Wins: number,
   draws = 0,
+  opts: { confirm?: boolean } = {},
 ): Promise<void> {
   const tournamentId = await repos().tournaments.findIdBySlug(slug);
   if (!tournamentId) throw new Error(`Tournament "${slug}" does not exist`);
@@ -747,29 +786,55 @@ export async function enterMatchResult(
 
   const match = engine.getMatch(matchId);
 
-  // Rewriting an already-decided match (a self-report resolution or an earlier
-  // override) has to go through clearResult() first - it's what unwinds any
-  // elimination-bracket progression the old result already caused, so the
-  // correction propagates forward cleanly instead of double-advancing anyone.
   if (match.hasEnded()) {
-    // What makes a correction unsafe is a *downstream* result, not a bigger
-    // round number. In a double-elimination bracket the round numbers run
-    // winners-then-losers, so "any higher round is paired" was true from the
-    // first round onward and blocked every correction in the event. The graph
-    // says it properly: this result feeds the matches at path.win/path.loss,
-    // and only once one of those has been played is rewriting it unsafe.
-    const downstream = [match.getPath().win, match.getPath().loss]
-      .filter((id): id is string => id !== null)
-      .map((id) => engine.getMatch(id));
-    const decided = downstream.find((m) => m.hasEnded());
-    if (decided) {
-      throw new Error(
-        "This match already fed a later one that has been played - correct that result first, then come back to this.",
-      );
+    const p1Id = match.getPlayer1().id;
+    const p2Id = match.getPlayer2().id;
+    const existingWinnerId = match.getWinner()?.id ?? null;
+    const intendedWinnerId = player1Wins > player2Wins ? p1Id : player2Wins > player1Wins ? p2Id : null;
+
+    if (existingWinnerId !== null && existingWinnerId === intendedWinnerId) {
+      // Same winner, different score. Write it directly instead of routing
+      // through clearResult()/enterResult(), which would reopen - and, since
+      // that pair doesn't check whether what it's reopening has itself
+      // already been decided, silently corrupt - any match this one already
+      // fed a winner or loser into.
+      match.set({
+        player1: { win: player1Wins, loss: player2Wins, draw: draws },
+        player2: { win: player2Wins, loss: player1Wins, draw: draws },
+      });
+      if (p1Id) engine.getPlayer(p1Id).updateMatch(matchId, { win: player1Wins, loss: player2Wins, draw: draws });
+      if (p2Id) engine.getPlayer(p2Id).updateMatch(matchId, { win: player2Wins, loss: player1Wins, draw: draws });
+      await persistEngine(tournamentId, engine);
+      await repos().matchReports.clearForMatch(matchId);
+      await repos().registrations.resetAbsences([p1Id, p2Id].filter((id): id is string => id !== null));
+      await syncMatchDeadlines(tournamentId, engine);
+      return;
     }
-    // Swiss has no such graph: its pairings are recomputed, so the guard is
-    // still "has the round moved on".
-    if (!engine.isElimination() && engine.getRoundNumber() > match.getRoundNumber()) {
+
+    // The winner is actually changing. What makes that unsafe is a
+    // *downstream* result, not a bigger round number - see decidedDescendants().
+    const downstream = decidedDescendants(engine, matchId);
+    if (downstream.length > 0) {
+      if (!engine.isElimination()) {
+        // Swiss has no bracket graph to repair through - its pairings are
+        // just recomputed each round, so there's nothing to selectively void.
+        throw new Error(
+          "This match's round has already closed - the next round has started, so its result can no longer be changed.",
+        );
+      }
+      if (!opts.confirm) throw new RepairConfirmationRequired(downstream.map((m) => m.getId()));
+
+      // Void every match this correction invalidates, deepest (highest round
+      // number) first, so nothing is cleared while something it feeds into
+      // still holds a stale result - tournament-organizer's clearResult()
+      // doesn't check that itself. The target is cleared last, then
+      // re-decided below, letting the engine's own propagation re-seat
+      // whoever really advances into the now-freshly-opened matches.
+      for (const m of [...downstream].sort((a, b) => b.getRoundNumber() - a.getRoundNumber())) {
+        engine.clearResult(m.getId());
+        await repos().matchReports.clearForMatch(m.getId());
+      }
+    } else if (!engine.isElimination() && engine.getRoundNumber() > match.getRoundNumber()) {
       throw new Error("This match's round has already closed - the next round has started, so its result can no longer be changed.");
     }
     engine.clearResult(matchId);

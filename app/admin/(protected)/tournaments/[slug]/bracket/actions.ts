@@ -11,6 +11,7 @@ import {
   enterMatchResult,
   extendCurrentRoundDeadline,
   generateNextRound,
+  RepairConfirmationRequired,
   startBracket,
 } from "@/lib/backend/services/results.service";
 import { getTournament } from "@/lib/tournaments";
@@ -63,7 +64,10 @@ function bracketError(slug: string, message: string): never {
  *
  * A rejected correction (the match already fed a later one that has been
  * played) comes back as a message on the page - failing silently is what made
- * "change result" look broken.
+ * "change result" look broken. Changing the winner of a match whose bracket
+ * descendants have already been played is a repair, not a plain correction:
+ * it comes back the same way, naming what it would void, until the form's
+ * "void those and proceed" box is checked and the action is resubmitted.
  */
 export async function enterResultAction(form: FormData) {
   const slug = String(form.get("slug") ?? "");
@@ -71,6 +75,7 @@ export async function enterResultAction(form: FormData) {
   const winner = String(form.get("winner") ?? "");
   const winnerGames = Number(form.get("winnerGames") ?? 1);
   const loserGames = Number(form.get("loserGames") ?? 0);
+  const confirmRepair = form.get("confirmRepair") === "on";
   if (!slug || !matchId) return;
   if (winner !== "player1" && winner !== "player2") bracketError(slug, "Pick which player won.");
   if (!Number.isInteger(winnerGames) || !Number.isInteger(loserGames) || loserGames >= winnerGames) {
@@ -85,8 +90,10 @@ export async function enterResultAction(form: FormData) {
       p1Won ? winnerGames : loserGames,
       p1Won ? loserGames : winnerGames,
       0,
+      { confirm: confirmRepair },
     );
   } catch (err) {
+    if (err instanceof RepairConfirmationRequired) bracketError(slug, `${err.message} Check the box below and save again.`);
     bracketError(slug, err instanceof Error ? err.message : "Could not save that result.");
   }
 
@@ -94,7 +101,7 @@ export async function enterResultAction(form: FormData) {
     ...(await actor()),
     action: "bracket.result",
     target: slug,
-    detail: `Entered a match result in "${slug}" (${p1Won ? `${winnerGames}-${loserGames}` : `${loserGames}-${winnerGames}`})`,
+    detail: `Entered a match result in "${slug}" (${p1Won ? `${winnerGames}-${loserGames}` : `${loserGames}-${winnerGames}`})${confirmRepair ? " - repair confirmed, voiding downstream matches" : ""}`,
   });
 
   revalidatePath(`/admin/tournaments/${slug}/bracket`);

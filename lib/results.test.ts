@@ -21,6 +21,7 @@ import {
   getLeaderboard,
   getPlacings,
   hasBracket,
+  RepairConfirmationRequired,
   startBracket,
   submitMatchReport,
   type BracketView,
@@ -772,6 +773,150 @@ test("double elimination names every match by bracket side, and the grand final 
   const reset = (await getBracketView(tournament.slug))!.matches.find((m) => m.label === "Grand Final Reset");
   assert.ok(reset, "losing the grand final gave the undefeated finalist their first loss, so a reset match exists");
   assert.equal(reset.bracket, "grand-final");
+});
+
+test("enterMatchResult: a same-winner score correction is always allowed, even once downstream matches are decided", async () => {
+  const tournament = await createTournament({
+    ...swissDraft,
+    name: "Repair Cup - Same Winner",
+    structure: "double-elim",
+    rounds: 0,
+    topCut: null,
+    matchFormat: "Bo3",
+  });
+  await seatFourViaAdmin(tournament.slug);
+  const event = (await getTournament(tournament.slug))!;
+  await startBracket(tournament.slug, event);
+
+  const [m1] = (await getBracketView(tournament.slug))!.matches.filter((m) => m.bracket === "winners");
+  await enterMatchResult(tournament.slug, m1.id, 2, 0);
+
+  // Play out everything else that opened up as a result, so m1 now has
+  // decided descendants - a correction that flips the winner would be
+  // refused past this point, but the score alone is fair game.
+  for (let guard = 0; guard < 8; guard++) {
+    const open = (await getBracketView(tournament.slug))!.matches.filter(
+      (m) => m.active && !m.bye && m.player1 && m.player2 && m.id !== m1.id,
+    );
+    if (open.length === 0) break;
+    for (const m of open) await enterMatchResult(tournament.slug, m.id, 2, 0);
+  }
+  const beforeRepair = (await getBracketView(tournament.slug))!;
+  const decidedDownstreamCount = beforeRepair.matches.filter((m) => m.id !== m1.id && m.hasResult).length;
+  assert.ok(decidedDownstreamCount > 0, "test setup: something downstream of m1 must already be decided");
+
+  await assert.doesNotReject(() => enterMatchResult(tournament.slug, m1.id, 2, 1));
+
+  const after = (await getBracketView(tournament.slug))!;
+  assert.equal(after.matches.find((m) => m.id === m1.id)!.score, "2-1", "the score changed");
+  assert.equal(
+    after.matches.filter((m) => m.id !== m1.id && m.hasResult).length,
+    decidedDownstreamCount,
+    "nothing downstream was touched - the winner never changed",
+  );
+});
+
+test("enterMatchResult: changing a winner past decided descendants is refused without confirmation, and confirming voids them", async () => {
+  const tournament = await createTournament({
+    ...swissDraft,
+    name: "Repair Cup - Winner Change",
+    structure: "double-elim",
+    rounds: 0,
+    topCut: null,
+  });
+  await seatFourViaAdmin(tournament.slug);
+  const event = (await getTournament(tournament.slug))!;
+  await startBracket(tournament.slug, event);
+
+  // The two round-1 winners matches are the only ones paired with real
+  // players before anything is reported - m2 is m1's sibling, never
+  // downstream of it, and stays the control for branch isolation below.
+  const [m1, m2] = (await getBracketView(tournament.slug))!.matches.filter(
+    (m) => m.bracket === "winners" && m.player1 && m.player2,
+  );
+  const originalWinnerId = m1.player1!.registrationId;
+  const m2WinnerId = m2.player1!.registrationId;
+  await enterMatchResult(tournament.slug, m1.id, 1, 0);
+  await enterMatchResult(tournament.slug, m2.id, 1, 0);
+
+  // Play out everything downstream of m1's result (winners final, the losers
+  // match its loser dropped into, and that losers match's own next match) so
+  // there's a multi-level chain of decided descendants to repair through -
+  // but stop short of the grand final, which isn't decided yet.
+  for (let guard = 0; guard < 8; guard++) {
+    const open = (await getBracketView(tournament.slug))!.matches.filter(
+      (m) => m.active && !m.bye && m.player1 && m.player2 && m.bracket !== "grand-final",
+    );
+    if (open.length === 0) break;
+    for (const m of open) await enterMatchResult(tournament.slug, m.id, 1, 0);
+  }
+
+  const beforeRepair = (await getBracketView(tournament.slug))!;
+  const decidedBefore = beforeRepair.matches.filter((m) => m.id !== m1.id && m.id !== m2.id && m.hasResult);
+  assert.ok(decidedBefore.length >= 2, "test setup: m1's correction needs a multi-level chain to repair through");
+
+  // Flipping the winner without confirming is refused, and changes nothing -
+  // m2, its sibling, is decided too but must not be named: it's never
+  // downstream of m1, only a fellow parent of the same losers-round match.
+  await assert.rejects(
+    () => enterMatchResult(tournament.slug, m1.id, 0, 1),
+    (err: unknown) =>
+      err instanceof RepairConfirmationRequired &&
+      err.affectedMatchIds.length === decidedBefore.length &&
+      !err.affectedMatchIds.includes(m2.id),
+  );
+  const unchanged = (await getBracketView(tournament.slug))!;
+  assert.equal(unchanged.matches.find((m) => m.id === m1.id)!.player1!.registrationId, originalWinnerId);
+  assert.equal(
+    unchanged.matches.filter((m) => m.id !== m1.id && m.hasResult).length,
+    decidedBefore.length + 1,
+    "a rejected repair must not have voided anything (the +1 is m2, untouched throughout)",
+  );
+
+  // Confirming applies the correction and voids exactly what was named.
+  await enterMatchResult(tournament.slug, m1.id, 0, 1, 0, { confirm: true });
+
+  const repaired = (await getBracketView(tournament.slug))!;
+  const repairedM1 = repaired.matches.find((m) => m.id === m1.id)!;
+  // Seats (player1/player2) are fixed for the life of a match - only the
+  // score entered into them changes. The original winner still sits in
+  // whichever seat it always did; that seat now shows the loss.
+  assert.equal(repairedM1.player1!.registrationId, originalWinnerId);
+  assert.equal(repairedM1.score, "0-1", "the seat that used to win now loses, per the corrected result");
+  for (const before of decidedBefore) {
+    const voided = repaired.matches.find((m) => m.id === before.id)!;
+    assert.equal(voided.hasResult, false, `match ${before.id} should have been voided by the repair`);
+    if (before.label === "Losers Final") {
+      // Two hops from m1: both of its own parents (Winners Final and Losers
+      // Round 1) are themselves being repaired, so who plays here can't be
+      // known until those are actually replayed - it stays unseated, not
+      // reopened with stale opponents.
+      assert.equal(voided.player1, null);
+      assert.equal(voided.player2, null);
+    } else {
+      assert.ok(voided.active, `match ${before.id} (${before.label}) should be open again, waiting on whoever really advanced`);
+    }
+  }
+
+  // The unrelated branch - m2 - must come through byte-for-byte unchanged.
+  const repairedM2 = repaired.matches.find((m) => m.id === m2.id)!;
+  assert.equal(repairedM2.hasResult, true, "m2 was never in the affected scope - it must still be decided");
+  assert.equal(repairedM2.player1!.registrationId, m2WinnerId, "m2's own winner is untouched by a repair on a sibling match");
+});
+
+test("enterMatchResult: a Swiss correction that flips the winner is still refused once the next round has started", async () => {
+  const tournament = await createTournament({ ...swissDraft, topCut: null });
+  await seatFourViaAdmin(tournament.slug);
+  const event = (await getTournament(tournament.slug))!;
+  await startBracket(tournament.slug, event);
+
+  const round1 = (await getBracketView(tournament.slug))!.matches.filter((m) => m.round === 1);
+  for (const match of round1) await enterMatchResult(tournament.slug, match.id, 1, 0);
+  await generateNextRound(tournament.slug);
+
+  // No confirmation option bails this out in Swiss - there's no bracket graph
+  // to repair through, only pairings that have already been recomputed.
+  await assert.rejects(() => enterMatchResult(tournament.slug, round1[0].id, 0, 1, 0, { confirm: true }));
 });
 
 test("no-show: opens a few minutes in, can be dismissed, and hands over the match once its grace runs out", async () => {
