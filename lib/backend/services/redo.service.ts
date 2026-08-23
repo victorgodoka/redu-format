@@ -18,7 +18,7 @@ import { TournamentsRepository } from "../repositories/tournaments.repository.ts
 import { NEXUS_WIN_REASON_DISCONNECT } from "../../nexus-parse.ts";
 import { REDO_REQUEST_TTL_MS } from "./duel-verification.service.ts";
 import { generateNexusRoomHash } from "./nexus-room.ts";
-import { getBracketView } from "./results.service.ts";
+import { getBracketView, type BracketView } from "./results.service.ts";
 
 function repos(pool: Pool = getPool()) {
   return {
@@ -47,18 +47,33 @@ async function notifyPlayer(registrationId: string, input: { kind: string; title
   });
 }
 
-/** Validates the caller is actually in this match, and returns their opponent's registration id. Null for anyone else - including a moderator, who has no redo say (this is a players-only flow). */
-async function matchContext(
-  slug: string,
+/** Pure half of matchContext() - takes an already-loaded view instead of fetching one, so a caller that has one in scope (a page render, which has usually already called getBracketView for its own display) never pays for a second, identical query. */
+function matchContextFromView(
+  view: BracketView | null,
   matchId: string,
   registrationId: string,
-): Promise<{ opponentRegistrationId: string } | null> {
-  const view = await getBracketView(slug);
+): { opponentRegistrationId: string } | null {
   const match = view?.matches.find((m) => m.id === matchId);
   if (!match || !match.player1 || !match.player2) return null;
   if (registrationId === match.player1.registrationId) return { opponentRegistrationId: match.player2.registrationId };
   if (registrationId === match.player2.registrationId) return { opponentRegistrationId: match.player1.registrationId };
   return null;
+}
+
+/**
+ * Validates the caller is actually in this match, and returns their
+ * opponent's registration id. Null for anyone else - including a moderator,
+ * who has no redo say (this is a players-only flow). Used by the mutating
+ * actions (request/accept/reject), which always need a fresh read regardless
+ * of what a page happened to render with - see getRedoStatus for the
+ * read-path, preloaded-view version.
+ */
+async function matchContext(
+  slug: string,
+  matchId: string,
+  registrationId: string,
+): Promise<{ opponentRegistrationId: string } | null> {
+  return matchContextFromView(await getBracketView(slug), matchId, registrationId);
 }
 
 /**
@@ -96,9 +111,20 @@ export type RedoStatus = {
  * guards the mutations): this also has to keep showing "accepted" for a
  * moment after acceptRedo() has already superseded the old attempt, so the
  * success message doesn't just vanish the instant it's true.
+ *
+ * `preloadedView` lets a caller that already ran getBracketView(slug) this
+ * request (the tournament page does, to render the bracket itself) skip a
+ * second, identical query - pass the one already in scope. Omit it and this
+ * fetches its own, for callers (the dashboard, today) that don't have one.
  */
-export async function getRedoStatus(slug: string, matchId: string, registrationId: string): Promise<RedoStatus> {
-  const ctx = await matchContext(slug, matchId, registrationId);
+export async function getRedoStatus(
+  slug: string,
+  matchId: string,
+  registrationId: string,
+  preloadedView?: BracketView | null,
+): Promise<RedoStatus> {
+  const view = preloadedView !== undefined ? preloadedView : await getBracketView(slug);
+  const ctx = matchContextFromView(view, matchId, registrationId);
   if (!ctx) return null;
 
   const slots = await repos().slots.listForMatch(matchId);

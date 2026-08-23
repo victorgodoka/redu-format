@@ -645,7 +645,7 @@ export default async function EventDetailPage({
   const myRound = !finished && myRegistrationId ? await getMyRound(slug, myRegistrationId) : null;
   const myHistory = myRegistrationId && (finished || past) ? await getMyMatchHistory(slug, myRegistrationId) : [];
   const redoStatus =
-    myRound?.match && myRegistrationId ? await getRedoStatus(slug, myRound.match.matchId, myRegistrationId) : null;
+    myRound?.match && myRegistrationId ? await getRedoStatus(slug, myRound.match.matchId, myRegistrationId, view) : null;
 
   return (
     <>

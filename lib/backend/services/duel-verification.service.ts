@@ -64,14 +64,15 @@ function repos(pool: Pool = getPool()) {
   };
 }
 
-/** The forms a room hash's game_name might come back as - the room-creation side (nexus-room.ts) only ever produces the bare hash, but the duel link format is "NA-{hash}", so both are checked rather than assumed. */
+/**
+ * game_name is the room hash itself - the "NA-" in the duel link
+ * (duelingnexus.com/duel/NA-{hash}) is a region prefix the client shows, not
+ * part of the name Nexus reports back. generateNexusRoomHash() always
+ * produces uppercase (see nexus-room.ts's BASE36_CHARS), so the lowercase
+ * form only guards against Nexus normalizing it on its own end.
+ */
 export function candidateGameNames(roomHash: string): string[] {
-  const names = new Set<string>();
-  for (const h of [roomHash, roomHash.toUpperCase(), roomHash.toLowerCase()]) {
-    names.add(h);
-    names.add(`NA-${h}`);
-  }
-  return [...names];
+  return [...new Set([roomHash, roomHash.toLowerCase()])];
 }
 
 /**
@@ -80,8 +81,14 @@ export function candidateGameNames(roomHash: string): string[] {
  * state, never a running timer:
  *
  * - no redo ever requested: counts once DISCONNECT_REDO_GRACE_MS has passed
- *   since the duel ended (gives both players a real chance to ask for a redo
- *   before it's final).
+ *   since *this app first saw the attempt* (attempt.createdAt) - deliberately
+ *   not the replay's own end_date. A verification gap (no admin token linked
+ *   for a while, the tournament simply wasn't polled) can mean a disconnect
+ *   is only discovered well after DISCONNECT_REDO_GRACE_MS has already
+ *   elapsed on Nexus's clock; counting it from discovery instead means
+ *   players always get a real window to click "Request Redo" through this
+ *   app, regardless of how late the discovery was. Free to compute - no
+ *   extra Nexus or database call, createdAt is already loaded with the row.
  * - a redo is pending: never counts (its acceptance/rejection/expiry decides
  *   this attempt's fate, not the passage of time on its own).
  * - a redo was accepted: never counts - the replacement attempt is what
@@ -89,14 +96,13 @@ export function candidateGameNames(roomHash: string): string[] {
  * - a redo was rejected or expired: counts, per the tournament's normal
  *   disconnect rule.
  */
-export function disconnectCounts(replayEndDate: string | null, redo: RedoRequest | null, now: Date): boolean {
+export function disconnectCounts(attemptCreatedAt: string, redo: RedoRequest | null, now: Date): boolean {
   if (redo) {
     if (redo.status === "accepted") return false;
     if (redo.status === "pending") return false;
     return true; // rejected or expired
   }
-  if (!replayEndDate) return false;
-  return now.getTime() - new Date(replayEndDate).getTime() >= DISCONNECT_REDO_GRACE_MS;
+  return now.getTime() - new Date(attemptCreatedAt).getTime() >= DISCONNECT_REDO_GRACE_MS;
 }
 
 type RegInfo = { playerId: string | null; nexusUserId: string | null; deckLockedSnapshot: unknown };
@@ -156,8 +162,11 @@ async function resolveAttempt(
 
   // Missing a Nexus id for one of our own players (never logged in since this
   // shipped) is not evidence of anything - can't confirm the lobby either
-  // way, so this is left pending rather than treated as a mismatch.
-  if (!expectedP1 || !expectedP2) return inconclusive(cached.winReason);
+  // way. Left genuinely open (the attempt stays "active", not resolved) so a
+  // later login retries this for free from the already-cached replay,
+  // instead of being permanently stuck the way a real dead end (a tag duel)
+  // deliberately is.
+  if (!expectedP1 || !expectedP2) return { dqApplied: false, attempt };
 
   const expected = [expectedP1, expectedP2];
   const inReplay = [cached.player1Id, cached.player2Id];
@@ -209,7 +218,7 @@ async function resolveAttempt(
   if (!winnerRegistrationId) return inconclusive(cached.winReason);
 
   const isDisconnect = cached.winReason === NEXUS_WIN_REASON_DISCONNECT;
-  const counts = isDisconnect ? disconnectCounts(cached.endDate, null, now) : true;
+  const counts = isDisconnect ? disconnectCounts(attempt.createdAt, null, now) : true;
 
   await attempts.resolve(attempt.id, { winnerRegistrationId, winReason: cached.winReason, counts, dqRegistrationIds: null }, now);
   return {
@@ -220,10 +229,10 @@ async function resolveAttempt(
 
 /** Re-checks a completed-but-not-counting disconnect attempt against the current redo state/clock - see disconnectCounts(). Applies the flip if it changed and reports the (possibly updated) attempt back. */
 async function refreshDisconnectCounts(attempt: DuelAttempt, now: Date, pool: Pool): Promise<DuelAttempt> {
-  if (attempt.counts || attempt.winReason !== NEXUS_WIN_REASON_DISCONNECT || !attempt.replayId) return attempt;
-  const { attempts, redoRequests, replayCache } = repos(pool);
-  const [redo, cached] = await Promise.all([redoRequests.findByAttempt(attempt.id), replayCache.findById(attempt.replayId)]);
-  const stillCounts = disconnectCounts(cached?.endDate ?? null, redo, now);
+  if (attempt.counts || attempt.winReason !== NEXUS_WIN_REASON_DISCONNECT) return attempt;
+  const { attempts, redoRequests } = repos(pool);
+  const redo = await redoRequests.findByAttempt(attempt.id);
+  const stillCounts = disconnectCounts(attempt.createdAt, redo, now);
   if (stillCounts === attempt.counts) return attempt;
   await attempts.setCounts(attempt.id, stillCounts);
   return { ...attempt, counts: stillCounts };
@@ -325,6 +334,7 @@ async function processMatch(
       winReason: null,
       counts: false,
       dqRegistrationIds: null,
+      createdAt: now.toISOString(),
       resolvedAt: null,
     };
     const result = await resolveAttempt(fresh, match, slug, regInfo, now, pool);
@@ -376,12 +386,19 @@ export async function verifyTournament(slug: string): Promise<void> {
     if (new Date(pending.expiresAt).getTime() <= now.getTime()) await redoRequests.expireIfDue(pending.id, now);
   }
 
+  // One bulk read instead of one listForMatch() per active match - only the
+  // matches actually missing a slot 1 (new this pass) cost a write.
+  let slotsByMatch = await slots.listForTournament(tournamentId);
   for (const match of activeMatches) {
-    if (!(await slots.listForMatch(match.id)).length) {
+    if (!slotsByMatch.get(match.id)?.length) {
       await slots.ensureNext(crypto.randomUUID(), tournamentId, match.id, 1, match.roomHash, now);
     }
   }
-  const slotsByMatch = await slots.listForTournament(tournamentId);
+  if (activeMatches.some((m) => !slotsByMatch.get(m.id)?.length)) {
+    slotsByMatch = await slots.listForTournament(tournamentId);
+  }
+
+  const relevantNames = new Set([...slotsByMatch.values()].flat().flatMap((s) => candidateGameNames(s.currentRoomHash)));
 
   const claimed = await fetchLog.claim(`tournament:${slug}`, now, FETCH_CACHE_MS);
   if (claimed) {
@@ -389,9 +406,6 @@ export async function verifyTournament(slug: string): Promise<void> {
     if (token) {
       const replays = await fetchNexusReplayList(token);
       if (replays) {
-        const relevantNames = new Set(
-          [...slotsByMatch.values()].flat().flatMap((s) => candidateGameNames(s.currentRoomHash)),
-        );
         for (const replay of replays) {
           if (relevantNames.has(replay.gameName)) await replayCache.upsertSummary(replay, now);
         }
@@ -403,7 +417,6 @@ export async function verifyTournament(slug: string): Promise<void> {
   // but get-replay-info.php hasn't been called for yet - independent of
   // whether *this* pass won the list-fetch claim above, since it's already
   // deduplicated per replay id (see the winning_team IS NULL check).
-  const relevantNames = new Set([...slotsByMatch.values()].flat().flatMap((s) => candidateGameNames(s.currentRoomHash)));
   for (const cached of await replayCache.listByGameNames([...relevantNames])) {
     if (cached.winningTeam !== null) continue;
     const details = await fetchNexusReplayDetails(cached.replayId);

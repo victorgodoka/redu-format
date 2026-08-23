@@ -14,6 +14,8 @@ export type DuelAttempt = {
   winReason: number | null;
   counts: boolean;
   dqRegistrationIds: string[] | null;
+  /** When this app first saw this attempt - the redo-eligibility grace window counts from here, not from Nexus's own end_date, so a late-discovered disconnect (no admin token linked for a while, a verification gap) still gives players a fair window instead of arriving already-expired. See disconnectCounts(). */
+  createdAt: string;
   resolvedAt: string | null;
 };
 
@@ -29,6 +31,7 @@ function toAttempt(row: RowDataPacket): DuelAttempt {
     winReason: row.win_reason,
     counts: Boolean(row.counts),
     dqRegistrationIds: typeof row.dq_registration_ids === "string" ? JSON.parse(row.dq_registration_ids) : row.dq_registration_ids,
+    createdAt: fromMysqlDatetimeMs(row.created_at),
     resolvedAt: fromMysqlDatetimeMs(row.resolved_at),
   };
 }

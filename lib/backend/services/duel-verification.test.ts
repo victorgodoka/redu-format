@@ -23,21 +23,25 @@ function redo(overrides: Partial<RedoRequest>): RedoRequest {
   };
 }
 
-test("candidateGameNames covers the bare hash and the NA- link form, case-insensitively", () => {
+test("candidateGameNames covers the room hash as-is and lowercased - no NA- prefix, that's link chrome, not the reported name", () => {
   const names = candidateGameNames("AbC123");
-  for (const expected of ["AbC123", "NA-AbC123", "ABC123", "NA-ABC123", "abc123", "NA-abc123"]) {
-    assert.ok(names.includes(expected), `expected ${expected} in ${JSON.stringify(names)}`);
-  }
+  assert.deepEqual(new Set(names), new Set(["AbC123", "abc123"]));
 });
 
-test("disconnectCounts: no redo ever requested waits out the grace window, then counts", () => {
-  const end = new Date("2026-01-01T00:00:00Z");
-  const justBefore = new Date(end.getTime() + DISCONNECT_REDO_GRACE_MS - 1);
-  const atGrace = new Date(end.getTime() + DISCONNECT_REDO_GRACE_MS);
+test("disconnectCounts: no redo ever requested waits out the grace window (from discovery, not Nexus's own end_date), then counts", () => {
+  const discoveredAt = new Date("2026-01-01T00:00:00Z");
+  const justBefore = new Date(discoveredAt.getTime() + DISCONNECT_REDO_GRACE_MS - 1);
+  const atGrace = new Date(discoveredAt.getTime() + DISCONNECT_REDO_GRACE_MS);
 
-  assert.equal(disconnectCounts(end.toISOString(), null, justBefore), false);
-  assert.equal(disconnectCounts(end.toISOString(), null, atGrace), true);
-  assert.equal(disconnectCounts(null, null, atGrace), false); // no known end time - never guessed at.
+  assert.equal(disconnectCounts(discoveredAt.toISOString(), null, justBefore), false);
+  assert.equal(disconnectCounts(discoveredAt.toISOString(), null, atGrace), true);
+});
+
+test("disconnectCounts: a disconnect discovered late still gets a full grace window from discovery, not from when it actually happened", () => {
+  // The duel ended hours ago (e.g. no admin Nexus token was linked, or a
+  // verification gap) - only just now discovered.
+  const discoveredAt = new Date("2026-01-01T05:00:00Z");
+  assert.equal(disconnectCounts(discoveredAt.toISOString(), null, discoveredAt), false);
 });
 
 test("disconnectCounts: a pending request always waits, regardless of the clock", () => {

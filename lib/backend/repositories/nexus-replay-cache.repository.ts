@@ -2,6 +2,18 @@ import type { Pool, RowDataPacket } from "mysql2/promise";
 import type { NexusReplay } from "../../nexus-parse.ts";
 import { fromMysqlDatetimeMs, toMysqlDatetimeMs } from "../db/datetime.ts";
 
+/**
+ * Nexus's start_date/end_date strings are untrusted input - toMysqlDatetimeMs
+ * throws on anything Date can't parse, and a single malformed replay must
+ * never take down the whole batch it arrived in (see verifyTournament, which
+ * loops over every replay from one get-info.php call). Null in, null out.
+ */
+function safeDatetimeMs(iso: string | null): string | null {
+  if (!iso) return null;
+  const ms = Date.parse(iso);
+  return Number.isNaN(ms) ? null : toMysqlDatetimeMs(new Date(ms).toISOString());
+}
+
 export type CachedReplay = {
   replayId: string;
   gameName: string;
@@ -58,7 +70,7 @@ export class NexusReplayCacheRepository {
         replay.player1 || null,
         replay.player2 || null,
         replay.player3Id !== null || replay.player4Id !== null,
-        replay.endDate ? toMysqlDatetimeMs(replay.endDate) : null,
+        safeDatetimeMs(replay.endDate),
         toMysqlDatetimeMs(now.toISOString()),
       ],
     );
