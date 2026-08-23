@@ -1469,6 +1469,33 @@ input[type="number"]::-webkit-inner-spin-button {
   color: var(--c-muted);
 }
 
+.admin-list.participants,
+.bracket-round__matches {  
+  grid-template-columns: 1fr 1fr 1fr;
+}
+
+.bracket-round__matches .admin-row__main {  
+  width: 100%;
+}
+
+.admin-list.participants .admin-row.panel:nth-child(1) {
+  background: var(--c-accent);
+  color: var(--c-accent);
+  font-weight: bold;
+}
+
+.admin-list.participants .admin-row.panel:nth-child(2) {
+  background: var(--c-muted);
+  color: var(--c-muted);
+  font-weight: bold;
+}
+
+.admin-list.participants .admin-row.panel:nth-child(3) {
+  background: var(--c-danger);
+  color: var(--c-danger);
+  font-weight: bold;
+}
+
 /* two stacked "name + score" rows read as a scoreboard, so the score never
    has to hide in a meta line the way "2-1" did before */
 .matchup {
@@ -1804,6 +1831,11 @@ input[type="number"]::-webkit-inner-spin-button {
    ========================================================= */
 
 @media (max-width: 900px) {
+  .admin-list.participants,
+  .bracket-round__matches {  
+    grid-template-columns: 1fr 1fr;
+  }
+
   :root {
     --cut: 18px;
   }
@@ -1872,6 +1904,13 @@ input[type="number"]::-webkit-inner-spin-button {
     position: absolute;
     bottom: 1rem;
     right: 1rem;
+  }
+}
+
+@media (min-width: 540px) {
+  .admin-list.participants,
+  .bracket-round__matches {  
+    grid-template-columns: 1fr;
   }
 }
 

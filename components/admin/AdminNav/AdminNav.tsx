@@ -25,6 +25,7 @@ const LINKS = [
   { href: "/admin/tournaments", label: "Tournaments" },
   { href: "/admin/inbox", label: "Inbox" },
   { href: "/admin/logs", label: "Logs" },
+  { href: "/", label: "Home", target: "_blank" },
 ];
 
 export default function AdminNav({
@@ -57,12 +58,13 @@ export default function AdminNav({
 
       <div className={styles.panel} id="admin-nav-panel" data-open={open}>
         <nav className={styles.links} aria-label="Admin sections">
-          {LINKS.map(({ href, label }) => {
+          {LINKS.map(({ href, label, target }) => {
             const active = pathname === href || pathname.startsWith(`${href}/`);
             return (
               <Link
                 key={href}
                 href={href}
+                target={target ?? "_self"}
                 className={styles.link}
                 aria-current={active ? "page" : undefined}
                 onClick={() => setOpen(false)}

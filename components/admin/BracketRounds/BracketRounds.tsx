@@ -55,7 +55,7 @@ export default function BracketRounds({
       {rounds.map((round) => (
         <div key={round} className="bracket-round">
           <h2 className="bracket-round__title">{titleFor(round)}</h2>
-          <AdminList>
+          <AdminList className="bracket-round__matches">
             {view.matches
               .filter((m) => m.round === round)
               .map((match) => {
@@ -175,7 +175,7 @@ export default function BracketRounds({
         </h2>
       </div>
       {view.status === "complete" ? (
-        <AdminList as="ol">
+        <AdminList className="participants" as="ol">
           {placings.map((p) => (
             <AdminRow key={p.registrationId}>
               <AdminRow.Main>
