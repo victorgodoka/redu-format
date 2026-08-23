@@ -285,7 +285,7 @@ export default function TournamentForm({
                 checked={hasTopCut}
                 onChange={(e) => setHasTopCut(e.target.checked)}
               />
-              <span>This tournament cuts to a bracket after Swiss</span>
+              <span>Enable Top Cut</span>
               {hasTopCut ? (
                 <p className="form__hint">
                   {seatsNumber === null
