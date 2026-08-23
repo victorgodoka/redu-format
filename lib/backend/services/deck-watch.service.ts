@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { describeDelta, diffDeckLists, parseSnapshot, type DeckCardDelta, type DeckSnapshot } from "../../deck-diff.ts";
 import { fetchDeckArt } from "../../nexus-parse.ts";
 import { getPool } from "../db/client.ts";
+import { DeckSnapshotsRepository } from "../repositories/deck-snapshots.repository.ts";
 import { RegistrationsRepository, type WatchedDeck } from "../repositories/registrations.repository.ts";
 import { notify } from "./notifications.service.ts";
 
@@ -44,6 +45,10 @@ function repo() {
   return new RegistrationsRepository(getPool());
 }
 
+function snapshotsRepo() {
+  return new DeckSnapshotsRepository(getPool());
+}
+
 /** The deck exactly as Dueling Nexus serves it right now, or null when it can't be read (private, deleted, upstream down). */
 async function liveSnapshot(deckId: string): Promise<DeckSnapshot | null> {
   const live = await fetchDeckArt(deckId);
@@ -51,27 +56,50 @@ async function liveSnapshot(deckId: string): Promise<DeckSnapshot | null> {
 }
 
 /**
- * Freezes every registered deck as it stands right now - called once, from
- * startBracket(). Whatever a player did to their list before this moment is
- * legal and raises nothing; from here on, that frozen list is the only one
- * they are allowed to play.
+ * Freezes every registered deck as it stands right now, and records the
+ * freeze in the deck_snapshots audit history - called once per round, before
+ * that round's lobbies are generated (startBracket() for round 1,
+ * generateNextRound() for every round after). Whatever a player did to their
+ * list before this moment is legal and raises nothing; from here on, that
+ * frozen list is the only one they are allowed to play until the next round
+ * re-freezes it.
  *
  * Falls back to the snapshot taken at signup when Nexus can't be reached, so
- * a tournament never starts with an unenforceable (null) baseline.
+ * a round never opens with an unenforceable (null) baseline.
  */
-export async function lockTournamentDecks(slug: string): Promise<number> {
+async function freezeDecks(slug: string, roundNumber: number): Promise<number> {
   const registrations = repo();
+  const snapshots = snapshotsRepo();
   const watched = await registrations.listWatchedDecks({ slug });
+  const now = new Date();
 
   const locked = await Promise.all(
     watched.map(async (w) => {
       const snapshot = (await liveSnapshot(w.deckId).catch(() => null)) ?? parseSnapshot(w.deckSnapshot);
       if (!snapshot) return false;
       await registrations.lockDeck(w.registrationId, snapshot);
+      await snapshots.record({
+        id: crypto.randomUUID(),
+        registrationId: w.registrationId,
+        kind: "round_start",
+        roundNumber,
+        snapshot,
+        now,
+      });
       return true;
     }),
   );
   return locked.filter(Boolean).length;
+}
+
+/** Round 1's freeze - called from startBracket(), before the first round's lobbies are generated. */
+export async function lockTournamentDecks(slug: string): Promise<number> {
+  return freezeDecks(slug, 1);
+}
+
+/** Every later round's freeze - called from generateNextRound(), before that round's lobbies are generated. */
+export async function snapshotRoundDecks(slug: string, roundNumber: number): Promise<number> {
+  return freezeDecks(slug, roundNumber);
 }
 
 /**

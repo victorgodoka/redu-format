@@ -441,4 +441,31 @@ export class RegistrationsRepository {
       [toMysqlDatetime(new Date().toISOString()), reason, registrationId],
     );
   }
+
+  // --- Nexus duel verification ---------------------------------------------
+
+  /**
+   * registrationId -> Nexus player id + current deck baseline, for every
+   * given registration - what duel-verification.service.ts needs to match
+   * replay players to tournament players and validate their decks, in one
+   * query per match instead of one per player.
+   */
+  async listForNexusMatching(
+    registrationIds: string[],
+  ): Promise<Map<string, { playerId: string | null; nexusUserId: string | null; deckLockedSnapshot: unknown }>> {
+    if (registrationIds.length === 0) return new Map();
+    const [rows] = await this.pool.query<RowDataPacket[]>(
+      `SELECT r.id, r.player_id, p.nexus_user_id, r.deck_locked_snapshot
+       FROM registrations r
+       LEFT JOIN players p ON p.id = r.player_id
+       WHERE r.id IN (?)`,
+      [registrationIds],
+    );
+    return new Map(
+      rows.map((r) => [
+        r.id,
+        { playerId: r.player_id, nexusUserId: r.nexus_user_id, deckLockedSnapshot: r.deck_locked_snapshot },
+      ]),
+    );
+  }
 }

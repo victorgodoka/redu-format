@@ -54,6 +54,7 @@ export async function refresh() {
 
   await resolvePlayerId(session.token, {
     name: profile.name,
+    userId: profile.userId,
     avatar: profile.avatar,
     contributor: profile.contributor,
     contributorTime: profile.contributorTime,
@@ -73,4 +74,19 @@ export async function logout() {
   const session = await getSession();
   session.destroy();
   redirect("/");
+}
+
+/**
+ * The cleanup half of the "your Nexus token stopped working" flow: SiteHeader
+ * already re-validates the token on every page load (fetchProfile), so this
+ * is only ever reached after that has already failed - see
+ * components/site/SessionExpiredRedirect, which calls this once its ~2s
+ * spinner has run. Session-only; a linked admin token (admins.nexus_token) is
+ * untouched, since that failure is the player-facing session's, not the
+ * admin's own.
+ */
+export async function destroySessionAndRedirect() {
+  const session = await getSession();
+  session.destroy();
+  redirect("/login");
 }

@@ -34,7 +34,7 @@ export async function linkNexusToken(
   const profile = await fetchProfile(token);
   if (!profile) return { error: "That token was rejected by Dueling Nexus." };
 
-  // Persisted so it survives past this 8-hour admin session (picked back up
+  // Persisted so it survives past this admin session (picked back up
   // on the next Discord login), not just carried in the JWT below.
   await setAdminNexusToken(session.userId, token);
 

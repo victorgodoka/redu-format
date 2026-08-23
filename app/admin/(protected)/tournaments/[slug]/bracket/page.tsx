@@ -7,10 +7,11 @@ import StartBracketForm from "@/components/admin/StartBracketForm";
 import StatBar from "@/components/admin/StatBar";
 import Button from "@/components/ui/Button";
 import EmptyState from "@/components/ui/EmptyState";
+import { verifyTournament } from "@/lib/backend/services/duel-verification.service";
 import { closeOverdueMatches, getBracketView, getPlacings } from "@/lib/backend/services/results.service";
 import { DURATION_MODES, formatDate, formatTime } from "@/lib/events";
 import { getTournament } from "@/lib/tournaments";
-import { completeBracketAction, extendRoundAction, nextRoundAction } from "./actions";
+import { completeBracketAction, extendRoundAction, nextRoundAction, updateBracketStatusAction } from "./actions";
 
 export const metadata: Metadata = {
   title: "Tournament bracket | REDU Format",
@@ -34,7 +35,10 @@ export default async function BracketPage({
   // during the render. Writing results mid-render makes the HTML and the RSC
   // payload disagree about which matches are settled, which surfaces as a
   // hydration mismatch in the result form.
-  if (tournament.status === "running") after(() => closeOverdueMatches(slug).catch(() => null));
+  if (tournament.status === "running") {
+    after(() => closeOverdueMatches(slug).catch(() => null));
+    after(() => verifyTournament(slug).catch(() => null));
+  }
 
   const view = await getBracketView(slug);
   const placings = view?.status === "complete" ? await getPlacings(slug) : [];
@@ -83,6 +87,13 @@ export default async function BracketPage({
               ? `open until ${formatDate(view.clock.deadlineAt)} at ${formatTime(view.clock.deadlineAt)}`
               : "open"}
         </p>
+      ) : null}
+
+      {view && view.status !== "complete" && hasOpenMatches ? (
+        <form action={updateBracketStatusAction}>
+          <input type="hidden" name="slug" value={slug} />
+          <Button type="submit">Update bracket status</Button>
+        </form>
       ) : null}
 
       {!view ? (

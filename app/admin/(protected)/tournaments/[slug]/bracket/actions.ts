@@ -14,6 +14,7 @@ import {
   RepairConfirmationRequired,
   startBracket,
 } from "@/lib/backend/services/results.service";
+import { verifyTournament } from "@/lib/backend/services/duel-verification.service";
 import { getTournament } from "@/lib/tournaments";
 
 export type BracketFormState = { error?: string };
@@ -188,6 +189,22 @@ export async function extendRoundAction(form: FormData) {
   });
 
   revalidatePath(`/admin/tournaments/${slug}/bracket`);
+}
+
+/**
+ * Runs the same verification pass automatic polling does, on demand -
+ * verifyTournament() itself decides whether that means a fresh get-info.php
+ * call or just re-checking already-cached replays (the 5-minute cache/lock
+ * applies here exactly as it does everywhere else, per spec). No separate
+ * resolution algorithm lives here or anywhere in the UI layer.
+ */
+export async function updateBracketStatusAction(form: FormData) {
+  const slug = String(form.get("slug") ?? "");
+  if (!slug) return;
+
+  await verifyTournament(slug).catch(() => null);
+  revalidatePath(`/admin/tournaments/${slug}/bracket`);
+  revalidatePath(`/events/${slug}`);
 }
 
 export async function completeBracketAction(form: FormData) {

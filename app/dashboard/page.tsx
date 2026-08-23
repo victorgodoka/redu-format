@@ -20,6 +20,8 @@ import {
   listSavedSlugsForPlayer,
   listSignupsForPlayer,
 } from "@/lib/backend/services/registration.service";
+import { verifyTournament } from "@/lib/backend/services/duel-verification.service";
+import { getRedoStatus } from "@/lib/backend/services/redo.service";
 import { closeOverdueMatches, getMyRound, getPlacingsForPlayer } from "@/lib/backend/services/results.service";
 import { Card } from "@/lib/cards";
 import { DEFAULT_AVATAR } from "@/lib/nexus-parse";
@@ -115,9 +117,11 @@ export default async function DashboardPage() {
               // Settled after the response, never during the render - see the
               // event page for why a mid-render write breaks hydration.
               after(() => closeOverdueMatches(event.slug).catch(() => null));
+              after(() => verifyTournament(event.slug).catch(() => null));
               const registrationId = await findMyRegistrationId(event.slug, playerId);
               const round = registrationId ? await getMyRound(event.slug, registrationId) : null;
-              return round ? { event, round } : null;
+              const redo = round?.match && registrationId ? await getRedoStatus(event.slug, round.match.matchId, registrationId) : null;
+              return round ? { event, round, redo } : null;
             }),
         )
       ).filter((r) => r !== null)
@@ -198,11 +202,12 @@ export default async function DashboardPage() {
             <>
               <h2 className="section__subtitle">Your current rounds</h2>
               <div className="dashboard-rounds">
-                {liveRounds.map(({ event, round }) => (
+                {liveRounds.map(({ event, round, redo }) => (
                   <MyRound
                     key={event.slug}
                     slug={event.slug}
                     round={round}
+                    redo={redo}
                     eventName={event.name}
                     href={`/events/${event.slug}`}
                   />

@@ -3,6 +3,7 @@ import type { Tournament as EngineTournament } from "tournament-organizer/compon
 import type { ExportedTournamentValues } from "tournament-organizer/interfaces";
 import type { Structure, TournamentEvent } from "../../events.ts";
 import { getPool } from "../db/client.ts";
+import { DuelSlotsRepository } from "../repositories/duel-slots.repository.ts";
 import { MatchDeadlinesRepository, type MatchTracking } from "../repositories/match-deadlines.repository.ts";
 import { MatchFlagsRepository, type MatchFlag } from "../repositories/match-flags.repository.ts";
 import { MatchReportsRepository, type MatchReport, type MatchResult } from "../repositories/match-reports.repository.ts";
@@ -11,7 +12,7 @@ import { TournamentBracketsRepository } from "../repositories/tournament-bracket
 import { TournamentsRepository } from "../repositories/tournaments.repository.ts";
 import { RegistrationsRepository } from "../repositories/registrations.repository.ts";
 import { generateNexusRoomHash } from "./nexus-room.ts";
-import { enforceTournamentDecks, lockTournamentDecks } from "./deck-watch.service.ts";
+import { enforceTournamentDecks, lockTournamentDecks, snapshotRoundDecks } from "./deck-watch.service.ts";
 import { roundClock, roundCutoffMs, shouldAutoAdvance, type RoundClock } from "../../rounds.ts";
 
 /** What a locked round rejects a report with - the same wording the player-facing notice carries. */
@@ -106,7 +107,22 @@ function repos() {
     matchReports: new MatchReportsRepository(pool),
     matchDeadlines: new MatchDeadlinesRepository(pool),
     matchFlags: new MatchFlagsRepository(pool),
+    duelSlots: new DuelSlotsRepository(pool),
   };
+}
+
+/**
+ * The lobby a player should actually join right now: normally just the
+ * match's own room (match_deadlines.room_hash), but a disconnect redo moves
+ * it - see redo.service.ts's acceptRedo(), which updates a duel slot's
+ * current_room_hash rather than the match's original one. Reads duel_slots
+ * directly rather than importing duel-verification.service.ts/redo.service.ts,
+ * which both already depend on this module - this stays a one-way edge.
+ */
+async function currentRoomHash(matchId: string, fallback: string | null): Promise<string | null> {
+  if (!fallback) return null;
+  const slots = await repos().duelSlots.listForMatch(matchId);
+  return slots[slots.length - 1]?.currentRoomHash ?? fallback;
 }
 
 /**
@@ -322,6 +338,7 @@ function toView(
   tracking: Map<string, MatchTracking>,
   reports: MatchReport[],
   flags: MatchFlag[] = [],
+  duelSlotsByMatch: Map<string, { currentRoomHash: string }[]> = new Map(),
 ): BracketView {
   const playersById = new Map(engine.getPlayers().map((p) => [p.getId(), p]));
   const cutoffMs = roundCutoffMs(event);
@@ -361,7 +378,8 @@ function toView(
       player1: toBracketPlayer(p1),
       player2: toBracketPlayer(p2),
       deadlineAt: matchTracking ? effectiveDeadline(matchTracking, cutoffMs).toISOString() : null,
-      roomHash: matchTracking?.roomHash ?? null,
+      // The redo-updated lobby, if a disconnect ever moved it - see currentRoomHash() and redo.service.ts's acceptRedo().
+      roomHash: duelSlotsByMatch.get(m.getId())?.at(-1)?.currentRoomHash ?? matchTracking?.roomHash ?? null,
       reports: matchReports.map((r) => ({
         registrationId: r.registrationId,
         result: r.result,
@@ -627,13 +645,14 @@ export async function getBracketView(slug: string): Promise<BracketView | null> 
   const engine = await loadEngine(tournamentId);
   if (!engine) return null;
 
-  const [tracking, reports, flags] = await Promise.all([
+  const [tracking, reports, flags, duelSlotsByMatch] = await Promise.all([
     matchDeadlines.getTrackingMap(tournamentId),
     matchReports.listForTournament(tournamentId),
     repos().matchFlags.listOpen(tournamentId),
+    repos().duelSlots.listForTournament(tournamentId),
   ]);
 
-  return toView(engine, event, tracking, reports, flags);
+  return toView(engine, event, tracking, reports, flags, duelSlotsByMatch);
 }
 
 /**
@@ -693,17 +712,19 @@ export async function startBracket(slug: string, event: TournamentEvent): Promis
   }
 
   engine.startTournament();
+  // The deck each player holds *right now* becomes the only legal list for
+  // round 1 - changes made before this instant are not violations. Run
+  // *before* syncMatchDeadlines: the first round's lobbies must not be
+  // generated until the baseline they'll be judged against exists. Awaited
+  // rather than fired and forgotten: a floating promise does not reliably
+  // survive the end of a serverless request.
+  await lockTournamentDecks(slug);
   await persistEngine(tournamentId, engine);
   await syncMatchDeadlines(tournamentId, engine);
   // Marks the tournament as actually started - separate from startsAt, since
   // staff can (and did) start a bracket ahead of the advertised time. This is
   // what the public site checks to stop calling it "upcoming".
   await tournaments.markStarted(tournamentId, new Date().toISOString());
-  // The deck each player holds *right now* becomes the only legal list for the
-  // rest of this tournament - changes made before this instant are not
-  // violations. Awaited rather than fired and forgotten: a floating promise
-  // does not reliably survive the end of a serverless request.
-  await lockTournamentDecks(slug);
 }
 
 export async function generateNextRound(slug: string): Promise<void> {
@@ -713,6 +734,9 @@ export async function generateNextRound(slug: string): Promise<void> {
   if (!engine) throw new Error(`Tournament "${slug}" has no bracket yet`);
 
   engine.nextRound();
+  // Same ordering as startBracket(): the new round's baseline exists before
+  // its lobbies do.
+  await snapshotRoundDecks(slug, engine.getRoundNumber());
   await persistEngine(tournamentId, engine);
   await syncMatchDeadlines(tournamentId, engine);
   await enforceTournamentDecks(slug);
@@ -1363,7 +1387,7 @@ export async function getMyCurrentMatch(slug: string, registrationId: string): P
       matchTracking && !noShowFlag && Date.now() - matchTracking.activeSince.getTime() >= NO_SHOW_AVAILABLE_AFTER_MS,
     ),
     deadlineAt,
-    roomHash: matchTracking?.roomHash ?? null,
+    roomHash: await currentRoomHash(match.getId(), matchTracking?.roomHash ?? null),
     locked: clock.locked || matchIsOverdue(match.getId(), tracking, roundCutoffMs(event)),
     nextRoundAt: clock.nextRoundAt,
   };

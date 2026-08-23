@@ -51,6 +51,21 @@ export class AdminsRepository {
     ]);
   }
 
+  /**
+   * Any one admin's linked Dueling Nexus token, for duel-verification.service.ts's
+   * polling of get-info.php - there's no per-tournament Nexus credential in
+   * this system, so the shared admin-linked token (already the account this
+   * site's rooms are created/moderated under) is what has visibility into the
+   * tournament's replays. Null if no admin has linked one yet, which the
+   * caller treats as "can't poll right now", not an error.
+   */
+  async findAnyLinkedToken(): Promise<string | null> {
+    const [rows] = await this.pool.query<RowDataPacket[]>(
+      "SELECT nexus_token FROM admins WHERE nexus_token IS NOT NULL ORDER BY updated_at DESC LIMIT 1",
+    );
+    return rows[0]?.nexus_token ?? null;
+  }
+
   /** Test seam. */
   async clear(): Promise<void> {
     await this.pool.query("DELETE FROM admins");

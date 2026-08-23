@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { getSession } from "@/lib/auth";
 import { findPlayerIdByToken } from "@/lib/backend/services/player.service";
 import { findMyRegistrationId } from "@/lib/backend/services/registration.service";
+import { acceptRedo, rejectRedo, requestRedo } from "@/lib/backend/services/redo.service";
 import {
   closeOverdueMatches,
   contestMatchResult,
@@ -11,6 +12,7 @@ import {
   reportNoShow,
   submitMatchReport,
 } from "@/lib/backend/services/results.service";
+import { verifyTournament } from "@/lib/backend/services/duel-verification.service";
 
 /** Resolves the signed-in player to their registration in this tournament, or null if they aren't in it. */
 async function me(slug: string): Promise<string | null> {
@@ -105,5 +107,45 @@ export async function dismissNoShowAction(form: FormData) {
   if (!registrationId) return;
 
   await dismissNoShow(slug, matchId, `player:${registrationId}`).catch(() => false);
+  refresh(slug);
+}
+
+/** "Our duel disconnected - let's redo it." */
+export async function requestRedoAction(form: FormData) {
+  const slug = String(form.get("slug") ?? "");
+  const matchId = String(form.get("matchId") ?? "");
+  if (!slug || !matchId) return;
+
+  const registrationId = await me(slug);
+  if (!registrationId) return;
+
+  await requestRedo(slug, matchId, registrationId).catch(() => null);
+  refresh(slug);
+}
+
+/** "I agree, let's redo it." Runs a verification pass right after in case both sides had already accepted moments apart - so the fresh lobby appears without waiting for the next poll. */
+export async function acceptRedoAction(form: FormData) {
+  const slug = String(form.get("slug") ?? "");
+  const matchId = String(form.get("matchId") ?? "");
+  if (!slug || !matchId) return;
+
+  const registrationId = await me(slug);
+  if (!registrationId) return;
+
+  await acceptRedo(slug, matchId, registrationId).catch(() => null);
+  await verifyTournament(slug).catch(() => null);
+  refresh(slug);
+}
+
+/** "No, the result stands." */
+export async function rejectRedoAction(form: FormData) {
+  const slug = String(form.get("slug") ?? "");
+  const matchId = String(form.get("matchId") ?? "");
+  if (!slug || !matchId) return;
+
+  const registrationId = await me(slug);
+  if (!registrationId) return;
+
+  await rejectRedo(slug, matchId, registrationId).catch(() => null);
   refresh(slug);
 }

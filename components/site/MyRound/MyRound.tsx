@@ -5,12 +5,16 @@ import Lede from "@/components/ui/Lede";
 import Notice from "@/components/ui/Notice";
 import Tab from "@/components/ui/Tab";
 import type { MyMatchView, MyRoundView } from "@/lib/backend/services/results.service";
+import type { RedoStatus } from "@/lib/backend/services/redo.service";
 import { formatDate, formatTime } from "@/lib/events";
 import { TO_DISCORD_URL } from "@/lib/site";
 import {
+  acceptRedoAction,
   contestResultAction,
   dismissNoShowAction,
+  rejectRedoAction,
   reportNoShowAction,
+  requestRedoAction,
   submitMatchReportAction,
 } from "@/app/events/[slug]/report-actions";
 
@@ -153,6 +157,106 @@ function NoShowNotice({ slug, match }: { slug: string; match: MyMatchView }) {
 }
 
 /**
+ * A duel Dueling Nexus reported as a connection loss - request-and-consent
+ * redo, per redo.service.ts. Shown for whichever side of the flow this
+ * player is currently in; the "eligible" state (nobody has asked yet) is the
+ * only one either player can act on unprompted.
+ */
+function RedoCard({ slug, match, redo }: { slug: string; match: MyMatchView; redo: RedoStatus }) {
+  if (!redo) return null;
+
+  const hidden = <input type="hidden" name="slug" value={slug} />;
+  const matchIdField = <input type="hidden" name="matchId" value={match.matchId} />;
+
+  if (redo.status === "eligible") {
+    return (
+      <Notice variant="warn">
+        <Tab>Disconnected</Tab>
+        <h2 className="notice__title">This duel ended in a connection loss</h2>
+        <Lede>
+          If you both agree it should be replayed, request a redo - your opponent has to accept
+          before anything changes. If nobody asks, the result stands as played.
+        </Lede>
+        <form action={requestRedoAction}>
+          {hidden}
+          {matchIdField}
+          <Button variant="solid" type="submit">
+            Request a redo
+          </Button>
+        </form>
+      </Notice>
+    );
+  }
+
+  if (redo.status === "pending") {
+    return (
+      <Notice variant="warn">
+        <Tab>Redo requested</Tab>
+        {redo.requestedByMe ? (
+          <>
+            <h2 className="notice__title">Waiting on your opponent</h2>
+            <Lede>
+              {redo.expiresAt ? (
+                <>
+                  If they do not respond by{" "}
+                  <Countdown to={redo.expiresAt} fallback={at(redo.expiresAt)} urgentUnder={120} />, the disconnect
+                  stands as played.
+                </>
+              ) : (
+                "Waiting for them to accept or decline."
+              )}
+            </Lede>
+            <form action={rejectRedoAction}>
+              {hidden}
+              {matchIdField}
+              <Button type="submit">Cancel the request</Button>
+            </form>
+          </>
+        ) : (
+          <>
+            <h2 className="notice__title">Your opponent wants to redo this duel</h2>
+            <Lede>
+              It disconnected, and they are asking to replay it.{" "}
+              {redo.expiresAt ? (
+                <>
+                  Respond by <Countdown to={redo.expiresAt} fallback={at(redo.expiresAt)} urgentUnder={120} /> or it
+                  stands as played.
+                </>
+              ) : null}
+            </Lede>
+            <div className="admin-row__actions">
+              <form action={acceptRedoAction}>
+                {hidden}
+                {matchIdField}
+                <Button variant="solid" type="submit">
+                  Agree to redo it
+                </Button>
+              </form>
+              <form action={rejectRedoAction}>
+                {hidden}
+                {matchIdField}
+                <Button type="submit">No, the result stands</Button>
+              </form>
+            </div>
+          </>
+        )}
+      </Notice>
+    );
+  }
+
+  if (redo.status === "accepted") {
+    return (
+      <Notice variant="done">
+        <Tab>Redo accepted</Tab>
+        <Lede>Both of you agreed to redo the disconnected duel - a fresh duel room is above.</Lede>
+      </Notice>
+    );
+  }
+
+  return null; // rejected/expired - the disconnect stands, nothing left to act on here.
+}
+
+/**
  * The player's current round in one card - the duel to report, a bye, a
  * between-rounds wait, or being out - rendered identically on the tournament
  * page and on the dashboard, so reporting is never something you have to go
@@ -164,11 +268,14 @@ function NoShowNotice({ slug, match }: { slug: string; match: MyMatchView }) {
 export default function MyRound({
   slug,
   round,
+  redo,
   eventName,
   href,
 }: {
   slug: string;
   round: MyRoundView;
+  /** A disconnected duel's redo state for this round's match, if any - see redo.service.ts's getRedoStatus. */
+  redo?: RedoStatus;
   eventName?: string;
   href?: string;
 }) {
@@ -314,6 +421,7 @@ export default function MyRound({
       </Notice>
 
       {match.locked ? null : <NoShowNotice slug={slug} match={match} />}
+      <RedoCard slug={slug} match={match} redo={redo ?? null} />
       {match.locked ? <Locked nextRoundAt={match.nextRoundAt} /> : null}
     </>
   );

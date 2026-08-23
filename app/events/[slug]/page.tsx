@@ -8,6 +8,7 @@ import Bracket from "@/components/site/Bracket";
 import BracketDownload from "@/components/site/BracketDownload";
 import EventBanner from "@/components/site/EventBanner";
 import MyRound from "@/components/site/MyRound";
+import NexusPoll from "@/components/site/NexusPoll";
 import ParticipantsPanel from "@/components/site/ParticipantsPanel";
 import TournamentBracket from "@/components/site/TournamentBracket";
 import EventDescription from "@/components/site/EventDescription";
@@ -24,7 +25,9 @@ import PageHeading from "@/components/ui/PageHeading";
 import Tab from "@/components/ui/Tab";
 import Wrap from "@/components/ui/Wrap";
 import { fetchProfile, getSession } from "@/lib/auth";
+import { verifyTournament } from "@/lib/backend/services/duel-verification.service";
 import { findPlayerIdByToken } from "@/lib/backend/services/player.service";
+import { getRedoStatus, type RedoStatus } from "@/lib/backend/services/redo.service";
 import {
   findMySignup,
   findMySignupRecord,
@@ -57,6 +60,7 @@ import { fetchDeckArt } from "@/lib/nexus-parse";
 import { TO_DISCORD_URL } from "@/lib/site";
 import { getTournament, listPublicParticipants, type PublicParticipant } from "@/lib/tournaments";
 import { YCS_PROVIDENCE_2012_BRACKET, YCS_PROVIDENCE_2012_DECKS } from "@/lib/ycs-providence-2012";
+import { pollTournamentAction } from "./poll-actions";
 import { saveTournamentAction, unsaveTournamentAction } from "../saved-actions";
 
 export async function generateMetadata({
@@ -400,6 +404,7 @@ function OngoingEventPage({
   event,
   registeredDeck,
   myRound,
+  redoStatus,
   myHistory,
   participants,
   view,
@@ -409,6 +414,7 @@ function OngoingEventPage({
   event: TournamentEvent;
   registeredDeck: { name: string; main: number; extra: number; side: number } | undefined;
   myRound: MyRoundView | null;
+  redoStatus: RedoStatus;
   myHistory: MyMatchHistoryEntry[];
   participants: PublicParticipant[];
   view: BracketView | null;
@@ -450,7 +456,7 @@ function OngoingEventPage({
               </Notice>
             ) : null}
 
-            {myRound && !disqualified ? <MyRound slug={event.slug} round={myRound} /> : null}
+            {myRound && !disqualified ? <MyRound slug={event.slug} round={myRound} redo={redoStatus} /> : null}
 
             <MatchHistory history={myHistory} />
           </div>
@@ -617,7 +623,14 @@ export default async function EventDetailPage({
   // a write in the middle of a render makes the two renders of this page
   // disagree, and the round lock this page displays comes from the timestamps
   // either way.
-  if (event.status === "running") after(() => closeOverdueMatches(slug).catch(() => null));
+  if (event.status === "running") {
+    after(() => closeOverdueMatches(slug).catch(() => null));
+    // Same cache/lock rules as everywhere else (see duel-verification.service.ts)
+    // apply here - this is cheap even on every visit, and it's what makes a
+    // duel resolve itself without anyone touching the "Update bracket status"
+    // button or waiting for the next client poll.
+    after(() => verifyTournament(slug).catch(() => null));
+  }
 
   const view = past || finished ? await getBracketView(slug) : null;
   const participants = await listPublicParticipants(
@@ -631,10 +644,15 @@ export default async function EventDetailPage({
 
   const myRound = !finished && myRegistrationId ? await getMyRound(slug, myRegistrationId) : null;
   const myHistory = myRegistrationId && (finished || past) ? await getMyMatchHistory(slug, myRegistrationId) : [];
+  const redoStatus =
+    myRound?.match && myRegistrationId ? await getRedoStatus(slug, myRound.match.matchId, myRegistrationId) : null;
 
   return (
     <>
       <SiteHeader />
+      {event.status === "running" ? (
+        <NexusPoll intervalMs={60 * 1000} action={pollTournamentAction} args={[slug]} />
+      ) : null}
 
       {finished ? (
         <FeaturedEventPage
@@ -651,6 +669,7 @@ export default async function EventDetailPage({
           event={event}
           registeredDeck={registeredDeck}
           myRound={myRound}
+          redoStatus={redoStatus}
           myHistory={myHistory}
           participants={participants}
           view={view}

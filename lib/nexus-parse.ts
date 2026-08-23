@@ -2,6 +2,8 @@
 const AVATAR_HOSTS = new Set(["duelingnexus.com", "ygopro.online"]);
 
 export const NEXUS_DECK_INFO_URL = "https://duelingnexus.com/api/get-deck-info.php";
+export const NEXUS_GET_INFO_URL = "https://duelingnexus.com/api/get-info.php";
+export const NEXUS_GET_REPLAY_INFO_URL = "https://duelingnexus.com/api/get-replay-info.php";
 
 /** Nexus's own default avatar. Fallback whenever a profile's avatar 404s. */
 export const DEFAULT_AVATAR = "https://ygopro.online/assets/profile/Avatars/0.jpg";
@@ -138,6 +140,93 @@ export function cleanAvatar(value: unknown): string {
   } catch {
     return "";
   }
+}
+
+/** The Nexus internal player id (TokenResponse.user_id) - absent/malformed reads as "", never guessed at. */
+export function parseUserId(value: unknown): string {
+  return typeof value === "string" ? value : "";
+}
+
+/**
+ * One individual duel (never a whole Bo3 - see docs on duel-verification.service.ts)
+ * as it comes back from get-info.php's `replays` array or get-replay-info.php's
+ * `replay_info`. Team 3/4 fields exist for tag duels, which this app doesn't
+ * resolve results for (see NEXUS_WIN_REASON_DISCONNECT and ReplayData below) -
+ * kept only so a tag replay is at least representable, never misread as 1v1.
+ */
+export type NexusReplay = {
+  id: string;
+  gameName: string;
+  startDate: string;
+  endDate: string;
+  isRanked: boolean;
+  player1Id: string;
+  player2Id: string;
+  player3Id: string | null;
+  player4Id: string | null;
+  player1: string;
+  player2: string;
+  player3: string | null;
+  player4: string | null;
+};
+
+export function parseReplay(raw: unknown): NexusReplay | null {
+  if (typeof raw !== "object" || raw === null) return null;
+  const r = raw as Record<string, unknown>;
+  const str = (v: unknown): string => (typeof v === "string" ? v : "");
+  const strOrNull = (v: unknown): string | null => (typeof v === "string" ? v : null);
+  if (!str(r.id) || !str(r.game_name)) return null;
+
+  return {
+    id: str(r.id),
+    gameName: str(r.game_name),
+    startDate: str(r.start_date),
+    endDate: str(r.end_date),
+    isRanked: Boolean(r.is_ranked),
+    player1Id: str(r.player_1_id),
+    player2Id: str(r.player_2_id),
+    player3Id: strOrNull(r.player_3_id),
+    player4Id: strOrNull(r.player_4_id),
+    player1: str(r.player_1),
+    player2: str(r.player_2),
+    player3: strOrNull(r.player_3),
+    player4: strOrNull(r.player_4),
+  };
+}
+
+export function parseReplays(raw: unknown): NexusReplay[] {
+  return Array.isArray(raw) ? raw.map(parseReplay).filter((r): r is NexusReplay => r !== null) : [];
+}
+
+/** get-replay-info.php's winReason: connection loss, per docs on duel-verification.service.ts. */
+export const NEXUS_WIN_REASON_DISCONNECT = 4;
+
+/** The actual duel outcome from get-replay-info.php's `replay_data` - decks played, who won, and how. */
+export type NexusReplayData = {
+  isTag: boolean;
+  /** 1 = player 1 (team 1) won, 2 = player 2 (team 2) won. Tag duels are out of scope - see isTag. */
+  winningTeam: number;
+  winReason: number;
+  /** Index 0 = player 1's deck, index 1 = player 2's (more entries only in a tag duel). */
+  mainDecks: number[][];
+  extraDecks: number[][];
+};
+
+export function parseReplayData(raw: unknown): NexusReplayData | null {
+  if (typeof raw !== "object" || raw === null) return null;
+  const d = raw as Record<string, unknown>;
+  const numArrays = (v: unknown): number[][] =>
+    Array.isArray(v) ? v.map((list) => (Array.isArray(list) ? list.filter((n): n is number => typeof n === "number") : [])) : [];
+
+  if (typeof d.winningTeam !== "number" || typeof d.winReason !== "number") return null;
+
+  return {
+    isTag: Boolean(d.isTag),
+    winningTeam: d.winningTeam,
+    winReason: d.winReason,
+    mainDecks: numArrays(d.mainDecks),
+    extraDecks: numArrays(d.extraDecks),
+  };
 }
 
 /**

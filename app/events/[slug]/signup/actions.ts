@@ -62,6 +62,7 @@ export async function register(
 
   const playerId = await resolvePlayerId(session.token, {
     name: profile.name,
+    userId: profile.userId,
     avatar: profile.avatar,
     contributor: profile.contributor,
     contributorTime: profile.contributorTime,

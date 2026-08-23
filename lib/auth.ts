@@ -6,10 +6,12 @@ import { cookies } from "next/headers";
 import { cache } from "react";
 import {
   cleanAvatar,
+  NEXUS_GET_INFO_URL,
   NexusDeckLists,
   parseContributor,
   parseDeck,
   parseDeckList,
+  parseUserId,
   type NexusDeck,
 } from "./nexus-parse";
 import {
@@ -20,11 +22,11 @@ import {
 import { enforcePlayerDecks } from "./backend/services/deck-watch.service";
 import { resolvePlayerId } from "./backend/services/player.service";
 
-const NEXUS_INFO = "https://duelingnexus.com/api/get-info.php";
-
 /** Nexus returns HTTP 200 with `success: false` on a bad token, so only the body is trustworthy. */
 export type NexusProfile = {
   name: string;
+  /** Nexus's own internal player id - the canonical identity for matching replay players. "" when absent. */
+  userId: string;
   /** Absolute URL on duelingnexus.com, or "" when absent/untrusted. */
   avatar: string;
   contributor: boolean;
@@ -135,7 +137,7 @@ export const fetchProfile = cache(async function fetchProfile(
 
   let payload: unknown;
   try {
-    const res = await fetch(`${NEXUS_INFO}?token=${encodeURIComponent(token)}`, {
+    const res = await fetch(`${NEXUS_GET_INFO_URL}?token=${encodeURIComponent(token)}`, {
       cache: "no-store",
       signal: AbortSignal.timeout(8000),
     });
@@ -154,11 +156,12 @@ export const fetchProfile = cache(async function fetchProfile(
     return null;
   }
 
-  const { name, avatar, contributor, deck } = payload as Record<string, unknown>;
+  const { name, user_id, avatar, contributor, deck } = payload as Record<string, unknown>;
   if (typeof name !== "string" || name.length === 0) return null;
 
   const profile: NexusProfile = {
     name,
+    userId: parseUserId(user_id),
     // Empty is fine: the UI falls back to the initial. Rejecting the whole
     // profile here would lock out any account without an avatar.
     avatar: cleanAvatar(avatar),
@@ -192,6 +195,7 @@ export async function establishPublicSession(token: string): Promise<boolean> {
 
   const playerId = await resolvePlayerId(token, {
     name: profile.name,
+    userId: profile.userId,
     avatar: profile.avatar,
     contributor: profile.contributor,
     contributorTime: profile.contributorTime,

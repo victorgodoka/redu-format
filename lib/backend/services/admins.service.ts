@@ -19,3 +19,8 @@ export async function getAdminNexusToken(discordUserId: string): Promise<string 
 export async function setAdminNexusToken(discordUserId: string, token: string | null): Promise<void> {
   await new AdminsRepository(getPool()).setNexusToken(discordUserId, token);
 }
+
+/** See AdminsRepository.findAnyLinkedToken - the shared credential duel-verification.service.ts polls Nexus with. */
+export async function findAnyLinkedNexusToken(): Promise<string | null> {
+  return new AdminsRepository(getPool()).findAnyLinkedToken();
+}

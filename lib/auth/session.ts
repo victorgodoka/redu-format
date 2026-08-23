@@ -6,7 +6,7 @@ export const SESSION_COOKIE = "admin_session";
 /** Short-lived hop that carries the protected page an admin was turned away from across the Discord round trip. */
 export const ADMIN_NEXT_COOKIE = "admin_next";
 
-const SESSION_DURATION = 60 * 60 * 8; // 8 hours
+const SESSION_DURATION = 60 * 60 * 24; // 1 day
 
 function getSecret(): Uint8Array {
   const secret = process.env.AUTH_SECRET;

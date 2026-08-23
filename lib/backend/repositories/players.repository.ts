@@ -4,6 +4,7 @@ import { fromMysqlDatetime, toMysqlDatetime } from "../db/datetime.ts";
 export type Player = {
   id: string;
   nexusIdentityKey: string;
+  nexusUserId: string | null;
   nexusName: string;
   avatarUrl: string;
   contributor: boolean;
@@ -13,6 +14,8 @@ export type Player = {
 
 export type PlayerProfile = {
   name: string;
+  /** Nexus's own internal player id, when the profile fetch returned one - see docs/on lib/nexus-parse.ts's parseUserId. */
+  userId?: string;
   avatar: string;
   contributor: boolean;
   contributorTime: number;
@@ -21,6 +24,7 @@ export type PlayerProfile = {
 type PlayerRow = RowDataPacket & {
   id: string;
   nexus_identity_key: string;
+  nexus_user_id: string | null;
   nexus_name: string;
   avatar_url: string | null;
   contributor: number;
@@ -32,6 +36,7 @@ function rowToPlayer(row: PlayerRow): Player {
   return {
     id: row.id,
     nexusIdentityKey: row.nexus_identity_key,
+    nexusUserId: row.nexus_user_id,
     nexusName: row.nexus_name,
     avatarUrl: row.avatar_url ?? "",
     contributor: Boolean(row.contributor),
@@ -64,13 +69,22 @@ export class PlayersRepository {
     return rows[0] ? rowToPlayer(rows[0]) : null;
   }
 
+  async findByNexusUserId(nexusUserId: string): Promise<Player | null> {
+    const [rows] = await this.pool.query<PlayerRow[]>(
+      "SELECT * FROM players WHERE nexus_user_id = ? LIMIT 1",
+      [nexusUserId],
+    );
+    return rows[0] ? rowToPlayer(rows[0]) : null;
+  }
+
   async insert(id: string, identityKey: string, profile: PlayerProfile): Promise<void> {
     await this.pool.query(
-      `INSERT INTO players (id, nexus_identity_key, nexus_name, avatar_url, contributor, contributor_time, last_seen_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO players (id, nexus_identity_key, nexus_user_id, nexus_name, avatar_url, contributor, contributor_time, last_seen_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id,
         identityKey,
+        profile.userId || null,
         profile.name,
         profile.avatar || null,
         profile.contributor,
@@ -83,10 +97,11 @@ export class PlayersRepository {
   async touch(id: string, identityKey: string, profile: PlayerProfile): Promise<void> {
     await this.pool.query(
       `UPDATE players
-       SET nexus_identity_key = ?, nexus_name = ?, avatar_url = ?, contributor = ?, contributor_time = ?, last_seen_at = ?
+       SET nexus_identity_key = ?, nexus_user_id = COALESCE(?, nexus_user_id), nexus_name = ?, avatar_url = ?, contributor = ?, contributor_time = ?, last_seen_at = ?
        WHERE id = ?`,
       [
         identityKey,
+        profile.userId || null,
         profile.name,
         profile.avatar || null,
         profile.contributor,

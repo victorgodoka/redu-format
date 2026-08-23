@@ -2,6 +2,7 @@ import type { DeckSnapshot } from "../../deck-diff.ts";
 import type { EntryFee } from "../../events.ts";
 import { isHttpUrl } from "../../safe-url.ts";
 import { getPool } from "../db/client.ts";
+import { DeckSnapshotsRepository } from "../repositories/deck-snapshots.repository.ts";
 import { RegistrationsRepository, type PublicSignup, type SignupRecord } from "../repositories/registrations.repository.ts";
 import { SavedTournamentsRepository } from "../repositories/saved-tournaments.repository.ts";
 import { dropFromStartedTournament, hasBracket } from "./results.service.ts";
@@ -12,6 +13,7 @@ function repos() {
   return {
     registrations: new RegistrationsRepository(pool),
     saved: new SavedTournamentsRepository(pool),
+    deckSnapshots: new DeckSnapshotsRepository(pool),
   };
 }
 
@@ -40,7 +42,8 @@ export async function registerSignup(
     entry: EntryFee;
   },
 ): Promise<void> {
-  await repos().registrations.upsertPublicSignup(crypto.randomUUID(), slug, {
+  const { registrations, deckSnapshots } = repos();
+  await registrations.upsertPublicSignup(crypto.randomUUID(), slug, {
     playerId: input.playerId,
     nexusIdentityKey: input.nexusIdentityKey,
     displayName: input.displayName,
@@ -49,6 +52,24 @@ export async function registerSignup(
     deckSnapshot: input.deckSnapshot,
     initialPaymentStatus: initialPaymentStatus(input.entry),
   });
+
+  // Audit history only - upsertPublicSignup is the actual baseline a drift
+  // check reads (deck_snapshot column), and it already treats a falsy
+  // snapshot (deck list unreadable at signup) as "no baseline yet" rather
+  // than inventing an empty one - this mirrors that. ON DUPLICATE KEY UPDATE
+  // means the row may already have existed under a different id than the one
+  // just generated above, so the real id is re-read rather than assumed.
+  const signup = await registrations.findPublicSignup(slug, input.playerId);
+  if (signup && input.deckSnapshot) {
+    await deckSnapshots.record({
+      id: crypto.randomUUID(),
+      registrationId: signup.registrationId,
+      kind: "signup",
+      roundNumber: null,
+      snapshot: input.deckSnapshot,
+      now: new Date(),
+    });
+  }
 }
 
 export async function cancelSignup(slug: string, playerId: string): Promise<void> {

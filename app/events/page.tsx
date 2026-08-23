@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { after } from "next/server";
 import EventList from "@/components/site/EventList";
 import FeaturedEventCard from "@/components/site/FeaturedEventCard";
 import Footer from "@/components/site/Footer";
+import NexusPoll from "@/components/site/NexusPoll";
 import SiteHeader from "@/components/site/SiteHeader";
 import Button from "@/components/ui/Button";
 import EmptyState from "@/components/ui/EmptyState";
@@ -12,10 +14,12 @@ import Pager from "@/components/ui/Pager";
 import Select from "@/components/ui/Select";
 import Wrap from "@/components/ui/Wrap";
 import { getSession } from "@/lib/auth";
+import { verifyAllActiveTournaments } from "@/lib/backend/services/duel-verification.service";
 import { findPlayerIdByToken } from "@/lib/backend/services/player.service";
 import { listSavedSlugsForPlayer, listSignupsForPlayer } from "@/lib/backend/services/registration.service";
 import { queryEvents, type EventQuery } from "@/lib/events";
 import { listTournaments } from "@/lib/tournaments";
+import { pollEventListAction } from "./poll-actions";
 import { saveTournamentAction, unsaveTournamentAction } from "./saved-actions";
 
 export const metadata: Metadata = {
@@ -92,6 +96,12 @@ export default async function EventsPage({
 
   const { items, page, pages, total } = queryEvents(tournaments, query, now);
 
+  // Every tournament with an open, unresolved duel - each one respects its
+  // own 5-minute Nexus fetch cache/lock (see duel-verification.service.ts),
+  // so this is cheap on every visit and never doubles up with the tournament
+  // page's own check or the client-side pollers below.
+  after(() => verifyAllActiveTournaments().catch(() => null));
+
   const playerId = session.token ? await findPlayerIdByToken(session.token) : null;
   const [signups, savedSlugs] = playerId
     ? await Promise.all([listSignupsForPlayer(playerId), listSavedSlugsForPlayer(playerId)])
@@ -102,6 +112,7 @@ export default async function EventsPage({
   return (
     <>
       <SiteHeader />
+      <NexusPoll intervalMs={5 * 60 * 1000} action={pollEventListAction} args={[]} />
 
       <main className="section" id="main">
         <Wrap>

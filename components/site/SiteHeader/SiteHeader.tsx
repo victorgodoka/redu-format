@@ -8,6 +8,7 @@ import { enforcePlayerDecks } from "@/lib/backend/services/deck-watch.service";
 import { countUnread, playerReader } from "@/lib/backend/services/notifications.service";
 import { findPlayerIdByToken } from "@/lib/backend/services/player.service";
 import { DEFAULT_AVATAR } from "@/lib/nexus-parse";
+import SessionExpiredRedirect from "@/components/site/SessionExpiredRedirect";
 import AccountChip from "./AccountChip";
 import styles from "./SiteHeader.module.css";
 
@@ -54,8 +55,15 @@ export default async function SiteHeader() {
       }
     : null;
 
+  // A token that no longer works - revoked, or the account was deleted - is
+  // caught right here, since this is the one fetchProfile() call every page
+  // already makes. Nothing else about this render changes; the overlay is
+  // what actually signs the player out, a couple seconds from now.
+  const sessionInvalid = Boolean(session.token) && profile === null;
+
   return (
     <>
+      {sessionInvalid ? <SessionExpiredRedirect /> : null}
       <SkipLink />
       <Wrap>
         <header className={styles.topbar}>
