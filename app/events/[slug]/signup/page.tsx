@@ -228,7 +228,7 @@ export default async function SignupPage({
                     <p className="profile-card__meta">
                       {profile.decks.length}{" "}
                       {profile.decks.length === 1 ? "deck" : "decks"}
-                      {profile.contributor ? " · Contributor" : ""}
+                      {/* {profile.contributor ? " · Contributor" : ""} */}
                     </p>
                   </div>
                 </div>

@@ -156,15 +156,13 @@ export const fetchProfile = cache(async function fetchProfile(
     return null;
   }
 
-  const { name, user_id, avatar, contributor, deck } = payload as Record<string, unknown>;
+  const { name, user_id, avatar, contributor, deck } = payload as Record<string, string>;
   if (typeof name !== "string" || name.length === 0) return null;
 
   const profile: NexusProfile = {
     name,
     userId: parseUserId(user_id),
-    // Empty is fine: the UI falls back to the initial. Rejecting the whole
-    // profile here would lock out any account without an avatar.
-    avatar: cleanAvatar(avatar),
+    avatar: avatar,
     ...parseContributor(contributor),
     decks: (Array.isArray(deck) ? deck : [])
       .map(parseDeck)

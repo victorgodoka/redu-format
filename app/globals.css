@@ -913,6 +913,143 @@ input[type="number"]::-webkit-inner-spin-button {
   margin-left: auto;
 }
 
+/* --- dashboard: tabs ---
+   Radio-driven, same technique as `.deck__view` (TopDeckList's Images/Text
+   toggle): the radios and their labelled panels are flat siblings of one
+   wrapper, so a plain `~` selector shows the checked panel with no JS. There
+   is exactly one of these per page, so the panels can target fixed ids
+   instead of the `:first-of-type` trick `.deck__view` needs for its
+   per-deck-instance ids. */
+
+.dash-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 32px 0 0;
+}
+
+.dash-tabs__radio {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.dash-tabs__tab {
+  padding: 11px 22px;
+  border: 1px solid var(--c-line);
+  border-radius: 999px;
+  font-family: var(--f-mono);
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--c-muted);
+  cursor: pointer;
+  transition: all 200ms ease;
+}
+
+.dash-tabs__tab:hover {
+  color: var(--c-text);
+}
+
+.dash-tabs__radio:checked + .dash-tabs__tab {
+  border-color: var(--c-accent);
+  background: color-mix(in srgb, var(--c-accent) 16%, transparent);
+  color: var(--c-accent);
+}
+
+.dash-tabs__radio:focus-visible + .dash-tabs__tab {
+  outline: 2px solid var(--c-accent);
+  outline-offset: 2px;
+}
+
+.dash-tabs__panel {
+  display: none;
+  flex: 1 0 100%;
+  margin-top: 28px;
+}
+
+#dash-tab-decks:checked ~ .dash-tabs__panel--decks,
+#dash-tab-events:checked ~ .dash-tabs__panel--events,
+#dash-tab-stats:checked ~ .dash-tabs__panel--stats {
+  display: block;
+}
+
+.dash-tabs__panel .deck__section-title {
+  margin: 24px 0 10px;
+}
+
+.dash-tabs__panel .deck__section-title:first-child {
+  margin-top: 0;
+}
+
+/* deck legality filter, same radio-pill technique, one level down: it hides
+   `.deck--legal`/`.deck--illegal` cards in the sibling list rather than
+   swapping a panel */
+
+/* the list has to be a flat sibling of the radios for the `~` rule below to
+   reach it, so it lives inside `.deck-filter` too (forced onto its own line
+   the same way `.deck__view-panel` breaks out of `.deck__view`) rather than
+   following the filter as a separate element. */
+
+.deck-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 4px;
+}
+
+.deck-filter > .decklist {
+  flex: 1 0 100%;
+}
+
+.deck-filter__radio {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.deck-filter__tab {
+  padding: 7px 16px;
+  border: 1px solid var(--c-line-soft);
+  border-radius: 999px;
+  font-family: var(--f-mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--c-muted);
+  cursor: pointer;
+  transition: all 200ms ease;
+}
+
+.deck-filter__tab:hover {
+  color: var(--c-text);
+}
+
+.deck-filter__radio:checked + .deck-filter__tab {
+  border-color: var(--c-accent);
+  background: color-mix(in srgb, var(--c-accent) 16%, transparent);
+  color: var(--c-accent);
+}
+
+.deck-filter__radio:focus-visible + .deck-filter__tab {
+  outline: 2px solid var(--c-accent);
+  outline-offset: 2px;
+}
+
+#deck-filter-legal:checked ~ .decklist .deck--illegal {
+  display: none;
+}
+
+#deck-filter-illegal:checked ~ .decklist .deck--legal {
+  display: none;
+}
+
 .decklist {
   display: grid;
   gap: clamp(16px, 2vw, 24px);
@@ -1014,6 +1151,7 @@ input[type="number"]::-webkit-inner-spin-button {
 
 .deck--illegal {
   opacity: 0.7;
+  filter: grayscale(1);
 }
 
 .deck__legality {
@@ -1028,15 +1166,94 @@ input[type="number"]::-webkit-inner-spin-button {
   color: var(--c-danger);
 }
 
+/* --- dashboard: poster-card grid ---
+   The plain-list layout above (small square thumbnail beside the copy)
+   still serves other callers of the base classes; this modifier only
+   restyles the parts that need to change for a large cover-art card,
+   the same way `.decklist--wide` does for the event-detail variant. */
+
+.decklist--grid {
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+}
+
+.decklist--grid .deck__link {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+  padding: 0;
+}
+
+.decklist--grid .deck__cover {
+  position: relative;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1 / 1;
+  border-radius: 0;
+  background: var(--c-raise);
+}
+
+.decklist--grid .deck__cover img {
+  transition: transform 400ms ease;
+}
+
+.decklist--grid .deck:hover .deck__cover img {
+  transform: scale(1.045);
+}
+
+.decklist--grid .deck__legality {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: var(--z-raise);
+  padding: 5px 10px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--c-accent) 88%, var(--c-ink));
+  color: var(--c-ink);
+  font-weight: 600;
+}
+
+.decklist--grid .deck--illegal .deck__legality {
+  background: color-mix(in srgb, var(--c-danger) 82%, var(--c-ink));
+  color: var(--c-text);
+}
+
+.decklist--grid .deck__body {
+  gap: 8px;
+  padding: 16px 18px 18px;
+}
+
+.decklist--grid .deck__name {
+  font-size: 17px;
+}
+
+.decklist--grid .deck__counts {
+  padding-top: 10px;
+  border-top: 1px solid var(--c-line-soft);
+}
+
 /* --- dashboard: stats row and quick actions --- */
 
 .dash-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0;
   margin: 32px 0 0;
-  padding: clamp(20px, 3vw, 30px);
+  padding: 0;
+}
+
+.dash-stats > div {
+  flex: 1 1 140px;
+  padding: clamp(16px, 2.4vw, 22px) clamp(20px, 3vw, 28px);
+  border-right: 1px solid var(--c-line-soft);
+}
+
+.dash-stats > div:last-of-type {
+  border-right: none;
 }
 
 .dash-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 12px;
   margin: 24px 0;
 }
@@ -1391,6 +1608,11 @@ input[type="number"]::-webkit-inner-spin-button {
   justify-content: space-between;
   gap: 16px;
   padding: 18px 24px;
+  transition: transform 220ms ease;
+}
+
+.admin-row:hover {
+  transform: translateY(-2px);
 }
 
 .admin-row.panel.bracket {

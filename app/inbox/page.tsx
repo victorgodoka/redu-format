@@ -46,7 +46,7 @@ export default async function PlayerInboxPage({
             messages={messages}
             selected={selected}
             basePath="/inbox"
-            emptyMessage="Nothing here yet. Alerts about your registrations and decks will arrive in this inbox."
+            emptyMessage="Nothing to read yet."
           >
             {payload ? <DeckMismatch data={payload} /> : null}
           </Inbox>

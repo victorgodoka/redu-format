@@ -35,7 +35,7 @@ export default function AccountChip({
         </span>
       )}
       <span className={styles.name}>{name}</span>
-      {contributor ? <span className={styles.badge}>Contributor</span> : null}
+      {/* {contributor ? <span className={styles.badge}>Contributor</span> : null} */}
       </Link>
 
       {/* Its own link, not part of the account link: the count is the way into

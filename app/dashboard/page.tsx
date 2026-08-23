@@ -3,7 +3,6 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
 import AdminList, { AdminRow } from "@/components/admin/AdminList";
-import StatBar from "@/components/admin/StatBar";
 import DeckList from "@/components/site/DeckList";
 import MyRound from "@/components/site/MyRound";
 import Footer from "@/components/site/Footer";
@@ -21,6 +20,7 @@ import {
   listSignupsForPlayer,
 } from "@/lib/backend/services/registration.service";
 import { verifyTournament } from "@/lib/backend/services/duel-verification.service";
+import { countUnread, playerReader } from "@/lib/backend/services/notifications.service";
 import { getRedoStatus } from "@/lib/backend/services/redo.service";
 import { closeOverdueMatches, getMyRound, getPlacingsForPlayer } from "@/lib/backend/services/results.service";
 import { Card } from "@/lib/cards";
@@ -65,19 +65,19 @@ export default async function DashboardPage() {
       return { deck, legal, coverFallbackId };
     })
     .sort((a, b) => Number(b.legal) - Number(a.legal));
-  const legalDeckCount = deckRows.filter((row) => row.legal).length;
 
   const allEvents = tournaments;
   const now = new Date();
 
   const playerId = await findPlayerIdByToken(session.token);
-  const [signups, savedSlugs, placings] = playerId
+  const [signups, savedSlugs, placings, unread] = playerId
     ? await Promise.all([
         listSignupsForPlayer(playerId),
         listSavedSlugsForPlayer(playerId),
         getPlacingsForPlayer(playerId),
+        countUnread(playerReader(playerId)),
       ])
-    : [new Map<string, string | null>(), [], new Map<string, { place: number; points: number }>()];
+    : [new Map<string, string | null>(), [], new Map<string, { place: number; points: number }>(), 0];
 
   const yourEvents = [...signups.entries()]
     .map(([slug, deckId]) => {
@@ -156,7 +156,7 @@ export default async function DashboardPage() {
                 key={profile.avatar}
                 className="profile__avatar"
                 src={profile.avatar}
-                fallbackSrc={DEFAULT_AVATAR}
+                fallbackSrc={session.avatar || DEFAULT_AVATAR}
                 alt=""
                 width={72}
                 height={72}
@@ -167,10 +167,13 @@ export default async function DashboardPage() {
               <p className="profile__meta">
                 {profile.decks.length}{" "}
                 {profile.decks.length === 1 ? "deck" : "decks"} on Dueling Nexus
-                {profile.contributor ? " · Contributor" : ""}
+                {/* {profile.contributor ? " · Contributor" : ""} */}
               </p>
             </div>
             <div className="profile__out">
+              <Button href="/inbox" variant="quiet">
+                Inbox{unread > 0 ? ` (${unread > 99 ? "99+" : unread})` : ""}
+              </Button>
               <form action={refresh}>
                 <Button type="submit">Refresh</Button>
               </form>
@@ -180,23 +183,14 @@ export default async function DashboardPage() {
             </div>
           </div>
 
-          <StatBar
-            stats={[
-              { label: "Decks", value: profile.decks.length },
-              { label: "REDU legal", value: legalDeckCount },
-              { label: "Upcoming signups", value: upcomingEvents.length },
-            ]}
-            actions={
-              <>
-                <Button variant="solid" href="/events">
-                  Browse events
-                </Button>
-                <a className="btn" href={EDITOR} target="_blank" rel="noopener noreferrer">
-                  Deck editor
-                </a>
-              </>
-            }
-          />
+          <div className="dash-actions">
+            <Button variant="solid" href="/events">
+              Browse events
+            </Button>
+            <a className="btn" href={EDITOR} target="_blank" rel="noopener noreferrer">
+              Deck editor
+            </a>
+          </div>
 
           {liveRounds.length > 0 ? (
             <>
@@ -216,66 +210,60 @@ export default async function DashboardPage() {
             </>
           ) : null}
 
-          <div className="section__grid">
-            <div className="section__content">
-              {yourEvents.length > 0 ? (
+          <div className="dash-tabs">
+            <input className="dash-tabs__radio" type="radio" name="dash-tabs" id="dash-tab-decks" defaultChecked />
+            <label className="dash-tabs__tab" htmlFor="dash-tab-decks">
+              Your Decks
+            </label>
+            <input className="dash-tabs__radio" type="radio" name="dash-tabs" id="dash-tab-events" />
+            <label className="dash-tabs__tab" htmlFor="dash-tab-events">
+              Saved Events
+            </label>
+            <input className="dash-tabs__radio" type="radio" name="dash-tabs" id="dash-tab-stats" />
+            <label className="dash-tabs__tab" htmlFor="dash-tab-stats">
+              Your Stats
+            </label>
+
+            <div className="dash-tabs__panel dash-tabs__panel--decks">
+              {profile.decks.length === 0 ? (
+                <EmptyState
+                  message="No decks on this account yet. Build one in the Dueling Nexus editor and it will show up here."
+                  action={
+                    <a className="btn" href={EDITOR} target="_blank" rel="noopener noreferrer">
+                      Open the editor
+                    </a>
+                  }
+                />
+              ) : (
                 <>
-                  <h2 className="section__subtitle">Your events</h2>
-
-                  {upcomingEvents.length > 0 ? (
-                    <AdminList>
-                      {upcomingEvents.map(({ event, deck }) => (
-                        <AdminRow key={event.slug}>
-                          <AdminRow.Main>
-                            <span className="admin-row__title">{event.name}</span>
-                            <span className="admin-row__meta">
-                              {formatDate(event.startsAt)} · {formatTime(event.startsAt)}
-                              {deck ? ` · ${deck.name}` : ""}
-                            </span>
-                          </AdminRow.Main>
-                          <AdminRow.Actions>
-                            <Link className="btn" href={`/events/${event.slug}`}>
-                              View event
-                            </Link>
-                          </AdminRow.Actions>
-                        </AdminRow>
-                      ))}
-                    </AdminList>
-                  ) : null}
-
-                  {pastYourEvents.length > 0 ? (
-                    <AdminList>
-                      {pastYourEvents.map(({ event, deck }) => {
-                        const placing = placings.get(event.slug);
-                        return (
-                          <AdminRow key={event.slug}>
-                            <AdminRow.Main>
-                              <span className="admin-row__title">{event.name}</span>
-                              <span className="admin-row__meta">
-                                {formatDate(event.startsAt)}
-                                {deck ? ` · ${deck.name}` : ""}
-                                {placing ? ` · Placed #${placing.place}` : ""}
-                              </span>
-                            </AdminRow.Main>
-                            <AdminRow.Actions>
-                              <Link className="btn" href={`/events/${event.slug}`}>
-                                View results
-                              </Link>
-                            </AdminRow.Actions>
-                          </AdminRow>
-                        );
-                      })}
-                    </AdminList>
-                  ) : null}
+                  <div className="deck-filter">
+                    <input
+                      className="deck-filter__radio"
+                      type="radio"
+                      name="deck-filter"
+                      id="deck-filter-all"
+                      defaultChecked
+                    />
+                    <label className="deck-filter__tab" htmlFor="deck-filter-all">
+                      All
+                    </label>
+                    <input className="deck-filter__radio" type="radio" name="deck-filter" id="deck-filter-legal" />
+                    <label className="deck-filter__tab" htmlFor="deck-filter-legal">
+                      REDU legal
+                    </label>
+                    <input className="deck-filter__radio" type="radio" name="deck-filter" id="deck-filter-illegal" />
+                    <label className="deck-filter__tab" htmlFor="deck-filter-illegal">
+                      Not legal
+                    </label>
+                    <DeckList decks={deckRows} />
+                  </div>
                 </>
-              ) : null}
+              )}
             </div>
 
-            <div className="section__content">
+            <div className="dash-tabs__panel dash-tabs__panel--events">
               {savedEvents.length > 0 ? (
                 <>
-                  <h2 className="section__subtitle">Saved tournaments</h2>
-
                   {savedUpcoming.length > 0 ? (
                     <AdminList>
                       {savedUpcoming.map(({ event }) => (
@@ -328,24 +316,78 @@ export default async function DashboardPage() {
                     </AdminList>
                   ) : null}
                 </>
-              ) : null}
+              ) : (
+                <EmptyState message="No saved tournaments yet. Save one from its event page to find it here later." />
+              )}
+            </div>
+
+            <div className="dash-tabs__panel dash-tabs__panel--stats">
+              {yourEvents.length > 0 ? (
+                <>
+                  {upcomingEvents.length > 0 ? (
+                    <>
+                      <p className="deck__section-title">Upcoming</p>
+                      <AdminList>
+                        {upcomingEvents.map(({ event, deck }) => (
+                          <AdminRow key={event.slug}>
+                            <AdminRow.Main>
+                              <span className="admin-row__title">{event.name}</span>
+                              <span className="admin-row__meta">
+                                {formatDate(event.startsAt)} · {formatTime(event.startsAt)}
+                                {deck ? ` · ${deck.name}` : ""}
+                              </span>
+                            </AdminRow.Main>
+                            <AdminRow.Actions>
+                              <Link className="btn" href={`/events/${event.slug}`}>
+                                View event
+                              </Link>
+                            </AdminRow.Actions>
+                          </AdminRow>
+                        ))}
+                      </AdminList>
+                    </>
+                  ) : null}
+
+                  {pastYourEvents.length > 0 ? (
+                    <>
+                      <p className="deck__section-title">History</p>
+                      <AdminList>
+                        {pastYourEvents.map(({ event, deck }) => {
+                          const placing = placings.get(event.slug);
+                          return (
+                            <AdminRow key={event.slug}>
+                              <AdminRow.Main>
+                                <span className="admin-row__title">{event.name}</span>
+                                <span className="admin-row__meta">
+                                  {formatDate(event.startsAt)}
+                                  {deck ? ` · ${deck.name}` : ""}
+                                  {placing ? ` · Placed #${placing.place}` : ""}
+                                </span>
+                              </AdminRow.Main>
+                              <AdminRow.Actions>
+                                <Link className="btn" href={`/events/${event.slug}`}>
+                                  View results
+                                </Link>
+                              </AdminRow.Actions>
+                            </AdminRow>
+                          );
+                        })}
+                      </AdminList>
+                    </>
+                  ) : null}
+                </>
+              ) : (
+                <EmptyState
+                  message="No tournaments yet. Sign up for one to see your stats here."
+                  action={
+                    <Button variant="solid" href="/events">
+                      Browse events
+                    </Button>
+                  }
+                />
+              )}
             </div>
           </div>
-
-          <h2 className="section__subtitle">Your decks</h2>
-
-          {profile.decks.length === 0 ? (
-            <EmptyState
-              message="No decks on this account yet. Build one in the Dueling Nexus editor and it will show up here."
-              action={
-                <a className="btn" href={EDITOR} target="_blank" rel="noopener noreferrer">
-                  Open the editor
-                </a>
-              }
-            />
-          ) : (
-            <DeckList decks={deckRows} />
-          )}
         </Wrap>
       </main>
 
