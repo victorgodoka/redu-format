@@ -51,6 +51,30 @@ export async function resolvePlayerId(token: string, profile: PlayerProfile): Pr
   return id;
 }
 
+/** The player behind a Discord account, or null if that account has never linked a Nexus token. */
+export async function findPlayerByDiscordId(discordUserId: string) {
+  return new PlayersRepository(getPool()).findByDiscordUserId(discordUserId);
+}
+
+/** Remembers which Discord account a Nexus token belongs to, so the next sign-in skips the token step. */
+export async function linkDiscordAccount(
+  playerId: string,
+  discordUserId: string,
+  token: string,
+): Promise<void> {
+  await new PlayersRepository(getPool()).linkDiscord(playerId, discordUserId, token);
+}
+
+/** Called when Nexus rejects a stored token - the link stays, the dead credential does not. */
+export async function forgetNexusToken(playerId: string): Promise<void> {
+  await new PlayersRepository(getPool()).clearNexusToken(playerId);
+}
+
+/** Nexus names for the admin broadcast form's autocomplete. */
+export async function listPlayerNames(limit = 500): Promise<string[]> {
+  return new PlayersRepository(getPool()).listNames(limit);
+}
+
 /**
  * Read-only: for pages/actions (cancel, unsave, "am I registered" checks)
  * that only need an existing player's id without touching the Nexus API or

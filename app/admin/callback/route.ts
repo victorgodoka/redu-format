@@ -84,7 +84,13 @@ export async function GET(request: Request) {
       ...(nexusToken ? { nexusToken } : {}),
     });
 
-    if (nexusToken) await establishPublicSession(nexusToken);
+    // The public session gets the same Discord identity the admin one has, so
+    // an admin browsing the site side is signed in exactly like a player.
+    if (nexusToken) {
+      await establishPublicSession(nexusToken, {
+        discord: { userId: user.id, username: user.username, displayName },
+      });
+    }
 
     // await recordAction({
     //   actorId: user.id,

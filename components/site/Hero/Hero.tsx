@@ -24,7 +24,7 @@ export default function Hero() {
           on Dueling Nexus.
         </Lede>
         <div className={styles.actions}>
-          <a className="btn btn--solid" href={DISCORD_URL} target="_blank" rel="noopener noreferrer">
+          <a className="btn btn--solid" href={'https://duelingnexus.com/'} target="_blank" rel="noopener noreferrer">
             Start dueling today
           </a>
           <Link className="btn" href="/events">

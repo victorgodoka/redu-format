@@ -10,12 +10,12 @@ import { notify } from "./notifications.service.ts";
 export type MessageAudience =
   | { kind: "all" }
   | { kind: "tournament"; slug: string }
-  | { kind: "players"; nexusIds: string[] };
+  | { kind: "players"; names: string[] };
 
 export type BroadcastResult = {
   /** How many players it reached, or null for the global "everyone" alert (one row, no list). */
   sent: number | null;
-  /** Nexus ids that matched no account - reported back rather than silently dropped. */
+  /** Names that matched no account - reported back rather than silently dropped. */
   unknown: string[];
 };
 
@@ -24,26 +24,28 @@ function repos() {
   return { players: new PlayersRepository(pool), registrations: new RegistrationsRepository(pool) };
 }
 
-/** Splits the pasted Nexus ids on commas, whitespace, or newlines. */
-export function parseNexusIds(raw: string): string[] {
-  return [...new Set(raw.split(/[\s,;]+/).map((s) => s.trim()).filter(Boolean))];
-}
-
 export async function broadcast(input: {
   title: string;
   body: string;
   audience: MessageAudience;
+  /** Display name of the admin sending it - signed onto the message so a player can see who wrote it. */
+  sentBy: string;
 }): Promise<BroadcastResult> {
   const messageId = crypto.randomUUID();
+  const body = `${input.body}
+
+---
+
+Sent by **${input.sentBy}**`;
 
   if (input.audience.kind === "all") {
-    await send(messageId, input.title, input.body, null);
+    await send(messageId, input.title, body, null);
     return { sent: null, unknown: [] };
   }
 
   const { playerIds, unknown } = await resolve(input.audience);
   for (const playerId of playerIds) {
-    await send(messageId, input.title, input.body, playerId);
+    await send(messageId, input.title, body, playerId);
   }
   return { sent: playerIds.length, unknown };
 }
@@ -56,14 +58,11 @@ async function resolve(
     return { playerIds: [...new Set(rows.map((r) => r.playerId))], unknown: [] };
   }
 
-  const found = await repos().players.findByNexusIds(audience.nexusIds);
-  const matched = new Set([
-    ...found.map((p) => p.nexusUserId).filter((id): id is string => id !== null),
-    ...found.map((p) => p.nexusName),
-  ]);
+  const found = await repos().players.findByNames(audience.names);
+  const matched = new Set(found.map((p) => p.nexusName));
   return {
     playerIds: found.map((p) => p.id),
-    unknown: audience.nexusIds.filter((id) => !matched.has(id)),
+    unknown: audience.names.filter((name) => !matched.has(name)),
   };
 }
 

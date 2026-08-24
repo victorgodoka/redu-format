@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import AdminPageHead from "@/components/admin/AdminPageHead";
 import MessageForm from "@/components/admin/MessageForm";
+import { listPlayerNames } from "@/lib/backend/services/player.service";
 import { listTournaments } from "@/lib/tournaments";
 import { sendMessageAction } from "./actions";
 
@@ -10,7 +11,7 @@ export const metadata: Metadata = {
 };
 
 export default async function AdminMessagesPage() {
-  const tournaments = await listTournaments();
+  const [tournaments, playerNames] = await Promise.all([listTournaments(), listPlayerNames()]);
 
   return (
     <>
@@ -22,6 +23,7 @@ export default async function AdminMessagesPage() {
       <MessageForm
         action={sendMessageAction}
         tournaments={tournaments.map((t) => ({ slug: t.slug, name: t.name }))}
+        playerNames={playerNames}
       />
     </>
   );

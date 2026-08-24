@@ -36,6 +36,15 @@ export type NexusProfile = {
   deckLists: NexusDeckLists[];
 };
 
+/** Who the browser signed in as. Any valid Discord account is accepted - the site, unlike /admin, checks no roles. */
+export type DiscordIdentity = {
+  userId: string;
+  /** Discord @handle. */
+  username: string;
+  /** global_name, falling back to the handle. */
+  displayName: string;
+};
+
 /**
  * The Nexus token is the only credential that can read a user's decks, so it
  * rides along inside the encrypted cookie. iron-session seals the payload, so
@@ -44,6 +53,13 @@ export type NexusProfile = {
  * should never leave the server at all.
  */
 export type Session = {
+  /**
+   * Discord identity from the sign-in itself. Present without `token` for a
+   * player who has signed in but not linked a Nexus account yet - they are
+   * known, but the logged-in area stays shut until `token` exists (see
+   * /login/nexus).
+   */
+  discord?: DiscordIdentity;
   token?: string;
   name?: string;
   avatar?: string;
@@ -187,7 +203,10 @@ export const fetchProfile = cache(async function fetchProfile(
  * token just means no public session gets created, not an error the caller
  * needs to handle.
  */
-export async function establishPublicSession(token: string): Promise<boolean> {
+export async function establishPublicSession(
+  token: string,
+  extra?: Pick<Session, "discord">,
+): Promise<boolean> {
   const profile = await fetchProfile(token);
   if (!profile) return false;
 
@@ -204,6 +223,9 @@ export async function establishPublicSession(token: string): Promise<boolean> {
   await enforcePlayerDecks(playerId).catch(() => 0);
 
   const session = await getSession();
+  // Written in the same read/save pass as the rest - a second getSession()
+  // round trip to add the identity afterwards would be racing this cookie.
+  if (extra?.discord) session.discord = extra.discord;
   session.token = token;
   session.name = profile.name;
   session.avatar = profile.avatar;
@@ -212,6 +234,17 @@ export async function establishPublicSession(token: string): Promise<boolean> {
   await session.save();
 
   return true;
+}
+
+/**
+ * Records the Discord identity on its own, for the half of the flow that has
+ * no Nexus token to go with it yet. The visitor is signed in; every page
+ * behind the token check still turns them away until they link one.
+ */
+export async function setDiscordSession(discord: DiscordIdentity): Promise<void> {
+  const session = await getSession();
+  session.discord = discord;
+  await session.save();
 }
 
 export { rateLimit } from "./rate-limit";

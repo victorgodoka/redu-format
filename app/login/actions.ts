@@ -10,11 +10,21 @@ import {
   invalidateProfile,
   rateLimit,
 } from "@/lib/auth";
-import { resolvePlayerId } from "@/lib/backend/services/player.service";
+import {
+  findPlayerIdByToken,
+  linkDiscordAccount,
+  resolvePlayerId,
+} from "@/lib/backend/services/player.service";
 import { safeNext } from "@/lib/safe-next";
 
 export type LoginState = { error?: string };
 
+/**
+ * Links a Dueling Nexus token to the Discord account that just signed in.
+ * Discord is the identity; this is what actually opens the logged-in area, and
+ * the token is remembered against that account so the next sign-in skips
+ * straight past this step.
+ */
 export async function login(
   _prev: LoginState,
   form: FormData,
@@ -22,6 +32,9 @@ export async function login(
   const token = String(form.get("token") ?? "").trim();
   const next = safeNext(form.get("next"));
   if (!token) return { error: "Paste your Dueling Nexus token." };
+
+  const discord = (await getSession()).discord;
+  if (!discord) redirect(`/login?next=${encodeURIComponent(next)}`);
 
   const ip = (await headers()).get("x-forwarded-for")?.split(",")[0] ?? "local";
   if (!(await rateLimit(`login:${ip}`))) {
@@ -31,6 +44,9 @@ export async function login(
   if (!(await establishPublicSession(token))) {
     return { error: "That token was rejected by Dueling Nexus." };
   }
+
+  const playerId = await findPlayerIdByToken(token);
+  if (playerId) await linkDiscordAccount(playerId, discord.userId, token);
 
   redirect(next);
 }

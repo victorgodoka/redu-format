@@ -22,12 +22,26 @@ const initial: MessageFormState = {};
 export default function MessageForm({
   action,
   tournaments,
+  playerNames,
 }: {
   action: (state: MessageFormState, form: FormData) => Promise<MessageFormState>;
   tournaments: { slug: string; name: string }[];
+  /** Known Nexus names, for the picker's autocomplete. */
+  playerNames: string[];
 }) {
   const [state, formAction, pending] = useActionState(action, initial);
   const [audience, setAudience] = useState<Audience>("all");
+  const [picked, setPicked] = useState<string[]>([]);
+  const [draft, setDraft] = useState("");
+
+  // The <datalist> below is the whole autocomplete - the browser does the
+  // matching, so there is no filtering, no debounce, and no dropdown to build.
+  function addPicked(name: string) {
+    const value = name.trim();
+    if (!value || picked.includes(value)) return;
+    setPicked([...picked, value]);
+    setDraft("");
+  }
 
   return (
     <form action={formAction} className="form form--grid">
@@ -84,12 +98,53 @@ export default function MessageForm({
 
       {audience === "players" ? (
         <FormField
-          label="Nexus IDs"
-          htmlFor="nexusIds"
+          label="Players"
+          htmlFor="playerName"
           full
-          hint="One per line, or separated by commas. Nexus IDs or account names - never a token."
+          hint="Start typing a Dueling Nexus name and pick it from the list. Add as many as you need."
         >
-          <Textarea id="nexusIds" name="nexusIds" rows={4} />
+          <div className="form__inline">
+            <Input
+              id="playerName"
+              list="player-names"
+              value={draft}
+              autoComplete="off"
+              placeholder="Nexus name"
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  // Enter in this field means "add", not "submit the message".
+                  e.preventDefault();
+                  addPicked(draft);
+                }
+              }}
+            />
+            <Button type="button" onClick={() => addPicked(draft)}>
+              Add
+            </Button>
+          </div>
+          <datalist id="player-names">
+            {playerNames.map((name) => (
+              <option key={name} value={name} />
+            ))}
+          </datalist>
+
+          <div className="form__chips">
+            {picked.map((name) => (
+              <span key={name} className="badge">
+                {name}
+                <input type="hidden" name="players" value={name} />
+                <button
+                  type="button"
+                  className="badge__remove"
+                  aria-label={`Remove ${name}`}
+                  onClick={() => setPicked(picked.filter((n) => n !== name))}
+                >
+                  x
+                </button>
+              </span>
+            ))}
+          </div>
         </FormField>
       ) : null}
 

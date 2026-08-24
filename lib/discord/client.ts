@@ -32,15 +32,17 @@ async function discordFetch<T>(
   return response.json() as Promise<T>;
 }
 
+/** `redirectUri` must be byte-identical to the one the authorize step used, or Discord rejects the exchange. */
 export async function exchangeCode(
   code: string,
+  redirectUri: string = discordConfig.redirectUri,
 ): Promise<DiscordOAuthTokenResponse> {
   const body = new URLSearchParams({
     client_id: discordConfig.clientId,
     client_secret: discordConfig.clientSecret,
     grant_type: "authorization_code",
     code,
-    redirect_uri: discordConfig.redirectUri,
+    redirect_uri: redirectUri,
   });
 
   const response = await fetch(
