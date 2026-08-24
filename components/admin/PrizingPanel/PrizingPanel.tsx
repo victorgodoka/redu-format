@@ -40,7 +40,7 @@ export default function PrizingPanel({
   const unsent = prizes.filter((p) => !p.sentAt).length;
 
   return (
-    <div className="section__content">
+    <div className="section__content" style={{ marginTop: "24px" }}>
       <h2 className="section__subtitle">Prizing</h2>
 
       {open ? (
