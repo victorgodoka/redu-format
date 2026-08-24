@@ -77,6 +77,20 @@ export class PlayersRepository {
     return rows[0] ? rowToPlayer(rows[0]) : null;
   }
 
+  /**
+   * Players picked out by Nexus id for an admin broadcast. The name is matched
+   * too: it is what an admin actually has on hand from a bracket or a signup
+   * list, and it is never a token - a token is not accepted here at all.
+   */
+  async findByNexusIds(ids: string[]): Promise<Player[]> {
+    if (ids.length === 0) return [];
+    const [rows] = await this.pool.query<PlayerRow[]>(
+      "SELECT * FROM players WHERE nexus_user_id IN (?) OR nexus_name IN (?)",
+      [ids, ids],
+    );
+    return rows.map(rowToPlayer);
+  }
+
   async insert(id: string, identityKey: string, profile: PlayerProfile): Promise<void> {
     await this.pool.query(
       `INSERT INTO players (id, nexus_identity_key, nexus_user_id, nexus_name, avatar_url, contributor, contributor_time, last_seen_at)

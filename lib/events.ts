@@ -99,6 +99,10 @@ export type TournamentEvent = {
   entry: EntryFee;
   host: string;
   signupUrl: string;
+  /** Whether this event hands out redeemable prize codes (see lib/prizing.ts). Optional so fixtures from before the field existed still satisfy the type. */
+  hasPrizing?: boolean;
+  /** ISO instant the prize codes were mailed out, or null while they haven't been. */
+  prizesSentAt?: string | null;
 };
 
 /** The admin form's Seats dropdown; null (Unlimited) is handled separately. */

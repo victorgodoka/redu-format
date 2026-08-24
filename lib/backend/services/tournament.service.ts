@@ -92,6 +92,8 @@ export async function createTournament(draft: TournamentDraft): Promise<Tourname
     finishedAt: null,
     cancelledAt: null,
     hasBanner: draft.banner != null,
+    hasPrizing: draft.hasPrizing ?? false,
+    prizesSentAt: null,
   };
 }
 

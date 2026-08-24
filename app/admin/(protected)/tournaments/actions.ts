@@ -16,6 +16,8 @@ import {
   type Engine,
   type Structure,
 } from "@/lib/events";
+import { isPrizeTier } from "@/lib/prizing";
+import { addPrize, removePrize, sendPrizes } from "@/lib/backend/services/prizing.service";
 import {
   cancelTournament,
   createTournament,
@@ -135,6 +137,8 @@ async function readDraft(form: FormData): Promise<TournamentDraft | { error: str
     entry = { type: "free" };
   }
 
+  const hasPrizing = form.get("hasPrizing") === "on";
+
   const host = String(form.get("host") ?? "").trim() || "Dueling Nexus";
   const signupUrl = String(form.get("signupUrl") ?? "").trim() || slugify(name);
 
@@ -156,6 +160,7 @@ async function readDraft(form: FormData): Promise<TournamentDraft | { error: str
     entry,
     host,
     signupUrl,
+    hasPrizing,
   };
 }
 
@@ -271,4 +276,82 @@ export async function deleteTournamentAction(form: FormData) {
   revalidatePath("/admin/tournaments");
   revalidatePath("/events");
   redirect("/admin/tournaments");
+}
+
+/**
+ * Adds one redemption code. The form posts a code and a tier at a time, which
+ * is also how the prize list reads back - a tier can hold any number of codes.
+ * The service refuses once the tournament is finished.
+ */
+export async function addPrizeAction(form: FormData) {
+  const slug = String(form.get("slug") ?? "");
+  const code = String(form.get("code") ?? "").trim();
+  const tier = String(form.get("tier") ?? "");
+
+  if (!code) redirect(`/admin/tournaments/${slug}?error=${encodeURIComponent("Enter a code.")}`);
+  if (!isPrizeTier(tier)) {
+    redirect(`/admin/tournaments/${slug}?error=${encodeURIComponent("Pick a prize tier.")}`);
+  }
+
+  try {
+    await addPrize(slug, tier, code);
+  } catch (error) {
+    redirect(`/admin/tournaments/${slug}?error=${encodeURIComponent(message(error))}`);
+  }
+
+  await recordAction({
+    ...(await actor()),
+    action: "prize.add",
+    target: slug,
+    detail: `Added a ${tier} prize code`,
+  });
+
+  revalidatePath(`/admin/tournaments/${slug}`);
+  redirect(`/admin/tournaments/${slug}`);
+}
+
+export async function removePrizeAction(form: FormData) {
+  const slug = String(form.get("slug") ?? "");
+  const prizeId = String(form.get("prizeId") ?? "");
+
+  if (await removePrize(slug, prizeId)) {
+    await recordAction({
+      ...(await actor()),
+      action: "prize.remove",
+      target: slug,
+      detail: "Removed a prize code",
+    });
+  }
+
+  revalidatePath(`/admin/tournaments/${slug}`);
+  redirect(`/admin/tournaments/${slug}`);
+}
+
+/** The one-shot mailing, once the tournament is over. See sendPrizes(). */
+export async function sendPrizesAction(form: FormData) {
+  const slug = String(form.get("slug") ?? "");
+
+  let result;
+  try {
+    result = await sendPrizes(slug);
+  } catch (error) {
+    redirect(`/admin/tournaments/${slug}?error=${encodeURIComponent(message(error))}`);
+  }
+
+  await recordAction({
+    ...(await actor()),
+    action: "prize.send",
+    target: slug,
+    detail: `Sent ${result.sent} prize code(s), ${result.unclaimed} left unclaimed`,
+  });
+
+  revalidatePath(`/admin/tournaments/${slug}`);
+  redirect(
+    `/admin/tournaments/${slug}?sent=${result.sent}&unclaimed=${result.unclaimed}`,
+  );
+}
+
+/** The service's own message when it refuses (closed prizing, already sent), or a generic one. */
+function message(error: unknown): string {
+  return error instanceof Error ? error.message : "Something went wrong.";
 }

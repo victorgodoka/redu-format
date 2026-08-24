@@ -4,7 +4,7 @@ import { fromMysqlDatetime, fromMysqlDatetimeMs, toMysqlDatetime, toMysqlDatetim
 
 export type TournamentDraft = Omit<
   TournamentEvent,
-  "slug" | "taken" | "status" | "startedAt" | "finishedAt" | "cancelledAt" | "hasBanner"
+  "slug" | "taken" | "status" | "startedAt" | "finishedAt" | "cancelledAt" | "hasBanner" | "prizesSentAt"
 > & {
   /** New banner to store. undefined leaves an existing banner untouched (update only - insert() treats it the same as null); null clears it. */
   banner?: { data: Buffer; mime: string } | null;
@@ -36,6 +36,8 @@ type TournamentRow = RowDataPacket & {
   entry_currency: string | null;
   host: string;
   signup_url: string;
+  has_prizing: number;
+  prizes_sent_at: string | null;
 };
 
 /** Every registration - public signup or admin-manual - occupies a seat, regardless of payment status. */
@@ -73,6 +75,8 @@ function rowToTournament(row: TournamentRow): TournamentEvent {
     entry: toEntry(row),
     host: row.host,
     signupUrl: row.signup_url,
+    hasPrizing: Boolean(row.has_prizing),
+    prizesSentAt: fromMysqlDatetimeMs(row.prizes_sent_at),
   };
 }
 
@@ -94,7 +98,7 @@ export class TournamentsRepository {
       `SELECT t.slug, t.name, t.description, (t.banner_image IS NOT NULL) AS has_banner, t.starts_at, t.started_at, t.finished_at, t.status, t.cancelled_at,
               t.structure, t.rounds, t.top_cut, t.match_format,
               t.round_limit_days, t.duration_mode, t.round_minutes, t.cleanup_minutes, t.engine, t.seat_cap, t.entry_type, t.entry_amount_minor, t.entry_currency,
-              t.host, t.signup_url, ${TAKEN_SUBQUERY}
+              t.host, t.signup_url, t.has_prizing, t.prizes_sent_at, ${TAKEN_SUBQUERY}
        FROM tournaments t
        WHERE t.deleted_at IS NULL
        ORDER BY t.starts_at ASC`,
@@ -107,7 +111,7 @@ export class TournamentsRepository {
       `SELECT t.slug, t.name, t.description, (t.banner_image IS NOT NULL) AS has_banner, t.starts_at, t.started_at, t.finished_at, t.status, t.cancelled_at,
               t.structure, t.rounds, t.top_cut, t.match_format,
               t.round_limit_days, t.duration_mode, t.round_minutes, t.cleanup_minutes, t.engine, t.seat_cap, t.entry_type, t.entry_amount_minor, t.entry_currency,
-              t.host, t.signup_url, ${TAKEN_SUBQUERY}
+              t.host, t.signup_url, t.has_prizing, t.prizes_sent_at, ${TAKEN_SUBQUERY}
        FROM tournaments t
        WHERE t.slug = ? AND t.deleted_at IS NULL
        LIMIT 1`,
@@ -188,8 +192,8 @@ export class TournamentsRepository {
     const [entryType, entryAmountMinor, entryCurrency] = entryColumns(draft.entry);
     await this.pool.query(
       `INSERT INTO tournaments
-        (id, slug, name, description, banner_image, banner_mime, starts_at, structure, rounds, top_cut, match_format, round_limit_days, duration_mode, round_minutes, cleanup_minutes, engine, seat_cap, entry_type, entry_amount_minor, entry_currency, host, signup_url)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        (id, slug, name, description, banner_image, banner_mime, starts_at, structure, rounds, top_cut, match_format, round_limit_days, duration_mode, round_minutes, cleanup_minutes, engine, seat_cap, entry_type, entry_amount_minor, entry_currency, host, signup_url, has_prizing)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id,
         slug,
@@ -213,6 +217,7 @@ export class TournamentsRepository {
         entryCurrency,
         draft.host,
         draft.signupUrl,
+        draft.hasPrizing ?? false,
       ],
     );
   }
@@ -224,7 +229,7 @@ export class TournamentsRepository {
         name = ?, description = ?, starts_at = ?, structure = ?, rounds = ?, top_cut = ?, match_format = ?,
         round_limit_days = ?, duration_mode = ?, round_minutes = ?, cleanup_minutes = ?,
         engine = ?, seat_cap = ?, entry_type = ?, entry_amount_minor = ?,
-        entry_currency = ?, host = ?, signup_url = ?
+        entry_currency = ?, host = ?, signup_url = ?, has_prizing = ?
        WHERE slug = ? AND deleted_at IS NULL`,
       [
         draft.name,
@@ -245,6 +250,7 @@ export class TournamentsRepository {
         entryCurrency,
         draft.host,
         draft.signupUrl,
+        draft.hasPrizing ?? false,
         slug,
       ],
     );
@@ -257,6 +263,24 @@ export class TournamentsRepository {
       ]);
     }
     return result.affectedRows > 0;
+  }
+
+  /**
+   * Claims the one-shot prize mailing: returns true only for the caller that
+   * actually flipped it, so a double-clicked "Send prizing" can't mail the
+   * codes twice.
+   */
+  async claimPrizeSend(id: string, at: string): Promise<boolean> {
+    const [result] = await this.pool.query<ResultSetHeader>(
+      "UPDATE tournaments SET prizes_sent_at = ? WHERE id = ? AND prizes_sent_at IS NULL AND status = 'finished'",
+      [toMysqlDatetimeMs(at), id],
+    );
+    return result.affectedRows > 0;
+  }
+
+  /** Undoes claimPrizeSend when the mailing turned out to have nothing to send. */
+  async releasePrizeSend(id: string): Promise<void> {
+    await this.pool.query("UPDATE tournaments SET prizes_sent_at = NULL WHERE id = ?", [id]);
   }
 
   async delete(slug: string): Promise<boolean> {

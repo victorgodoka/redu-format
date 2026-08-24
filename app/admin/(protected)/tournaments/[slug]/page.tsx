@@ -3,11 +3,21 @@ import { notFound } from "next/navigation";
 import AdminPageHead from "@/components/admin/AdminPageHead";
 import CopyLinkButton from "@/components/admin/CopyLinkButton";
 import DeleteButton from "@/components/admin/DeleteButton";
+import PrizingPanel from "@/components/admin/PrizingPanel";
 import StatBar from "@/components/admin/StatBar";
 import TournamentForm from "@/components/admin/TournamentForm";
 import Button from "@/components/ui/Button";
+import Notice from "@/components/ui/Notice";
+import { listPrizes } from "@/lib/backend/services/prizing.service";
 import { getTournament } from "@/lib/tournaments";
-import { cancelTournamentAction, deleteTournamentAction, updateTournamentAction } from "../actions";
+import {
+  addPrizeAction,
+  cancelTournamentAction,
+  deleteTournamentAction,
+  removePrizeAction,
+  sendPrizesAction,
+  updateTournamentAction,
+} from "../actions";
 
 export const metadata: Metadata = {
   title: "Edit tournament | REDU Format",
@@ -16,12 +26,17 @@ export const metadata: Metadata = {
 
 export default async function EditTournamentPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<{ error?: string; sent?: string; unclaimed?: string }>;
 }) {
   const { slug } = await params;
+  const { error, sent, unclaimed } = await searchParams;
   const tournament = await getTournament(slug);
   if (!tournament) notFound();
+
+  const prizes = tournament.hasPrizing ? await listPrizes(slug) : [];
 
   return (
     <>
@@ -30,7 +45,30 @@ export default async function EditTournamentPage({
         back={{ href: "/admin/tournaments", label: "← Back to tournaments" }}
       />
 
+      {error ? (
+        <p role="alert" className="form__error">
+          {error}
+        </p>
+      ) : null}
+      {sent ? (
+        <Notice variant="done">
+          Sent {sent} prize code(s). {unclaimed ?? "0"} left unclaimed.
+        </Notice>
+      ) : null}
+
       <TournamentForm isEditing={true} action={updateTournamentAction} tournament={tournament} />
+
+      {tournament.hasPrizing ? (
+        <PrizingPanel
+          slug={tournament.slug}
+          status={tournament.status}
+          prizes={prizes}
+          prizesSentAt={tournament.prizesSentAt ?? null}
+          addPrizeAction={addPrizeAction}
+          removePrizeAction={removePrizeAction}
+          sendPrizesAction={sendPrizesAction}
+        />
+      ) : null}
 
       <StatBar
         actions={

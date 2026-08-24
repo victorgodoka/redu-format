@@ -24,6 +24,7 @@ const LINKS = [
   { href: "/admin/dashboard", label: "Dashboard" },
   { href: "/admin/tournaments", label: "Tournaments" },
   { href: "/admin/inbox", label: "Inbox" },
+  { href: "/admin/messages", label: "Messages" },
   { href: "/admin/logs", label: "Logs" },
   { href: "/", label: "Home", target: "_blank" },
 ];

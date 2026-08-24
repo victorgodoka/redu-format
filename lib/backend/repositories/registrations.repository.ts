@@ -91,6 +91,21 @@ export class RegistrationsRepository {
     return rows.map(rowToParticipant);
   }
 
+  /**
+   * Which registrations in this tournament belong to a real account, and to
+   * whom. Manual entries (no signup behind them) have no player_id and are
+   * simply absent - nothing can be mailed to them.
+   */
+  async listPlayerIdsBySlug(slug: string): Promise<{ registrationId: string; playerId: string }[]> {
+    const [rows] = await this.pool.query<RowDataPacket[]>(
+      `SELECT r.id, r.player_id FROM registrations r
+       JOIN tournaments t ON t.id = r.tournament_id
+       WHERE t.slug = ? AND r.player_id IS NOT NULL`,
+      [slug],
+    );
+    return rows.map((row) => ({ registrationId: row.id, playerId: row.player_id }));
+  }
+
   async findOne(slug: string, id: string): Promise<Participant | null> {
     const [rows] = await this.pool.query<RegistrationRow[]>(
       `SELECT r.* FROM registrations r

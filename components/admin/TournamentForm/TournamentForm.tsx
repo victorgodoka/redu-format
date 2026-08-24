@@ -476,6 +476,23 @@ export default function TournamentForm({
         </FormGroup>
       ) : null}
 
+      <FormField
+        label="Prizing"
+        htmlFor="hasPrizing"
+        full
+        hint="Redemption codes are added one at a time from the tournament page, and can be changed until the tournament is finished."
+      >
+        <Label className="topcut__toggle">
+          <input
+            id="hasPrizing"
+            type="checkbox"
+            name="hasPrizing"
+            defaultChecked={tournament?.hasPrizing ?? false}
+          />
+          <span>This event has prizing with redemption codes</span>
+        </Label>
+      </FormField>
+
       {isEditing && tournament ? (
         <FormField label="Seats taken" htmlFor="seatsTaken">
           <Input id="seatsTaken" name="seatsTaken" type="number" disabled defaultValue={tournament.taken} />

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import Markdown from "@/components/ui/Markdown";
 import { formatDate, formatTime } from "@/lib/events";
 import styles from "./Inbox.module.css";
 
@@ -73,7 +74,7 @@ export default function Inbox({
                 </time>
               </p>
             </header>
-            <div className={styles.readerBody}>{selected.body}</div>
+            <Markdown className={styles.readerBody} source={selected.body} />
             {children}
           </>
         ) : (
