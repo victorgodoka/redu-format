@@ -42,6 +42,17 @@ test("rarity digits are stripped before the lookup", () => {
   assert.equal(tooMany.valid, false);
 });
 
+test("an alternate art id listed in card_images resolves to its card", () => {
+  // "Aleister the Invoker": the alternate print sits one *below* the passcode,
+  // so only card_images can find it - walking down never would.
+  const ALEISTER = 86120752;
+  const ALEISTER_ALT = 86120751;
+  assert.equal(validateTcgDeck(deck([ALEISTER_ALT])).valid, true);
+  // Both printings are the same card, so three copies is still three copies.
+  const mixed = validateTcgDeck(deck([ALEISTER, ALEISTER_ALT, ALEISTER, ALEISTER_ALT]));
+  assert.equal(mixed.errors[0]?.type, "banlist");
+});
+
 test("an alt-art id resolves to the print a few ids below it", () => {
   assert.equal(validateTcgDeck(deck([FREE + 5])).valid, true);
   // Six above is past the search window, so it reads as an id nobody knows.

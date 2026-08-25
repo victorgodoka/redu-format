@@ -1,4 +1,4 @@
-import { Card } from "./cards.ts";
+import { Card, stripRarity } from "./cards.ts";
 import type { NexusDeckLists } from "./nexus-parse.ts";
 
 /** The three lists a deck is made of, without the Nexus id wrapper. */
@@ -22,8 +22,18 @@ export type DeckCardDelta = {
 
 const SECTIONS: DeckSection[] = ["main", "extra", "side"];
 
+/**
+ * The three lists, with rarity stripped off every id. A snapshot is only ever
+ * compared against another snapshot, so both sides have to speak passcodes:
+ * otherwise re-buying the same card in a different rarity would read as a deck
+ * edit and disqualify the player mid-tournament.
+ */
 export function toSnapshot(deck: NexusDeckLists | DeckSnapshot): DeckSnapshot {
-  return { main: [...deck.main], extra: [...deck.extra], side: [...deck.side] };
+  return {
+    main: deck.main.map(stripRarity),
+    extra: deck.extra.map(stripRarity),
+    side: deck.side.map(stripRarity),
+  };
 }
 
 function countById(ids: readonly number[]): Map<number, number> {
@@ -84,7 +94,9 @@ export function parseSnapshot(raw: unknown): DeckSnapshot | null {
   );
   if (lists.some((list) => list === null)) return null;
 
-  return { main: lists[0]!, extra: lists[1]!, side: lists[2]! };
+  // Stripped on the way out too: rows written before ids were normalised are
+  // still in the table, and they have to compare against a fresh snapshot.
+  return toSnapshot({ main: lists[0]!, extra: lists[1]!, side: lists[2]! });
 }
 
 function safeJson(raw: string): unknown {

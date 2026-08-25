@@ -1,5 +1,12 @@
 import { createHash } from "node:crypto";
-import { describeDelta, diffDeckLists, parseSnapshot, type DeckCardDelta, type DeckSnapshot } from "../../deck-diff.ts";
+import {
+  describeDelta,
+  diffDeckLists,
+  parseSnapshot,
+  toSnapshot,
+  type DeckCardDelta,
+  type DeckSnapshot,
+} from "../../deck-diff.ts";
 import { fetchDeckArt } from "../../nexus-parse.ts";
 import { getPool } from "../db/client.ts";
 import { DeckSnapshotsRepository } from "../repositories/deck-snapshots.repository.ts";
@@ -52,7 +59,8 @@ function snapshotsRepo() {
 /** The deck exactly as Dueling Nexus serves it right now, or null when it can't be read (private, deleted, upstream down). */
 async function liveSnapshot(deckId: string): Promise<DeckSnapshot | null> {
   const live = await fetchDeckArt(deckId);
-  return live ? { main: live.main, extra: live.extra, side: live.side } : null;
+  // toSnapshot, not a hand-built object: it is what strips the rarity digits.
+  return live ? toSnapshot(live) : null;
 }
 
 /**

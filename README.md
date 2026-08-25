@@ -321,6 +321,7 @@ Renderiza em três variantes conforme o status: **próximo**, **em andamento** e
 
 - **Consome:** `tournaments`, `registrations` e os decks do perfil Nexus.
 - **Valida:** tamanho do deck e a legalidade **contra a banlist daquele torneio**. Decks ilegais aparecem desabilitados no seletor, com o motivo escrito.
+- **Filtros do seletor:** busca por nome do deck e um "só decks legais para este evento". Um deck já escolhido continua escolhido mesmo que o filtro o esconda — a página avisa quando isso acontece.
 - **Grava:** `registrations` com o snapshot da lista no momento da inscrição — é esse snapshot que a checagem de deck alterado compara depois.
 - Exige login: sem sessão, vai para o login e volta.
 
@@ -403,7 +404,7 @@ Cada torneio declara sua banlist e é ela que decide a validação na inscriçã
 - rarity removida do id (`id % 100000000000`) — vale para os dois validadores;
 - carta legal se `misc_info[0].formats` contém `TCG` **ou** `misc_info[0].tcg_date` é uma data válida;
 - cópias limitadas por `banlist_info.ban_tcg` (forbidden 0, limited 1, semi-limited 2, resto 3);
-- id não encontrado: tenta de novo decrementando 1, até 5 vezes (artes alternativas ficam alguns ids acima da impressão);
+- id não encontrado: primeiro procura em `card_images` (é lá que ficam os ids de arte alternativa), depois tenta decrementando 1, até 5 vezes, para impressões que o `card_images` não lista;
 - ids que continuam sem match aparecem juntos numa linha só, pedindo para o jogador revisar artes alternativas e avisar a moderação;
 - carta que existe mas nunca saiu no TCG é apontada pelo nome, não como id desconhecido.
 

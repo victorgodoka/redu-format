@@ -22,6 +22,19 @@ for (const card of CARD_LIB) {
 }
 const byId = (id: number) => BY_ID.get(id);
 
+/**
+ * Dueling Nexus encodes a card's rarity in the high digits of the id
+ * (passcode + rarity * 10^11), so the printed passcode is what is left over.
+ * Every real passcode is far below the modulus, so this is a no-op for them.
+ * Ids are stripped both before they are validated and before a deck snapshot
+ * is stored, so a player swapping a card's rarity never reads as a deck edit.
+ */
+const RARITY_MODULUS = 100_000_000_000;
+
+export function stripRarity(id: number): number {
+  return id % RARITY_MODULUS;
+}
+
 /** Card page on the rulings database, keyed by Konami id, not by passcode. */
 const RULINGS = "https://db.ygoresources.com/card#";
 /** Only reached if a card has no koid on file. */

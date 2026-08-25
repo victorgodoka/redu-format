@@ -1,6 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { decksDiffer, describeDelta, diffDeckLists, parseSnapshot, type DeckSnapshot } from "./deck-diff.ts";
+import {
+  decksDiffer,
+  describeDelta,
+  diffDeckLists,
+  parseSnapshot,
+  toSnapshot,
+  type DeckSnapshot,
+} from "./deck-diff.ts";
 
 const DARK_HOLE = 53129443;
 const RAIGEKI = 12580477;
@@ -57,4 +64,17 @@ test("snapshots survive a JSON round trip, and junk is rejected rather than half
   assert.equal(parseSnapshot("not json"), null);
   assert.equal(parseSnapshot({ main: [1], extra: [] }), null, "a missing section is not an empty one");
   assert.equal(parseSnapshot(null), null);
+});
+
+test("rarity is stripped when a snapshot is taken, and when an older one is read back", () => {
+  const RARITY = 100_000_000_000;
+
+  // Same card, bought in a different rarity - not a deck edit.
+  const registered = toSnapshot({ main: [DARK_HOLE, DARK_HOLE], extra: [], side: [] });
+  const rebought = toSnapshot({ main: [DARK_HOLE + RARITY, DARK_HOLE + 3 * RARITY], extra: [], side: [] });
+  assert.equal(decksDiffer(registered, rebought), false);
+
+  // A row stored before ids were normalised still compares clean.
+  const legacy = parseSnapshot({ main: [DARK_HOLE + 2 * RARITY], extra: [], side: [] })!;
+  assert.deepEqual(legacy.main, [DARK_HOLE]);
 });

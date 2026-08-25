@@ -32,37 +32,46 @@ type RawCard = {
   id: number;
   name: string;
   banlist_info?: { ban_tcg?: string };
+  card_images?: { id: number }[];
   misc_info?: { formats?: string[]; tcg_date?: string }[];
 };
 
 /**
  * lib/cardinfo.json is the source of truth for the modern game - 24MB of it,
  * so it is read once, on the first TCG deck anyone validates, and reduced to
- * the three fields that decide legality. A REDU-only site never pays for it,
- * and the parsed dump is dropped as soon as the index is built.
+ * the three fields that decide legality plus the alternate-art ids. A
+ * REDU-only site never pays for it, and the parsed dump is dropped as soon as
+ * the index is built.
  */
-let index: Map<number, TcgCard> | null = null;
+let index: { cards: Map<number, TcgCard>; altArt: Map<number, number> } | null = null;
 
-function cards(): Map<number, TcgCard> {
+function load(): NonNullable<typeof index> {
   if (index) return index;
 
   const file = path.join(process.cwd(), "lib", "cardinfo.json");
   const dump = JSON.parse(readFileSync(file, "utf8")) as { data: RawCard[] };
 
-  const built = new Map<number, TcgCard>();
+  const cards = new Map<number, TcgCard>();
+  // Every printing's own id, from card_images - an alternate art is a
+  // different id for the same card, and the only place it is written down.
+  const altArt = new Map<number, number>();
+
   for (const card of dump.data) {
     const misc = card.misc_info?.[0];
-    built.set(card.id, {
+    cards.set(card.id, {
       name: card.name,
       // Released to the TCG at all: either the format list says so, or there
       // is a real TCG release date on file.
       tcg: Boolean(misc?.formats?.includes("TCG") || isDate(misc?.tcg_date)),
       ban: card.banlist_info?.ban_tcg?.toLowerCase() ?? null,
     });
+    for (const image of card.card_images ?? []) {
+      if (image.id !== card.id) altArt.set(image.id, card.id);
+    }
   }
 
-  index = built;
-  return built;
+  index = { cards, altArt };
+  return index;
 }
 
 function isDate(value: string | undefined): boolean {
@@ -70,19 +79,26 @@ function isDate(value: string | undefined): boolean {
 }
 
 /**
- * The card a written id means. Nexus hands out one id per alternate art, a
- * few above the printed passcode, so a miss walks back down before giving up.
+ * The card a written id means: the passcode itself, then the alternate-art id
+ * the database has on file for it, and only then a walk back down a few ids -
+ * the fallback for a printing card_images does not list, since Nexus hands
+ * out alternate ids close to the passcode.
  */
 function resolve(id: number): number | null {
-  const pool = cards();
-  for (let candidate = id; candidate >= id - ALT_ART_SEARCH; candidate--) {
-    if (pool.has(candidate)) return candidate;
+  const { cards, altArt } = load();
+  if (cards.has(id)) return id;
+
+  const alt = altArt.get(id);
+  if (alt !== undefined) return alt;
+
+  for (let candidate = id - 1; candidate >= id - ALT_ART_SEARCH; candidate--) {
+    if (cards.has(candidate)) return candidate;
   }
   return null;
 }
 
 export function validateTcgDeck(deck: NexusDeckLists): DeckValidationResult {
-  const pool = cards();
+  const { cards: pool } = load();
   const errors: DeckValidationError[] = [];
   const unknown = new Set<number>();
   const copies = new Map<number, number>();

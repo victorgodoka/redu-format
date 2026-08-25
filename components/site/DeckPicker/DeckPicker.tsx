@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import Button from "@/components/ui/Button";
 import FallbackImage from "@/components/ui/FallbackImage";
 import { CARD_ART } from "@/lib/banlist";
@@ -55,6 +55,23 @@ export default function DeckPicker({
   const firstPlayable = rows.find((row) => row.playable)?.deck;
   const preselected = rows.find((row) => row.deck.id === selectedDeckId && row.playable)?.deck ?? firstPlayable;
 
+  // Selection is state, not just a defaultChecked: filtering re-renders the
+  // list, and the pick has to survive a deck scrolling out of view.
+  const [picked, setPicked] = useState(preselected?.id);
+  const [query, setQuery] = useState("");
+  const [legalOnly, setLegalOnly] = useState(false);
+
+  const term = query.trim().toLowerCase();
+  const visible = rows.filter(
+    (row) =>
+      (!legalOnly || row.playable) && (term === "" || row.deck.name.toLowerCase().includes(term)),
+  );
+  // A pick the filter has hidden is still the pick - say so, rather than
+  // letting someone submit a deck the page is no longer showing them.
+  const hidden = picked && !visible.some((row) => row.deck.id === picked)
+    ? rows.find((row) => row.deck.id === picked)?.deck
+    : undefined;
+
   // Two decks can share a name (e.g. a main build and a testing copy) - a
   // trailing id fragment is the only thing telling them apart in the list.
   const nameCounts = new Map<string, number>();
@@ -67,8 +84,35 @@ export default function DeckPicker({
       <fieldset className={styles.set}>
         <legend className={styles.legend}>Choose the deck you will play</legend>
 
+        <div className={styles.filters}>
+          <input
+            type="search"
+            className={styles.search}
+            placeholder="Filter by deck name"
+            aria-label="Filter by deck name"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+          <label className={styles.toggle}>
+            <input
+              type="checkbox"
+              checked={legalOnly}
+              onChange={(e) => setLegalOnly(e.target.checked)}
+            />
+            <span>Only decks legal for this event</span>
+          </label>
+        </div>
+
+        {hidden ? (
+          <p className={styles.hiddenPick}>
+            Still selected, hidden by the filter: <b>{hidden.name}</b>
+          </p>
+        ) : null}
+
         <ul className={styles.list}>
-          {rows.map(({ deck, problems, playable }) => (
+          {visible.length === 0 ? <li className={styles.empty}>No deck matches this filter.</li> : null}
+
+          {visible.map(({ deck, problems, playable }) => (
             <li key={deck.id}>
               <label
                 className={`${styles.pick}${playable ? "" : ` ${styles.illegal}`}`}
@@ -80,7 +124,8 @@ export default function DeckPicker({
                   name="deckId"
                   value={deck.id}
                   disabled={!playable}
-                  defaultChecked={deck.id === preselected?.id}
+                  checked={deck.id === picked}
+                  onChange={() => setPicked(deck.id)}
                   required
                 />
                 <span className={styles.cover}>

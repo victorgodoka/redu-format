@@ -1,5 +1,6 @@
 import { BANLIST_IDS } from "./banlist.ts";
 import { CARD_LIB } from "./cardLib.ts";
+import { stripRarity } from "./cards.ts";
 import type { NexusDeckLists } from "./nexus-parse.ts";
 
 export type DeckValidationError =
@@ -53,16 +54,7 @@ const BAN_COPIES: Record<string, number> = {
 /** The game's own ceiling for anything the banlist does not mention. */
 export const DEFAULT_COPIES = 3;
 
-/**
- * Dueling Nexus encodes a card's rarity in the high digits of the id
- * (passcode + rarity * 10^11), so the printed passcode is what is left over.
- * Every real passcode is far below the modulus, so this is a no-op for them.
- */
-const RARITY_MODULUS = 100_000_000_000;
-
-export function stripRarity(id: number): number {
-  return id % RARITY_MODULUS;
-}
+export { stripRarity } from "./cards.ts";
 
 /**
  * A deck may never carry the plain passcode of a card that has an errata, nor

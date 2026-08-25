@@ -21,6 +21,46 @@
   color: var(--c-muted);
 }
 
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 18px;
+  margin-bottom: 14px;
+}
+
+.search {
+  flex: 1 1 220px;
+  padding: 10px 14px;
+  border: 1px solid var(--c-line);
+  border-radius: 4px;
+  background: var(--c-panel);
+  color: inherit;
+  font: inherit;
+}
+
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--c-muted);
+  cursor: pointer;
+}
+
+.hiddenPick {
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: var(--c-muted);
+}
+
+.empty {
+  padding: 18px;
+  border: 1px dashed var(--c-line);
+  border-radius: 4px;
+  color: var(--c-muted);
+}
+
 .list {
   display: grid;
   gap: 12px;
