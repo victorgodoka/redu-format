@@ -216,7 +216,10 @@ export async function acceptRedo(slug: string, matchId: string, registrationId: 
   const fresh = await repos().redoRequests.findByAttempt(eligible.attempt.id);
   if (!fresh || !fresh.playerAConsent || !fresh.playerBConsent) return "consented";
 
-  const replacementRoomHash = generateNexusRoomHash();
+  // Same ruleset as the lobby it replaces - see generateNexusRoomHash.
+  const replacementRoomHash = generateNexusRoomHash(
+    (await repos().tournaments.findBySlug(slug))?.banlist,
+  );
   const claimed = await repos().redoRequests.claimAccepted(fresh.id, replacementRoomHash, now);
   if (!claimed) return "consented"; // another concurrent accept already finished this - nothing more for this caller to do.
 

@@ -379,6 +379,7 @@ There is no official API and no key: reads use the player's own token (or the sh
 
 - **Profile and decks** (`get-info.php`): Nexus answers HTTP 200 even for an invalid token, so only the body (`success: true`) decides. Two cache levels: process memory (1 min) and the `nexus_profile_cache` table.
 - **Replays** (`get-replay-info.php`): used to verify duel results automatically. Each tournament has a 5-minute cache/lock in `nexus_fetch_log` — two simultaneous requests never fire two calls.
+- **Duel rooms:** the room hash bit-packs the ruleset, so it is built from the tournament's banlist — REDU opens on DN banlist index 10 under Master Rule 2, TCG on index 0 under Master Rule 5 (`lib/backend/services/nexus-room.ts`). Those indices are positions in DN's own `/assets/data/banlists.json`, not stable ids.
 - **Deck lock:** the registered list is frozen when the tournament starts; on every visit, round and login the deck is compared to what Nexus reports. A deck edited mid-tournament is disqualified automatically, and both the player and moderation are notified.
 
 ### Discord

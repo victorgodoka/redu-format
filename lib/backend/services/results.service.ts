@@ -144,7 +144,14 @@ async function syncMatchDeadlines(tournamentId: string, engine: EngineTournament
     .getMatches()
     .filter((m) => m.isActive())
     .map((m) => m.getId());
-  await repos().matchDeadlines.ensureActiveSince(tournamentId, activeMatchIds, new Date(), () => generateNexusRoomHash());
+  if (activeMatchIds.length === 0) return;
+
+  // The lobby has to open on the tournament's own banlist and Master Rule - a
+  // TCG event opening REDU rooms is a whole round played on the wrong format.
+  const banlist = await repos().tournaments.findBanlistById(tournamentId);
+  await repos().matchDeadlines.ensureActiveSince(tournamentId, activeMatchIds, new Date(), () =>
+    generateNexusRoomHash(banlist),
+  );
 }
 
 /**

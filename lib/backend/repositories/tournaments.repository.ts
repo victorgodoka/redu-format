@@ -2,6 +2,7 @@ import type { Pool, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import {
   DEFAULT_BANLIST,
   isBanlist,
+  type Banlist,
   type DurationMode,
   type EntryFee,
   type Engine,
@@ -157,6 +158,16 @@ export class TournamentsRepository {
       [slug],
     );
     return rows[0]?.id ?? null;
+  }
+
+  /** Just the banlist for a tournament id - what the duel rooms have to be opened on. */
+  async findBanlistById(id: string): Promise<Banlist> {
+    const [rows] = await this.pool.query<RowDataPacket[]>(
+      "SELECT banlist FROM tournaments WHERE id = ? AND deleted_at IS NULL LIMIT 1",
+      [id],
+    );
+    const value = rows[0]?.banlist;
+    return typeof value === "string" && isBanlist(value) ? value : DEFAULT_BANLIST;
   }
 
   /** The slug for an internal id - the reverse of findIdBySlug, for jobs that start from a tournament_id. */

@@ -7,7 +7,25 @@
  * back here, so only the encode half of the original is ported.
  */
 
+import { DEFAULT_BANLIST, type Banlist } from "../../events.ts";
+
 const BASE36_CHARS = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
+/**
+ * What each of our banlists means to Dueling Nexus: its Master Rule, and its
+ * position in DN's own banlist list (`/assets/data/banlists.json`, which the
+ * client fetches and indexes into - the packed value is that index, not a
+ * stable id). Index 0 is "2026.05 TCG" and index 10 is "2012.10 REDU/Wind-Up"
+ * as of this writing.
+ *
+ * ponytail: hardcoded indices. If DN ever inserts a list ahead of one of
+ * these, rooms silently open on the wrong banlist - the fix is to fetch that
+ * JSON and resolve by name, cached, rather than to renumber by hand.
+ */
+const NEXUS_RULESET: Record<Banlist, { banlist: number; masterRule: number }> = {
+  "redu-2012-10": { banlist: 10, masterRule: 2 },
+  "tcg-2026-05": { banlist: 0, masterRule: 5 },
+};
 
 function encodeBase36(input: number): string {
   let result = "";
@@ -20,11 +38,11 @@ function encodeBase36(input: number): string {
   return result;
 }
 
-function serializeBasic(randomness: number): number {
-  // isPrivate=0, isMatch=1, isTag=0, masterRule=2, isCustom=1, isManual=0.
+function serializeBasic(masterRule: number, randomness: number): number {
+  // isPrivate=0, isMatch=1, isTag=0, masterRule (3 bits), isCustom=1, isManual=0.
   let data = 0;
   data += 1 << 1; // isMatch
-  data += 2 << 3; // masterRule 2 (Master Rules 2, 2011)
+  data += masterRule << 3;
   data += 1 << 6; // isCustom
   data += randomness << 8;
   return data;
@@ -38,12 +56,12 @@ function serializeStartingLife(life: number): number {
   return 0;
 }
 
-function serializeCustom(): number {
-  // banlist=10 (2012.10 REDU/Wind-Up), format=1 (TCG), timeLimit=240s,
+function serializeCustom(banlist: number): number {
+  // banlist (5 bits, see NEXUS_RULESET), format=1 (TCG), timeLimit=240s,
   // autoSkipTurn=false, startingLife=8000, startingHand=5, cardsPerDraw=1,
   // allowInvalidDecks=false, doNotShuffleTheDeck=false.
   let data = 0;
-  data += 10 << 0;
+  data += banlist << 0;
   data += 1 << 5;
   data += (240 / 30 - 1) << 8;
   data += serializeStartingLife(8000) << 17;
@@ -54,12 +72,17 @@ function serializeCustom(): number {
 
 /**
  * A fresh room hash for a Dueling Nexus duel link
- * (`https://duelingnexus.com/duel/NA-{hash}`), fixed to REDU's standard
- * ruleset. Every call returns a different hash (a random ~23-bit component
- * keeps room names from colliding), so call it once per match and persist
- * the result rather than regenerating it.
+ * (`https://duelingnexus.com/duel/NA-{hash}`), on the banlist and Master Rule
+ * the tournament runs - a TCG event must not open REDU lobbies. Every call
+ * returns a different hash (a random ~23-bit component keeps room names from
+ * colliding), so call it once per match and persist the result rather than
+ * regenerating it.
  */
-export function generateNexusRoomHash(): string {
+export function generateNexusRoomHash(banlist: Banlist = DEFAULT_BANLIST): string {
+  const ruleset = NEXUS_RULESET[banlist] ?? NEXUS_RULESET[DEFAULT_BANLIST];
   const randomness = Math.floor(Math.random() * 0x800000);
-  return encodeBase36(serializeBasic(randomness)) + encodeBase36(serializeCustom());
+  return (
+    encodeBase36(serializeBasic(ruleset.masterRule, randomness)) +
+    encodeBase36(serializeCustom(ruleset.banlist))
+  );
 }
