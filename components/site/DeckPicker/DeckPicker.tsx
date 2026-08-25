@@ -8,6 +8,7 @@ import { deckLegality, type NexusDeck } from "@/lib/nexus-parse";
 import { describeError, type ValidatedDeck } from "@/lib/validateDecks";
 import { register, type SignupState } from "@/app/events/[slug]/signup/actions";
 import styles from "./DeckPicker.module.css";
+import { normalizeID } from "@/lib/utils";
 
 const initial: SignupState = {};
 
@@ -132,8 +133,8 @@ export default function DeckPicker({
                   {deck.coverId ? (
                     <FallbackImage
                       key={deck.coverId}
-                      src={`${CARD_ART}/${deck.coverId}.jpg`}
-                      fallbackSrc={`${CARD_ART}/${coverFallbackIds[deck.id] ?? deck.coverId}.jpg`}
+                      src={`${CARD_ART}/${normalizeID(deck.coverId)}.jpg`}
+                      fallbackSrc={`${CARD_ART}/${coverFallbackIds[deck.id] ?? normalizeID(deck.coverId)}.jpg`}
                       alt=""
                       width={120}
                       height={120}
