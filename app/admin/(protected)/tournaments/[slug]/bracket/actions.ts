@@ -229,7 +229,7 @@ export async function repairRoundAction(form: FormData) {
     ...(await actor()),
     action: "bracket.repair_round",
     target: slug,
-    detail: `Re-paired round ${result.round} in "${slug}" - voided ${result.voidedMatches} match(es), paired ${result.pairedMatches}`,
+    detail: `Re-paired round ${result.round} in "${slug}" - voided ${result.voidedMatches} match(es), paired ${result.pairedMatches}, added ${result.addedPlayers} late entrant(s)`,
   });
 
   revalidatePath(`/admin/tournaments/${slug}/bracket`);

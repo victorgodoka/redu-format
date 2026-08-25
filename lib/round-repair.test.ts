@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { Manager } from "tournament-organizer/components";
 import type { ExportedTournamentValues } from "tournament-organizer/interfaces";
-import { withoutRound } from "./backend/services/results.service.ts";
+import { withField, withoutRound } from "./backend/services/results.service.ts";
 
 /** A Swiss tournament shaped like the ones startBracket() creates, with no database in sight. */
 function swiss(players: number) {
@@ -133,4 +133,60 @@ test("a correction in the round below is what the fresh pairings are drawn from"
   assert.equal(record.win, 2);
   assert.equal(record.loss, 0);
   assert.equal(repaired.getMatchesByRound(2).length, 4);
+});
+
+/** Registrations as listParticipants() hands them over, for withField(). */
+const signup = (id: string, over: { droppedAt?: string; disqualifiedAt?: string } = {}) => ({
+  id,
+  name: id.toUpperCase(),
+  droppedAt: over.droppedAt ?? null,
+  disqualifiedAt: over.disqualifiedAt ?? null,
+});
+
+test("a duelist who registered after the bracket was generated joins the re-paired round", () => {
+  const engine = swiss(8);
+  const values = engine.getValues() as ExportedTournamentValues;
+
+  // p9 signed up after startBracket() froze the field, so the engine has never
+  // heard of them.
+  const registrations = [...Array.from({ length: 8 }, (_, i) => signup(`p${i + 1}`)), signup("p9")];
+  const repaired = reload(withField(withoutRound(values, 1), registrations));
+
+  assert.equal(repaired.getPlayers().length, 9);
+  repaired.nextRound();
+
+  const seats = repaired.getMatchesByRound(1).flatMap((m) => [m.getPlayer1().id, m.getPlayer2().id]);
+  assert.ok(seats.includes("p9"), "the late entry has to be in the draw");
+  // Odd field: the engine hands someone a bye rather than dropping them.
+  assert.equal(seats.filter((id) => id !== null).length, 9);
+});
+
+test("drops and disqualifications are not dragged back into the field", () => {
+  const engine = swiss(8);
+  const values = engine.getValues() as ExportedTournamentValues;
+
+  const registrations = [
+    ...Array.from({ length: 8 }, (_, i) => signup(`p${i + 1}`)),
+    signup("p9", { droppedAt: "2026-01-01T00:00:00Z" }),
+    signup("p10", { disqualifiedAt: "2026-01-01T00:00:00Z" }),
+  ];
+
+  const field = withField(withoutRound(values, 1), registrations);
+  assert.equal(field.players.length, 8);
+  assert.equal(field.players.some((p) => p.id === "p9" || p.id === "p10"), false);
+});
+
+test("players already in the bracket keep their record when the field is synced", () => {
+  const engine = swiss(8);
+  playRound(engine);
+  engine.nextRound();
+
+  const values = engine.getValues() as ExportedTournamentValues;
+  const registrations = [...Array.from({ length: 8 }, (_, i) => signup(`p${i + 1}`)), signup("p9")];
+  const field = withField(withoutRound(values, 2), registrations);
+
+  // Round 1 records survive; only the newcomer starts empty.
+  for (const player of field.players) {
+    assert.equal(player.matches.length, player.id === "p9" ? 0 : 1);
+  }
 });

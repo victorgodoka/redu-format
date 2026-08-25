@@ -891,7 +891,44 @@ export async function enterMatchResult(
  * match, it's settled first (a real loss for them, exactly like a round-
  * deadline no-show) before they're deactivated for every round after it.
  */
-export type RoundRepair = { round: number; voidedMatches: number; pairedMatches: number };
+export type RoundRepair = {
+  round: number;
+  voidedMatches: number;
+  pairedMatches: number;
+  /** Registrations that existed but had never been in the bracket - added by this repair. */
+  addedPlayers: number;
+};
+
+/**
+ * The field as the registration list has it, not as the bracket froze it at
+ * start. A duelist registered (or added by an admin) after the bracket was
+ * generated is not in the engine at all, so a plain re-pair would draw the
+ * round without them - which is exactly the case a late entry is repaired for.
+ *
+ * Drops and disqualifications are not added back: they left on purpose.
+ * Players already in the bracket are left untouched, records and all.
+ *
+ * Pure, and exported for the test alongside withoutRound().
+ */
+export function withField(
+  values: ExportedTournamentValues,
+  registrations: { id: string; name: string; droppedAt: string | null; disqualifiedAt: string | null }[],
+): ExportedTournamentValues {
+  const known = new Set(values.players.map((p) => p.id));
+  const missing = registrations.filter(
+    (r) => !known.has(r.id) && !r.droppedAt && !r.disqualifiedAt,
+  );
+  if (missing.length === 0) return values;
+
+  return {
+    ...values,
+    // Same shape the engine's own createPlayer() produces for a fresh entrant.
+    players: [
+      ...values.players,
+      ...missing.map((r) => ({ id: r.id, name: r.name, active: true, value: 0, matches: [], meta: {} })),
+    ],
+  };
+}
 
 /**
  * Engine state as it stood *before* `round` was paired: the round's matches
@@ -937,6 +974,12 @@ export function withoutRound(
  * would have to be unwound in step. Filtering both and reloading is the only
  * way to land on a state the engine itself would have produced.
  *
+ * Anyone registered since the bracket was generated is added to the field
+ * first - a late entry is one of the main reasons to re-pair at all. Note that
+ * they join with no record, so re-pairing a later round hands them a clean
+ * slate for rounds they never played; that is the tournament organizer's call
+ * to make, not something this can fabricate.
+ *
  * The deck lock is deliberately left alone: the round keeps the lists it was
  * frozen under when it was first paired. Re-freezing here would quietly adopt
  * whatever a player has edited since - the opposite of what the lock is for.
@@ -968,7 +1011,13 @@ export async function repairRound(slug: string): Promise<RoundRepair> {
 
   const values = engine.getValues();
   const voidedIds = values.matches.filter((m) => m.round === round).map((m) => m.id);
-  const repaired = new Manager().loadTournament(withoutRound(values, round));
+
+  // Late entries join here: whoever is on the registration list is who the
+  // round is drawn from, which is the whole point of drawing it again.
+  const registrations = await repos().registrations.findByTournamentSlug(slug);
+  const withLateEntries = withField(withoutRound(values, round), registrations);
+  const addedPlayers = withLateEntries.players.length - values.players.length;
+  const repaired = new Manager().loadTournament(withLateEntries);
 
   // Same call the tournament makes on its own between rounds, so the fresh
   // pairings come out of the engine's own logic rather than anything here.
@@ -1001,7 +1050,7 @@ export async function repairRound(slug: string): Promise<RoundRepair> {
     }
   }
 
-  return { round, voidedMatches: voidedIds.length, pairedMatches: paired.length };
+  return { round, voidedMatches: voidedIds.length, pairedMatches: paired.length, addedPlayers };
 }
 
 export async function dropFromStartedTournament(slug: string, registrationId: string): Promise<void> {

@@ -184,7 +184,7 @@ export default async function BracketPage({
                       action={repairRoundAction}
                       hidden={{ slug }}
                       label={`Re-pair round ${view.round}`}
-                      confirmText={`Re-pair round ${view.round}? Every match in it is voided - results, reports and duel rooms included - and the round is drawn again from the current standings. Swiss pairings are not deterministic, so who plays whom will likely change even if nothing else did. Players are notified. This cannot be undone.`}
+                      confirmText={`Re-pair round ${view.round}? Every match in it is voided - results, reports and duel rooms included - and the round is drawn again from the current standings, including anyone who registered after the bracket was generated. Swiss pairings are not deterministic, so who plays whom will likely change even if nothing else did. Players are notified. This cannot be undone.`}
                     />
                   }
                 />
