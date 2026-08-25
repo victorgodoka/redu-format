@@ -84,6 +84,11 @@ export async function forgetNexusToken(playerId: string): Promise<void> {
   await new PlayersRepository(getPool()).clearNexusToken(playerId);
 }
 
+/** The account behind a Nexus name, for the admin forms that pick a duelist by name. */
+export async function findPlayerByName(name: string) {
+  return new PlayersRepository(getPool()).findByName(name);
+}
+
 /** Nexus names for the admin broadcast form's autocomplete. */
 export async function listPlayerNames(limit = 500): Promise<string[]> {
   return new PlayersRepository(getPool()).listNames(limit);

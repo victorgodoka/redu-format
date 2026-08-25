@@ -274,8 +274,9 @@ Tournament editing, the prizing panel (when enabled) and the destructive actions
 
 - **Reads:** `registrations` (joined with `tournaments`), bracket state.
 - **Writes:** `registrations`, `notifications`, `audit_logs`.
-- **Actions:** add a manual participant (name + deck uuid), change/override a deck, confirm or contest payment, remove, disqualify (notifies the player) and reinstate.
-- **Detail:** a manual entry has no linked account — it gets no notification and no prize code, because there is no inbox to send to.
+- **Actions:** add a participant (name + deck uuid), change/override a deck, confirm or contest payment, remove, disqualify (notifies the player) and reinstate.
+- **Adding a duelist by hand:** the name field autocompletes against registered players. Picking one registers them exactly as their own signup would have — `player_id`, identity snapshot and `deck_id` — so the deck lock, inbox, prize codes and leaderboard all treat them as that account. The deck UUID is still typed in, and it is verified against Nexus before anything is stored.
+- **Detail:** a name that matches no account still goes in, as a plain entry — it just has no inbox, so it receives no notification and no prize code.
 
 ### `/admin/tournaments/[slug]/bracket`
 

@@ -117,12 +117,37 @@ export class RegistrationsRepository {
     return rows[0] ? rowToParticipant(rows[0]) : null;
   }
 
-  /** Resolves tournament_id from the slug in the same statement; 0 affected rows means the slug doesn't exist. */
-  async insert(id: string, slug: string, input: { name: string; deckName: string }): Promise<boolean> {
+  /**
+   * Resolves tournament_id from the slug in the same statement; 0 affected rows
+   * means the slug doesn't exist.
+   *
+   * `player` links the registration to a real account, which is what an admin
+   * adding a registered duelist by name produces: notifications, prize codes,
+   * the leaderboard and the deck lock all key off it. Absent, the row is a
+   * name on a list and nothing more - which is still valid for an entrant who
+   * has no account here.
+   */
+  async insert(
+    id: string,
+    slug: string,
+    input: {
+      name: string;
+      deckName: string;
+      player?: { id: string; identityKey: string; deckId: string };
+    },
+  ): Promise<boolean> {
     const [result] = await this.pool.query<ResultSetHeader>(
-      `INSERT INTO registrations (id, tournament_id, display_name, deck_name)
-       SELECT ?, id, ?, ? FROM tournaments WHERE slug = ?`,
-      [id, input.name, input.deckName, slug],
+      `INSERT INTO registrations (id, tournament_id, player_id, nexus_identity_key_snapshot, deck_id, display_name, deck_name)
+       SELECT ?, id, ?, ?, ?, ?, ? FROM tournaments WHERE slug = ?`,
+      [
+        id,
+        input.player?.id ?? null,
+        input.player?.identityKey ?? null,
+        input.player?.deckId ?? null,
+        input.name,
+        input.deckName,
+        slug,
+      ],
     );
     return result.affectedRows > 0;
   }

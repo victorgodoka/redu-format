@@ -10,6 +10,7 @@ import {
   reinstateRegistration,
 } from "@/lib/backend/services/results.service";
 import { getAdminSession } from "@/lib/auth/session";
+import { findPlayerByName } from "@/lib/backend/services/player.service";
 import { NEXUS_DECK_INFO_URL } from "@/lib/nexus-parse";
 import { isHttpUrl } from "@/lib/safe-url";
 import {
@@ -63,6 +64,14 @@ function errorRedirect(slug: string, message: string): never {
   redirect(`/admin/tournaments/${slug}/participants?error=${encodeURIComponent(message)}`);
 }
 
+/**
+ * Adds a registration by hand. When the name matches a registered duelist -
+ * which is what the form's autocomplete is for - the registration is linked to
+ * that account, exactly as their own signup would have been: same identity
+ * snapshot, same deck id, so the deck lock, the inbox, prize codes and the
+ * leaderboard all treat them as the player they are. A name nobody here owns
+ * still goes in as a plain entry, which is all it can be.
+ */
 export async function addParticipantAction(form: FormData) {
   const slug = String(form.get("slug") ?? "");
   const name = String(form.get("name") ?? "").trim();
@@ -72,12 +81,33 @@ export async function addParticipantAction(form: FormData) {
   const check = await verifyDeckUuid(deckUuid);
   if (!check.ok) errorRedirect(slug, check.error);
 
-  await addParticipant(slug, { name, deckName: deckUuid });
+  const player = await findPlayerByName(name);
+
+  try {
+    await addParticipant(slug, {
+      // The account's own Nexus name, not whatever casing was typed.
+      name: player?.nexusName ?? name,
+      deckName: deckUuid,
+      player: player
+        ? { id: player.id, identityKey: player.nexusIdentityKey, deckId: deckUuid }
+        : undefined,
+    });
+  } catch (err) {
+    // uq_registrations_tournament_player: the same account cannot hold two
+    // registrations in one tournament. Saying so beats a 500.
+    if (err instanceof Error && err.message.includes("Duplicate")) {
+      errorRedirect(slug, `${player?.nexusName ?? name} is already registered for this tournament.`);
+    }
+    errorRedirect(slug, err instanceof Error ? err.message : "Could not add that participant.");
+  }
+
   await recordAction({
     ...(await actor()),
     action: "participant.add",
     target: slug,
-    detail: `Added participant "${name}" to "${slug}" with deck ${deckUuid}`,
+    detail: player
+      ? `Added registered duelist "${player.nexusName}" to "${slug}" with deck ${deckUuid}`
+      : `Added participant "${name}" (no linked account) to "${slug}" with deck ${deckUuid}`,
   });
 
   revalidatePath(`/admin/tournaments/${slug}/participants`);

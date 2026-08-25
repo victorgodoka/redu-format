@@ -6,6 +6,7 @@ import Button from "@/components/ui/Button";
 import EmptyState from "@/components/ui/EmptyState";
 import FormField from "@/components/ui/FormField";
 import Input from "@/components/ui/Input";
+import { listPlayerNames } from "@/lib/backend/services/player.service";
 import { hasBracket } from "@/lib/backend/services/results.service";
 import { getTournament, listParticipants } from "@/lib/tournaments";
 import {
@@ -36,7 +37,11 @@ export default async function ParticipantsPage({
   const tournament = await getTournament(slug);
   if (!tournament) notFound();
 
-  const [participants, started] = await Promise.all([listParticipants(slug), hasBracket(slug)]);
+  const [participants, started, playerNames] = await Promise.all([
+    listParticipants(slug),
+    hasBracket(slug),
+    listPlayerNames(),
+  ]);
   const isPaid = tournament.entry.type === "paid";
 
   return (
@@ -54,8 +59,19 @@ export default async function ParticipantsPage({
 
       <form action={addParticipantAction} className="form form--flex">
         <input type="hidden" name="slug" value={slug} />
-        <FormField label="Duelist name" htmlFor="name">
-          <Input id="name" name="name" type="text" required />
+        <FormField
+          label="Duelist name"
+          htmlFor="name"
+          hint="Pick a registered duelist to register them exactly as their own signup would - identity, inbox, prizing and deck lock all included. A name nobody here owns still goes in, as a plain entry."
+        >
+          {/* Plain datalist: the browser does the matching, so the page stays
+              a server component and there is no dropdown to build. */}
+          <Input id="name" name="name" type="text" list="registered-players" autoComplete="off" required />
+          <datalist id="registered-players">
+            {playerNames.map((playerName) => (
+              <option key={playerName} value={playerName} />
+            ))}
+          </datalist>
         </FormField>
         <FormField label="Deck UUID" htmlFor="deckName">
           <Input id="deckName" name="deckName" type="text" placeholder="Dueling Nexus deck UUID" required />

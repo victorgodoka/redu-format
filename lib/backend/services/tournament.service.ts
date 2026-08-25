@@ -161,16 +161,28 @@ export async function listPublicParticipants(
   }));
 }
 
+/**
+ * Adds a registration by hand. `player` makes it a registration for a real
+ * account - the same thing a public signup produces, minus the deck snapshot,
+ * which the round-one deck lock fills in from Nexus anyway. Without it the row
+ * is just a name and a deck, which is all an entrant with no account here can
+ * be given.
+ */
 export async function addParticipant(
   slug: string,
-  input: { name: string; deckName: string },
+  input: {
+    name: string;
+    deckName: string;
+    player?: { id: string; identityKey: string; deckId: string };
+  },
 ): Promise<Participant> {
   const id = crypto.randomUUID();
   const ok = await repos().registrations.insert(id, slug, input);
   if (!ok) throw new Error(`Tournament "${slug}" does not exist`);
   return {
     id,
-    ...input,
+    name: input.name,
+    deckName: input.deckName,
     paymentStatus: "pending",
     proofUrl: null,
     paymentBy: null,
