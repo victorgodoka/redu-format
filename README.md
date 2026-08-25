@@ -203,11 +203,13 @@ pnpm start
 
 Put the app behind HTTPS. In production (`NODE_ENV=production`) cookies are issued with `secure: true` — over plain HTTP the browser drops them and login never completes.
 
+**The build itself does not touch the database.** Every route is server-rendered on demand (each one reads the session cookie), and `/sitemap.xml` is explicitly `force-dynamic` for the same reason, so `next build` never queries and a database that is down or out of connections cannot fail a deploy. `pnpm db:migrate` does need it, which is why it is a separate step.
+
 ### Platform notes
 
 - **Vercel:** `vercel.json` already declares the cron (`0 12 * * *`) and Vercel injects the `Authorization` header from `CRON_SECRET`. The Hobby plan allows one run a day — enough, because the cron is a *backstop*, not the main clock (see [Rounds and deadlines](#rounds-and-deadlines)).
 - **Docker / VPS / managed Node:** works with `next start` behind a reverse proxy. If you use `output: "standalone"`, confirm `lib/cardinfo.json` was copied along. Point the system cron at the endpoint above.
-- **Horizontal scaling:** safe. There is no in-process state that needs sharing — profile cache, rate limit and fetch lock all live in the database. The connection pool is deliberately small (3 per instance) precisely because of many concurrent instances.
+- **Horizontal scaling:** safe. There is no in-process state that needs sharing — profile cache, rate limit and fetch lock all live in the database. The connection pool is deliberately small (3 per instance, at most 1 kept idle for 30s) precisely because many instances share one database's `max_connections`. If you ever see `ER_CON_COUNT_ERROR`, count the clients attached to that database before raising the pool.
 
 ## Authentication and sessions
 

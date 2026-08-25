@@ -11,7 +11,18 @@ export function getPool(): Pool {
     // multiplied across many concurrent instances can blow past the DB's
     // max_connections; a request here is typically I/O-bound and short-lived,
     // so a handful of connections per instance is plenty.
-    pool = createPool({ uri, dateStrings: true, connectionLimit: 3 });
+    //
+    // maxIdle/idleTimeout are the other half of that: without them the pool
+    // holds every connection it ever opened for the life of the instance, so
+    // an instance that served one burst keeps three connections parked while
+    // some other instance is being refused with ER_CON_COUNT_ERROR.
+    pool = createPool({
+      uri,
+      dateStrings: true,
+      connectionLimit: 3,
+      maxIdle: 1,
+      idleTimeout: 30_000,
+    });
   }
   return pool;
 }

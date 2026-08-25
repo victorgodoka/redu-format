@@ -3,8 +3,19 @@ import { FEATURED_EVENT, isFinished } from "@/lib/events";
 import { SITE_URL } from "@/lib/site";
 import { listTournaments } from "@/lib/tournaments";
 
+/**
+ * Built per request, not at build time. Every other route pulls in SiteHeader
+ * (which reads the session cookie) and is dynamic already, so this was the one
+ * page Next prerendered - which made `next build` depend on the database being
+ * reachable, and fail the whole deploy when it was not. It also means a new
+ * tournament shows up here without a rebuild.
+ */
+export const dynamic = "force-dynamic";
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const tournaments = await listTournaments();
+  // A sitemap missing the tournaments is worth far more than a 500: crawlers
+  // still get the fixed pages, and the next crawl picks the rest back up.
+  const tournaments = await listTournaments().catch(() => []);
 
   return [
     { url: SITE_URL, changeFrequency: "weekly", priority: 1 },
