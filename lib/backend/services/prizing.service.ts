@@ -26,17 +26,25 @@ export async function listPrizes(slug: string): Promise<PrizeRow[]> {
 /**
  * Codes can be added and removed for as long as the tournament is still
  * scheduled or running - once it is finished the list is what gets mailed out,
- * so it stops moving.
+ * so it stops moving. Saved as a batch, since that is how the form collects
+ * them; the tournament's state is checked once for the whole batch.
  */
-export async function addPrize(slug: string, tier: PrizeTier, code: string): Promise<void> {
+export async function addPrizes(
+  slug: string,
+  entries: { tier: PrizeTier; code: string }[],
+): Promise<number> {
   const { prizes, tournaments } = repos();
   const event = await tournaments.findBySlug(slug);
   if (!event) throw new Error(`Tournament "${slug}" does not exist`);
   if (event.status === "finished" || event.status === "cancelled") {
     throw new Error("Prizing is closed for this tournament.");
   }
-  const id = await tournaments.findIdBySlug(slug);
-  await prizes.insert(crypto.randomUUID(), id!, tier, code);
+
+  const id = (await tournaments.findIdBySlug(slug))!;
+  for (const entry of entries) {
+    await prizes.insert(crypto.randomUUID(), id, entry.tier, entry.code);
+  }
+  return entries.length;
 }
 
 export async function removePrize(slug: string, prizeId: string): Promise<boolean> {

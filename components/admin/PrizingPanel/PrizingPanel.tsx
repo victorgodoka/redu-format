@@ -1,30 +1,27 @@
 import AdminList, { AdminRow } from "@/components/admin/AdminList";
 import DeleteButton from "@/components/admin/DeleteButton";
 import Badge from "@/components/ui/Badge";
-import Button from "@/components/ui/Button";
 import EmptyState from "@/components/ui/EmptyState";
-import FormField from "@/components/ui/FormField";
-import Input from "@/components/ui/Input";
-import Select from "@/components/ui/Select";
 import { formatDate, formatTime } from "@/lib/events";
 import type { PrizeRow } from "@/lib/backend/services/prizing.service";
-import { PRIZE_TIER_ORDER, PRIZE_TIERS } from "@/lib/prizing";
+import { PRIZE_TIERS } from "@/lib/prizing";
 import type { TournamentStatus } from "@/lib/tournaments";
+import PrizeCodeFields from "./PrizeCodeFields";
 
 type FormAction = (form: FormData) => void | Promise<void>;
 
 /**
- * The prize codes for one tournament: added one at a time while it is still
+ * The prize codes for one tournament: entered in a batch while it is still
  * scheduled or running, then mailed out in a single pass once it is finished.
- * Every control here is a plain form, so the whole panel stays a server
- * component (the confirm dialog on the buttons is the only client bit).
+ * Only the code entry needs client state (rows come and go); the list and the
+ * buttons stay server-rendered.
  */
 export default function PrizingPanel({
   slug,
   status,
   prizes,
   prizesSentAt,
-  addPrizeAction,
+  addPrizesAction,
   removePrizeAction,
   sendPrizesAction,
 }: {
@@ -32,7 +29,7 @@ export default function PrizingPanel({
   status: TournamentStatus;
   prizes: PrizeRow[];
   prizesSentAt: string | null;
-  addPrizeAction: FormAction;
+  addPrizesAction: FormAction;
   removePrizeAction: FormAction;
   sendPrizesAction: FormAction;
 }) {
@@ -43,26 +40,7 @@ export default function PrizingPanel({
     <div className="section__content" style={{ marginTop: "24px" }}>
       <h2 className="section__subtitle">Prizing</h2>
 
-      {open ? (
-        <form action={addPrizeAction} className="form form--flex">
-          <input type="hidden" name="slug" value={slug} />
-          <FormField label="Redemption code" htmlFor="code">
-            <Input id="code" name="code" type="text" autoComplete="off" required />
-          </FormField>
-          <FormField label="Prize type" htmlFor="tier">
-            <Select id="tier" name="tier" defaultValue="participation">
-              {PRIZE_TIER_ORDER.map((tier) => (
-                <option key={tier} value={tier}>
-                  {PRIZE_TIERS[tier].label}
-                </option>
-              ))}
-            </Select>
-          </FormField>
-          <Button variant="solid" type="submit">
-            Add code
-          </Button>
-        </form>
-      ) : null}
+      {open ? <PrizeCodeFields slug={slug} action={addPrizesAction} /> : null}
 
       <p className="form__hint">
         Winner is 1st, Runner-up is 2nd, and each Top X covers the places down to the next tier

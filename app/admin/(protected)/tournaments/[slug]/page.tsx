@@ -11,7 +11,7 @@ import Notice from "@/components/ui/Notice";
 import { listPrizes } from "@/lib/backend/services/prizing.service";
 import { getTournament } from "@/lib/tournaments";
 import {
-  addPrizeAction,
+  addPrizesAction,
   cancelTournamentAction,
   deleteTournamentAction,
   removePrizeAction,
@@ -64,7 +64,7 @@ export default async function EditTournamentPage({
           status={tournament.status}
           prizes={prizes}
           prizesSentAt={tournament.prizesSentAt ?? null}
-          addPrizeAction={addPrizeAction}
+          addPrizesAction={addPrizesAction}
           removePrizeAction={removePrizeAction}
           sendPrizesAction={sendPrizesAction}
         />

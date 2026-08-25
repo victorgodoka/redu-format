@@ -18,8 +18,8 @@ import {
   type Engine,
   type Structure,
 } from "@/lib/events";
-import { isPrizeTier } from "@/lib/prizing";
-import { addPrize, removePrize, sendPrizes } from "@/lib/backend/services/prizing.service";
+import { isPrizeTier, type PrizeTier } from "@/lib/prizing";
+import { addPrizes, removePrize, sendPrizes } from "@/lib/backend/services/prizing.service";
 import {
   cancelTournament,
   createTournament,
@@ -287,22 +287,30 @@ export async function deleteTournamentAction(form: FormData) {
 }
 
 /**
- * Adds one redemption code. The form posts a code and a tier at a time, which
- * is also how the prize list reads back - a tier can hold any number of codes.
- * The service refuses once the tournament is finished.
+ * Saves a batch of redemption codes. The form posts one `code` and one `tier`
+ * per row, so the two arrays are paired back up by position. Blank rows are
+ * dropped rather than rejected - an empty extra row is how the form looks
+ * right after someone clicks "+". The service refuses once the tournament is
+ * finished.
  */
-export async function addPrizeAction(form: FormData) {
+export async function addPrizesAction(form: FormData) {
   const slug = String(form.get("slug") ?? "");
-  const code = String(form.get("code") ?? "").trim();
-  const tier = String(form.get("tier") ?? "");
+  const codes = form.getAll("code").map((v) => String(v).trim());
+  const tiers = form.getAll("tier").map((v) => String(v));
 
-  if (!code) redirect(`/admin/tournaments/${slug}?error=${encodeURIComponent("Enter a code.")}`);
-  if (!isPrizeTier(tier)) {
-    redirect(`/admin/tournaments/${slug}?error=${encodeURIComponent("Pick a prize tier.")}`);
+  const entries = codes
+    .map((code, i) => ({ code, tier: tiers[i] ?? "" }))
+    .filter((entry) => entry.code !== "");
+
+  if (entries.length === 0) {
+    redirect(`/admin/tournaments/${slug}?error=${encodeURIComponent("Enter at least one code.")}`);
+  }
+  if (!entries.every((entry) => isPrizeTier(entry.tier))) {
+    redirect(`/admin/tournaments/${slug}?error=${encodeURIComponent("Pick a prize type for every code.")}`);
   }
 
   try {
-    await addPrize(slug, tier, code);
+    await addPrizes(slug, entries as { tier: PrizeTier; code: string }[]);
   } catch (error) {
     redirect(`/admin/tournaments/${slug}?error=${encodeURIComponent(message(error))}`);
   }
@@ -311,7 +319,7 @@ export async function addPrizeAction(form: FormData) {
     ...(await actor()),
     action: "prize.add",
     target: slug,
-    detail: `Added a ${tier} prize code`,
+    detail: `Added ${entries.length} prize code(s): ${entries.map((e) => e.tier).join(", ")}`,
   });
 
   revalidatePath(`/admin/tournaments/${slug}`);
