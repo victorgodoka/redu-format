@@ -209,8 +209,7 @@ export function describeError(error: DeckValidationError): string {
       return `${error.cardName} has an errata: use card ${error.errataId}, not ${error.cardId}`;
     case "not-tcg":
       return `${error.cardName} is not legal in the TCG`;
-    // Copy as specified by the tournament staff, in Portuguese.
     case "unknown":
-      return `Esses IDs de carta não foram achadas: ${error.cardIds.join(", ")}. Edite seu deck e/ou verifique artes alternativas e avise a moderação`;
+      return `These card IDs were not found: ${error.cardIds.join(", ")}. Edit your deck and/or check for alternate art, and notify the moderation team.`;
   }
 }
