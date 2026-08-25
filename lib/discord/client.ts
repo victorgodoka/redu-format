@@ -79,6 +79,16 @@ export async function getCurrentUser(
   });
 }
 
+/**
+ * Absolute CDN url for a user's avatar, or null when they never set one (the
+ * default silhouette is Discord's, and nothing here renders it - players are
+ * shown by their Nexus avatar).
+ */
+export function avatarUrl(user: DiscordUser): string | null {
+  if (!user.avatar) return null;
+  return `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png?size=128`;
+}
+
 export async function getGuildMember(
   userId: string,
 ): Promise<DiscordGuildMember> {

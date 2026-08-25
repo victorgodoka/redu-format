@@ -1,8 +1,12 @@
 import { createHash } from "node:crypto";
 import { getPool } from "../db/client.ts";
+import {
+  DiscordAccountsRepository,
+  type DiscordAccount,
+} from "../repositories/discord-accounts.repository.ts";
 import { PlayersRepository, type PlayerProfile } from "../repositories/players.repository.ts";
 
-export type { PlayerProfile };
+export type { DiscordAccount, PlayerProfile };
 
 /**
  * sha256 of the Nexus token - the stable-ish id a registration snapshots at
@@ -49,6 +53,16 @@ export async function resolvePlayerId(token: string, profile: PlayerProfile): Pr
   const id = crypto.randomUUID();
   await repo.insert(id, key, profile);
   return id;
+}
+
+/**
+ * Saves what Discord says about whoever just signed in. Kept for the record -
+ * support, moderation, and knowing an account exists at all before it has a
+ * Nexus token behind it. Nothing player-facing renders it: duelists are always
+ * shown by their Dueling Nexus name and avatar.
+ */
+export async function rememberDiscordAccount(account: DiscordAccount): Promise<void> {
+  await new DiscordAccountsRepository(getPool()).upsert(account);
 }
 
 /** The player behind a Discord account, or null if that account has never linked a Nexus token. */

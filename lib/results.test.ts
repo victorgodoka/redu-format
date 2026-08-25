@@ -153,7 +153,8 @@ test("full swiss + top cut lifecycle: start, play every round, complete, leaderb
 
   // Leaderboard only ever includes players linked to a real account - none of these four are.
   const leaderboard = await getLeaderboard();
-  assert.deepEqual(leaderboard, []);
+  assert.deepEqual(leaderboard.rows, []);
+  assert.equal(leaderboard.total, 0);
 });
 
 test("swiss with an odd number of players auto-assigns a bye each round, worth an automatic win", async () => {

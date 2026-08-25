@@ -43,6 +43,8 @@ export type DiscordIdentity = {
   username: string;
   /** global_name, falling back to the handle. */
   displayName: string;
+  /** Discord CDN avatar, null when they never set one. Stored, not shown - see rememberDiscordAccount. */
+  avatar?: string | null;
 };
 
 /**

@@ -1,8 +1,12 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { establishPublicSession, setDiscordSession } from "@/lib/auth";
-import { findPlayerByDiscordId, forgetNexusToken } from "@/lib/backend/services/player.service";
-import { exchangeCode, getCurrentUser } from "@/lib/discord/client";
+import {
+  findPlayerByDiscordId,
+  forgetNexusToken,
+  rememberDiscordAccount,
+} from "@/lib/backend/services/player.service";
+import { avatarUrl, exchangeCode, getCurrentUser } from "@/lib/discord/client";
 import { discordConfig } from "@/lib/discord/config";
 import { PLAYER_NEXT_COOKIE, PLAYER_STATE_COOKIE } from "@/lib/auth/state";
 import { safeNext } from "@/lib/safe-next";
@@ -39,7 +43,17 @@ export async function GET(request: Request) {
       userId: user.id,
       username: user.username,
       displayName: user.global_name ?? user.username,
+      avatar: avatarUrl(user),
     };
+
+    // Recorded on every sign-in, so a renamed handle or a new avatar does not
+    // leave a stale row behind.
+    await rememberDiscordAccount({
+      discordUserId: discord.userId,
+      username: discord.username,
+      displayName: discord.displayName,
+      avatarUrl: discord.avatar,
+    });
 
     // A token linked on an earlier visit signs them straight back in. If Nexus
     // has since rejected it, it is dropped here rather than left to fail again

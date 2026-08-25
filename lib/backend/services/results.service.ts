@@ -7,7 +7,12 @@ import { DuelSlotsRepository } from "../repositories/duel-slots.repository.ts";
 import { MatchDeadlinesRepository, type MatchTracking } from "../repositories/match-deadlines.repository.ts";
 import { MatchFlagsRepository, type MatchFlag } from "../repositories/match-flags.repository.ts";
 import { MatchReportsRepository, type MatchReport, type MatchResult } from "../repositories/match-reports.repository.ts";
-import { PlacingsRepository, type Placing } from "../repositories/placings.repository.ts";
+import {
+  PlacingsRepository,
+  type LeaderboardRow,
+  type MatchRecord,
+  type Placing,
+} from "../repositories/placings.repository.ts";
 import { TournamentBracketsRepository } from "../repositories/tournament-brackets.repository.ts";
 import { TournamentsRepository } from "../repositories/tournaments.repository.ts";
 import { RegistrationsRepository } from "../repositories/registrations.repository.ts";
@@ -1209,11 +1214,20 @@ export async function completeBracket(slug: string): Promise<void> {
     place: index + 1,
     points: r.points,
     rankingPoints: rankingPointsForPlace(index + 1),
+    ...matchRecord(engine, r.registrationId),
   }));
 
   await repos().placings.replaceForTournament(tournamentId, placings);
   await persistEngine(tournamentId, engine);
   await repos().tournaments.markFinished(tournamentId, new Date().toISOString());
+}
+
+/** What a player did across one tournament, straight off the persisted bracket. */
+function matchRecord(engine: EngineTournament, registrationId: string): MatchRecord {
+  const matches = engine.getPlayers().find((p) => p.getId() === registrationId)?.getMatches() ?? [];
+  const wins = matches.filter((m) => m.win > m.loss).length;
+  const losses = matches.filter((m) => m.loss > m.win).length;
+  return { wins, losses, draws: matches.length - wins - losses };
 }
 
 export async function getPlacings(slug: string) {
@@ -1246,10 +1260,7 @@ export async function getPlacingsWithTiebreak(slug: string): Promise<PlacingWith
   if (!engine) return placings.map((p) => ({ ...p, wins: 0, losses: 0, draws: 0, omw: 0, oomw: 0 }));
 
   return placings.map((p) => {
-    const matches = engine.getPlayers().find((pl) => pl.getId() === p.registrationId)?.getMatches() ?? [];
-    const wins = matches.filter((m) => m.win > m.loss).length;
-    const losses = matches.filter((m) => m.loss > m.win).length;
-    const draws = matches.length - wins - losses;
+    const { wins, losses, draws } = matchRecord(engine, p.registrationId);
 
     const opponentIds = opponentsOf(engine, p.registrationId);
     const omw = avgMatchWinPercent(engine, opponentIds);
@@ -1261,8 +1272,50 @@ export async function getPlacingsWithTiebreak(slug: string): Promise<PlacingWith
   });
 }
 
-export async function getLeaderboard(limit = 50) {
-  return repos().placings.leaderboard(limit);
+export const LEADERBOARD_PAGE_SIZE = 20;
+
+/**
+ * One page of the ranking, newest records included: placings frozen before the
+ * match record was stored are filled in on the way past (see backfillRecords),
+ * which happens at most once per tournament.
+ */
+export async function getLeaderboard(
+  page = 1,
+  pageSize = LEADERBOARD_PAGE_SIZE,
+): Promise<{ rows: LeaderboardRow[]; page: number; pages: number; total: number }> {
+  await backfillRecords();
+
+  const { placings } = repos();
+  const total = await placings.countRanked();
+  const pages = Math.max(1, Math.ceil(total / pageSize));
+  const current = Math.min(Math.max(1, page), pages);
+
+  return {
+    rows: await placings.leaderboard(pageSize, (current - 1) * pageSize),
+    page: current,
+    pages,
+    total,
+  };
+}
+
+/**
+ * Fills in wins/losses/draws for placings that were frozen before those were
+ * recorded, reading them back out of the stored bracket. Self-terminating: a
+ * tournament is only ever seen here once, and one whose bracket has gone
+ * (nothing to recompute from) is written as an empty record rather than
+ * retried on every leaderboard view.
+ */
+async function backfillRecords(): Promise<void> {
+  const { placings } = repos();
+  for (const tournamentId of await placings.tournamentsMissingRecords()) {
+    const engine = await loadEngine(tournamentId);
+    if (engine) {
+      for (const placing of await placings.listForTournament(tournamentId)) {
+        await placings.setRecord(tournamentId, placing.registrationId, matchRecord(engine, placing.registrationId));
+      }
+    }
+    await placings.zeroMissingRecords(tournamentId);
+  }
 }
 
 /** slug -> final placing, for every completed tournament this player has a real result in. */
