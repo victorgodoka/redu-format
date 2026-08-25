@@ -281,7 +281,16 @@ Tournament editing, the prizing panel (when enabled) and the destructive actions
 
 - **Reads:** `tournament_brackets`, `registrations`, `match_deadlines`, `match_flags`, `match_reports`.
 - **Writes:** the same, plus `tournament_placings` and `deck_snapshots` at completion.
-- **Actions:** `startBracketAction` (closes signups, locks the deck lists, generates round 1), `enterResultAction` (moderator override), `dismissNoShowAdminAction`, `nextRoundAction`, `extendRoundAction`, `updateBracketStatusAction` (forces the Nexus check right now), `completeBracketAction` (freezes placings, match records and ranking points; marks the tournament `finished`).
+- **Actions:** `startBracketAction` (closes signups, locks the deck lists, generates round 1), `enterResultAction` (moderator override), `dismissNoShowAdminAction`, `nextRoundAction`, `extendRoundAction`, `updateBracketStatusAction` (forces the Nexus check right now), `repairRoundAction` (see below), `completeBracketAction` (freezes placings, match records and ranking points; marks the tournament `finished`).
+
+**Re-pairing a Swiss round.** When a round itself goes wrong — a result entered against the wrong match, someone in the pool who should not have been, pairings drawn from standings that were themselves wrong — `repairRound()` throws the current round away and draws it again from the standings as they stand now. It is Swiss-only and stage-one-only: an elimination bracket repairs through the match itself (`enterMatchResult` with `confirmRepair`), and once the top cut exists it was cut from these standings and cannot be unwound from here.
+
+What it does: voids every match of the round, deletes what hung off them (deadlines and lobbies, player reports, open no-show/contest flags, duel slots — attempts cascade), re-pairs through the engine's own `nextRound()`, opens fresh lobbies, and notifies every player in the new round.
+
+Two things worth knowing before using it:
+
+- **Swiss pairing is not deterministic.** The same standings can pair differently from one draw to the next, so this re-draws the round rather than reproducing it — who plays whom will likely change even if nothing else did. Verified in `lib/round-repair.test.ts`.
+- **The deck lock is left alone.** The round keeps the lists frozen when it was first paired; re-freezing would quietly adopt whatever a player edited since, which is the opposite of what the lock is for.
 
 ### `/admin/messages`
 

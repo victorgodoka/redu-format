@@ -63,6 +63,15 @@ export class MatchDeadlinesRepository {
     }
   }
 
+  /** Drops the clock (and the lobby) of matches that no longer exist - see repairRound(). */
+  async deleteForMatches(tournamentId: string, matchIds: string[]): Promise<void> {
+    if (matchIds.length === 0) return;
+    await this.pool.query("DELETE FROM match_deadlines WHERE tournament_id = ? AND match_id IN (?)", [
+      tournamentId,
+      matchIds,
+    ]);
+  }
+
   /** Test seam. */
   async clear(): Promise<void> {
     await this.pool.query("DELETE FROM match_deadlines");

@@ -23,6 +23,7 @@ export type AdminAction =
   | "bracket.complete"
   | "bracket.extend_round"
   | "bracket.no_show_dismissed"
+  | "bracket.repair_round"
   | "participant.disqualify"
   | "participant.reinstate"
   | "prize.add"
@@ -52,6 +53,7 @@ export const ADMIN_ACTIONS: readonly AdminAction[] = [
   "bracket.complete",
   "bracket.extend_round",
   "bracket.no_show_dismissed",
+  "bracket.repair_round",
   "participant.disqualify",
   "participant.reinstate",
   "prize.add",

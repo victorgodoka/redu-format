@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { after } from "next/server";
 import AdminPageHead from "@/components/admin/AdminPageHead";
 import BracketRounds from "@/components/admin/BracketRounds";
+import DeleteButton from "@/components/admin/DeleteButton";
 import StartBracketForm from "@/components/admin/StartBracketForm";
 import StatBar from "@/components/admin/StatBar";
 import Button from "@/components/ui/Button";
@@ -11,7 +12,13 @@ import { verifyTournament } from "@/lib/backend/services/duel-verification.servi
 import { closeOverdueMatches, getBracketView, getPlacings } from "@/lib/backend/services/results.service";
 import { DURATION_MODES, formatDate, formatTime } from "@/lib/events";
 import { getTournament } from "@/lib/tournaments";
-import { completeBracketAction, extendRoundAction, nextRoundAction, updateBracketStatusAction } from "./actions";
+import {
+  completeBracketAction,
+  extendRoundAction,
+  nextRoundAction,
+  repairRoundAction,
+  updateBracketStatusAction,
+} from "./actions";
 
 export const metadata: Metadata = {
   title: "Tournament bracket | REDU Format",
@@ -60,6 +67,15 @@ export default async function BracketPage({
   // that just skips the rest of the cleanup window, and in a long-duration one
   // it is the only way the next round ever starts.
   const canStartNextRound = view !== null && view.status !== "complete" && (!hasOpenMatches || view.clock.locked);
+
+  // Re-pairing is a Swiss-only escape hatch, and only while the Swiss rounds
+  // are still what the tournament is running - once the top cut exists it was
+  // cut from these standings and cannot be unwound from here.
+  const canRepairRound =
+    view !== null &&
+    view.status === "stage-one" &&
+    tournament.structure === "swiss" &&
+    view.round >= 1;
 
   return (
     <>
@@ -158,6 +174,18 @@ export default async function BracketPage({
                         </Button>
                       </form>
                     </>
+                  }
+                />
+              ) : null}
+              {canRepairRound ? (
+                <StatBar
+                  actions={
+                    <DeleteButton
+                      action={repairRoundAction}
+                      hidden={{ slug }}
+                      label={`Re-pair round ${view.round}`}
+                      confirmText={`Re-pair round ${view.round}? Every match in it is voided - results, reports and duel rooms included - and the round is drawn again from the current standings. Swiss pairings are not deterministic, so who plays whom will likely change even if nothing else did. Players are notified. This cannot be undone.`}
+                    />
                   }
                 />
               ) : null}

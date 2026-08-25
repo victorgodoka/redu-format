@@ -11,6 +11,7 @@ import {
   enterMatchResult,
   extendCurrentRoundDeadline,
   generateNextRound,
+  repairRound,
   RepairConfirmationRequired,
   startBracket,
 } from "@/lib/backend/services/results.service";
@@ -205,6 +206,35 @@ export async function updateBracketStatusAction(form: FormData) {
   await verifyTournament(slug).catch(() => null);
   revalidatePath(`/admin/tournaments/${slug}/bracket`);
   revalidatePath(`/events/${slug}`);
+}
+
+/**
+ * Throws away the current Swiss round and pairs it again. Destructive by
+ * design - the confirm dialog on the button is what stands between a mistyped
+ * click and a round of duels being voided - so the outcome is spelled out in
+ * the audit log rather than just "repaired".
+ */
+export async function repairRoundAction(form: FormData) {
+  const slug = String(form.get("slug") ?? "");
+  if (!slug) return;
+
+  let result;
+  try {
+    result = await repairRound(slug);
+  } catch (err) {
+    bracketError(slug, err instanceof Error ? err.message : "Could not re-pair that round.");
+  }
+
+  await recordAction({
+    ...(await actor()),
+    action: "bracket.repair_round",
+    target: slug,
+    detail: `Re-paired round ${result.round} in "${slug}" - voided ${result.voidedMatches} match(es), paired ${result.pairedMatches}`,
+  });
+
+  revalidatePath(`/admin/tournaments/${slug}/bracket`);
+  revalidatePath(`/events/${slug}`);
+  redirect(`/admin/tournaments/${slug}/bracket`);
 }
 
 export async function completeBracketAction(form: FormData) {

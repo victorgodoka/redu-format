@@ -891,6 +891,119 @@ export async function enterMatchResult(
  * match, it's settled first (a real loss for them, exactly like a round-
  * deadline no-show) before they're deactivated for every round after it.
  */
+export type RoundRepair = { round: number; voidedMatches: number; pairedMatches: number };
+
+/**
+ * Engine state as it stood *before* `round` was paired: the round's matches
+ * are dropped, and so is every player's own record of them. Both halves
+ * matter - standings and future pairings are computed from the player records,
+ * so a match removed from only one of the two lists leaves a tournament that
+ * still believes those duels happened.
+ *
+ * Pure, and exported for the test: this is the part of repairRound() that can
+ * silently corrupt a tournament if it is wrong.
+ */
+export function withoutRound(
+  values: ExportedTournamentValues,
+  round: number,
+): ExportedTournamentValues {
+  const voided = new Set(values.matches.filter((m) => m.round === round).map((m) => m.id));
+
+  return {
+    ...values,
+    round: round - 1,
+    matches: values.matches.filter((m) => m.round !== round),
+    players: values.players.map((player) => ({
+      ...player,
+      matches: player.matches.filter((record) => !voided.has(record.id)),
+    })),
+  };
+}
+
+/**
+ * Throws away the current Swiss round and pairs it again from the standings
+ * as they stand now. This is the escape hatch for a round that went wrong -
+ * a result entered against the wrong match, a player who should never have
+ * been in the pool, pairings generated off a standing that was itself wrong.
+ *
+ * Why a whole round rather than one match: Swiss pairings are a function of
+ * the standings, so a bad round-N-1 result does not corrupt one round-N match,
+ * it corrupts every pairing in round N. There is no bracket graph to walk and
+ * nothing to void selectively, so the unit of repair is the round.
+ *
+ * The rebuild is done on the exported values rather than by mutating the live
+ * engine: `Tournament.set({ matches })` only merges and appends, it can never
+ * remove, and each player carries their own copy of their match records that
+ * would have to be unwound in step. Filtering both and reloading is the only
+ * way to land on a state the engine itself would have produced.
+ *
+ * The deck lock is deliberately left alone: the round keeps the lists it was
+ * frozen under when it was first paired. Re-freezing here would quietly adopt
+ * whatever a player has edited since - the opposite of what the lock is for.
+ *
+ * Note that the pairing library is not deterministic: the same standings can
+ * pair differently from one draw to the next (see lib/round-repair.test.ts),
+ * so this re-draws the round rather than reproducing it. That is the point -
+ * it is an escape hatch, not a recalculation.
+ */
+export async function repairRound(slug: string): Promise<RoundRepair> {
+  const tournamentId = await repos().tournaments.findIdBySlug(slug);
+  if (!tournamentId) throw new Error(`Tournament "${slug}" does not exist`);
+  const engine = await loadEngine(tournamentId);
+  if (!engine) throw new Error(`Tournament "${slug}" has no bracket yet`);
+
+  if (engine.isElimination()) {
+    throw new Error(
+      "Only a Swiss round can be re-paired. In an elimination bracket, correct the match itself - the bracket repairs through it.",
+    );
+  }
+  if (engine.getStatus() !== "stage-one") {
+    throw new Error(
+      "The top cut has already been generated, so the Swiss rounds it was cut from can no longer be re-paired.",
+    );
+  }
+
+  const round = engine.getRoundNumber();
+  if (round < 1) throw new Error("This tournament has no round to re-pair yet.");
+
+  const values = engine.getValues();
+  const voidedIds = values.matches.filter((m) => m.round === round).map((m) => m.id);
+  const repaired = new Manager().loadTournament(withoutRound(values, round));
+
+  // Same call the tournament makes on its own between rounds, so the fresh
+  // pairings come out of the engine's own logic rather than anything here.
+  repaired.nextRound();
+  await persistEngine(tournamentId, repaired);
+
+  // Everything that hung off the old pairings goes with them: their clocks and
+  // lobbies, the reports players filed, open no-show/contest flags, and the
+  // duel slots (attempts cascade). Leaving any of it behind would attach a
+  // stale duel to a match id that no longer exists.
+  await repos().matchDeadlines.deleteForMatches(tournamentId, voidedIds);
+  await repos().matchFlags.deleteForMatches(tournamentId, voidedIds);
+  await repos().duelSlots.deleteForMatches(tournamentId, voidedIds);
+  for (const matchId of voidedIds) await repos().matchReports.clearForMatch(matchId);
+
+  await syncMatchDeadlines(tournamentId, repaired);
+
+  const paired = repaired.getMatchesByRound(round);
+  for (const match of paired) {
+    for (const id of [match.getPlayer1().id, match.getPlayer2().id]) {
+      if (!id) continue;
+      await notifyPlayer(id, {
+        kind: "round.repaired",
+        title: `Round ${round} was paired again`,
+        body:
+          `A Tournament Organizer re-paired round ${round}. Your opponent and duel room for this round have most likely changed - ` +
+          "open the tournament page for the current pairing before you play. Anything already reported for the old pairing no longer counts.",
+        fingerprint: `round-repair|${match.getId()}|${id}`,
+      });
+    }
+  }
+
+  return { round, voidedMatches: voidedIds.length, pairedMatches: paired.length };
+}
+
 export async function dropFromStartedTournament(slug: string, registrationId: string): Promise<void> {
   const tournamentId = await repos().tournaments.findIdBySlug(slug);
   if (!tournamentId) throw new Error(`Tournament "${slug}" does not exist`);

@@ -63,6 +63,15 @@ export class DuelSlotsRepository {
     await this.pool.query("UPDATE duel_slots SET current_room_hash = ? WHERE id = ?", [roomHash, id]);
   }
 
+  /** Drops the duel slots of matches that no longer exist - attempts cascade with them. See repairRound(). */
+  async deleteForMatches(tournamentId: string, matchIds: string[]): Promise<void> {
+    if (matchIds.length === 0) return;
+    await this.pool.query("DELETE FROM duel_slots WHERE tournament_id = ? AND match_id IN (?)", [
+      tournamentId,
+      matchIds,
+    ]);
+  }
+
   /** Test seam. */
   async clear(): Promise<void> {
     await this.pool.query("DELETE FROM duel_slots");
