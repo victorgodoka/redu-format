@@ -1,5 +1,14 @@
 import type { Pool, ResultSetHeader, RowDataPacket } from "mysql2/promise";
-import type { DurationMode, EntryFee, Engine, Structure, TournamentEvent, TournamentStatus } from "../../events.ts";
+import {
+  DEFAULT_BANLIST,
+  isBanlist,
+  type DurationMode,
+  type EntryFee,
+  type Engine,
+  type Structure,
+  type TournamentEvent,
+  type TournamentStatus,
+} from "../../events.ts";
 import { fromMysqlDatetime, fromMysqlDatetimeMs, toMysqlDatetime, toMysqlDatetimeMs } from "../db/datetime.ts";
 
 export type TournamentDraft = Omit<
@@ -29,6 +38,7 @@ type TournamentRow = RowDataPacket & {
   round_minutes: number;
   cleanup_minutes: number;
   engine: Engine;
+  banlist: string;
   seat_cap: number | null;
   taken: number;
   entry_type: "free" | "paid";
@@ -70,6 +80,7 @@ function rowToTournament(row: TournamentRow): TournamentEvent {
     roundMinutes: row.round_minutes,
     cleanupMinutes: row.cleanup_minutes,
     engine: row.engine,
+    banlist: isBanlist(row.banlist) ? row.banlist : DEFAULT_BANLIST,
     seats: row.seat_cap,
     taken: Number(row.taken),
     entry: toEntry(row),
@@ -97,7 +108,7 @@ export class TournamentsRepository {
     const [rows] = await this.pool.query<TournamentRow[]>(
       `SELECT t.slug, t.name, t.description, (t.banner_image IS NOT NULL) AS has_banner, t.starts_at, t.started_at, t.finished_at, t.status, t.cancelled_at,
               t.structure, t.rounds, t.top_cut, t.match_format,
-              t.round_limit_days, t.duration_mode, t.round_minutes, t.cleanup_minutes, t.engine, t.seat_cap, t.entry_type, t.entry_amount_minor, t.entry_currency,
+              t.round_limit_days, t.duration_mode, t.round_minutes, t.cleanup_minutes, t.engine, t.banlist, t.seat_cap, t.entry_type, t.entry_amount_minor, t.entry_currency,
               t.host, t.signup_url, t.has_prizing, t.prizes_sent_at, ${TAKEN_SUBQUERY}
        FROM tournaments t
        WHERE t.deleted_at IS NULL
@@ -110,7 +121,7 @@ export class TournamentsRepository {
     const [rows] = await this.pool.query<TournamentRow[]>(
       `SELECT t.slug, t.name, t.description, (t.banner_image IS NOT NULL) AS has_banner, t.starts_at, t.started_at, t.finished_at, t.status, t.cancelled_at,
               t.structure, t.rounds, t.top_cut, t.match_format,
-              t.round_limit_days, t.duration_mode, t.round_minutes, t.cleanup_minutes, t.engine, t.seat_cap, t.entry_type, t.entry_amount_minor, t.entry_currency,
+              t.round_limit_days, t.duration_mode, t.round_minutes, t.cleanup_minutes, t.engine, t.banlist, t.seat_cap, t.entry_type, t.entry_amount_minor, t.entry_currency,
               t.host, t.signup_url, t.has_prizing, t.prizes_sent_at, ${TAKEN_SUBQUERY}
        FROM tournaments t
        WHERE t.slug = ? AND t.deleted_at IS NULL
@@ -192,8 +203,8 @@ export class TournamentsRepository {
     const [entryType, entryAmountMinor, entryCurrency] = entryColumns(draft.entry);
     await this.pool.query(
       `INSERT INTO tournaments
-        (id, slug, name, description, banner_image, banner_mime, starts_at, structure, rounds, top_cut, match_format, round_limit_days, duration_mode, round_minutes, cleanup_minutes, engine, seat_cap, entry_type, entry_amount_minor, entry_currency, host, signup_url, has_prizing)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        (id, slug, name, description, banner_image, banner_mime, starts_at, structure, rounds, top_cut, match_format, round_limit_days, duration_mode, round_minutes, cleanup_minutes, engine, banlist, seat_cap, entry_type, entry_amount_minor, entry_currency, host, signup_url, has_prizing)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id,
         slug,
@@ -211,6 +222,7 @@ export class TournamentsRepository {
         draft.roundMinutes,
         draft.cleanupMinutes,
         draft.engine,
+        draft.banlist ?? DEFAULT_BANLIST,
         draft.seats,
         entryType,
         entryAmountMinor,
@@ -228,7 +240,7 @@ export class TournamentsRepository {
       `UPDATE tournaments SET
         name = ?, description = ?, starts_at = ?, structure = ?, rounds = ?, top_cut = ?, match_format = ?,
         round_limit_days = ?, duration_mode = ?, round_minutes = ?, cleanup_minutes = ?,
-        engine = ?, seat_cap = ?, entry_type = ?, entry_amount_minor = ?,
+        engine = ?, banlist = ?, seat_cap = ?, entry_type = ?, entry_amount_minor = ?,
         entry_currency = ?, host = ?, signup_url = ?, has_prizing = ?
        WHERE slug = ? AND deleted_at IS NULL`,
       [
@@ -244,6 +256,7 @@ export class TournamentsRepository {
         draft.roundMinutes,
         draft.cleanupMinutes,
         draft.engine,
+        draft.banlist ?? DEFAULT_BANLIST,
         draft.seats,
         entryType,
         entryAmountMinor,

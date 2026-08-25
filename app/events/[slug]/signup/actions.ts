@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { fetchProfile, getSession } from "@/lib/auth";
 import { deckLegality } from "@/lib/nexus-parse";
-import { seatsLeft } from "@/lib/events";
+import { BANLISTS, DEFAULT_BANLIST, seatsLeft } from "@/lib/events";
 import { getTournament } from "@/lib/tournaments";
 import {
   dropRegistration,
@@ -12,7 +12,8 @@ import {
 } from "@/lib/backend/services/registration.service";
 import { findPlayerIdByToken, identityKey, resolvePlayerId } from "@/lib/backend/services/player.service";
 import { toSnapshot } from "@/lib/deck-diff";
-import { describeError, validateDeck } from "@/lib/validateDecks";
+import { validateDeckFor } from "@/lib/tcg-decks";
+import { describeError } from "@/lib/validateDecks";
 
 export type SignupState = { error?: string };
 
@@ -51,10 +52,11 @@ export async function register(
   const list = profile.deckLists.find((d) => d.id === deckId);
   if (!list) return { error: "That deck list could not be read." };
 
-  const { errors } = validateDeck(list);
+  const { errors } = validateDeckFor(event.banlist, list);
   if (errors.length > 0) {
+    const format = BANLISTS[event.banlist ?? DEFAULT_BANLIST].label;
     return {
-      error: `${deck.name} is not legal for REDU Format: ${describeError(errors[0])}${
+      error: `${deck.name} is not legal for ${format}: ${describeError(errors[0])}${
         errors.length > 1 ? ` (and ${errors.length - 1} more)` : ""
       }`,
     };

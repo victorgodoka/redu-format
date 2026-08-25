@@ -20,7 +20,7 @@ import { Card } from "@/lib/cards";
 import { formatDate, formatEntry, formatTime, isFinished, isPast, seatsLeft, STRUCTURES } from "@/lib/events";
 import { DEFAULT_AVATAR } from "@/lib/nexus-parse";
 import { getTournament } from "@/lib/tournaments";
-import { validateDecks } from "@/lib/validateDecks";
+import { validateDecksFor } from "@/lib/tcg-decks";
 import { cancel, submitProof } from "./actions";
 
 export const metadata: Metadata = {
@@ -46,7 +46,7 @@ export default async function SignupPage({
   const profile = await fetchProfile(session.token);
   if (!profile) redirect("/api/auth/logout");
 
-  const validDecklists = validateDecks(profile.deckLists);
+  const validDecklists = validateDecksFor(event.banlist, profile.deckLists);
   // Cover art can point at an errata id; the original passcode is what the
   // fallback image retries if that specific print was never mirrored.
   const coverFallbackIds = Object.fromEntries(

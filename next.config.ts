@@ -1,6 +1,11 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // lib/cardinfo.json is read at runtime (lib/tcg-decks.ts), not imported, so
+  // the tracer has to be told to ship it with the server bundle.
+  outputFileTracingIncludes: {
+    "/**": ["./lib/cardinfo.json"],
+  },
   images: {
     unoptimized: true,
     remotePatterns: [

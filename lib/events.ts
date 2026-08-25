@@ -13,6 +13,25 @@ export const ENGINES: Record<Engine, { label: string }> = {
 };
 
 /**
+ * Which banlist (and card pool) a tournament's decks are checked against.
+ * REDU is the frozen 2012.10 Wind-Up format the site was built around; TCG is
+ * the modern game, validated against lib/cardinfo.json instead of the frozen
+ * REDU library. Player dashboards always speak REDU - only tournaments choose.
+ */
+export type Banlist = "redu-2012-10" | "tcg-2026-05";
+
+export const BANLISTS: Record<Banlist, { label: string }> = {
+  "redu-2012-10": { label: "2012.10 REDU/Wind-Up" },
+  "tcg-2026-05": { label: "2026.05 TCG" },
+};
+
+export const DEFAULT_BANLIST: Banlist = "redu-2012-10";
+
+export function isBanlist(value: string): value is Banlist {
+  return value in BANLISTS;
+}
+
+/**
  * Swiss can optionally cut to a bracket afterwards (TournamentEvent.topCut);
  * that used to be its own "mixed" structure, but a top cut is an attribute of
  * Swiss, not a different structure.
@@ -93,6 +112,8 @@ export type TournamentEvent = {
   /** Same-day only: moderator grace period between a round locking and the next one starting automatically. */
   cleanupMinutes: number;
   engine: Engine;
+  /** Which banlist decks are checked against. Optional so fixtures from before the field existed still satisfy the type; absent reads as REDU. */
+  banlist?: Banlist;
   /** null means uncapped registration. */
   seats: number | null;
   taken: number;

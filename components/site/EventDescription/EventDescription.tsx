@@ -7,7 +7,7 @@ export default function EventDescription({ event }: { event: TournamentEvent }) 
   if (!event.description) return null;
 
   return (
-    <Notice variant="done">
+    <Notice variant="done" className="event-description">
       <Markdown className="event__description" source={event.description} />
     </Notice>
   );

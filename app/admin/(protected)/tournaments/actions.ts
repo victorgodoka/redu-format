@@ -5,10 +5,12 @@ import { redirect } from "next/navigation";
 import { recordAction } from "@/lib/audit-log";
 import { getAdminSession } from "@/lib/auth/session";
 import {
+  DEFAULT_BANLIST,
   DEFAULT_CLEANUP_MINUTES,
   DEFAULT_ROUND_MINUTES,
   DURATION_MODES,
   ENGINES,
+  isBanlist,
   recommendedTopCut,
   SEAT_OPTIONS,
   zonedDateTimeToUtc,
@@ -72,6 +74,11 @@ async function readDraft(form: FormData): Promise<TournamentDraft | { error: str
 
   const engine = String(form.get("engine") ?? "") as Engine;
   if (!(engine in ENGINES)) return { error: "Pick an engine." };
+
+  // An older form post with no banlist field at all is REDU, same as every
+  // tournament that existed before tournaments could be anything else.
+  const banlistRaw = String(form.get("banlist") ?? DEFAULT_BANLIST);
+  if (!isBanlist(banlistRaw)) return { error: "Pick a banlist." };
 
   // Rounds only means anything for Swiss - elimination brackets size
   // themselves from the field, same as startBracket() already treats it
@@ -156,6 +163,7 @@ async function readDraft(form: FormData): Promise<TournamentDraft | { error: str
     roundMinutes,
     cleanupMinutes,
     engine,
+    banlist: banlistRaw,
     seats,
     entry,
     host,

@@ -47,6 +47,8 @@ import {
 } from "@/lib/backend/services/results.service";
 import {
   FEATURED_EVENT,
+  BANLISTS,
+  DEFAULT_BANLIST,
   formatDate,
   formatEntry,
   formatTime,
@@ -139,6 +141,7 @@ function EventFacts({ event, past }: { event: TournamentEvent; past: boolean }) 
                 ? `${event.taken} of ${event.seats} duelists`
                 : `${left} of ${event.seats} left`,
         },
+        { label: "Banlist", value: BANLISTS[event.banlist ?? DEFAULT_BANLIST].label },
         { label: "Host", value: `${event.host} · ${formatEntry(event.entry)}` },
       ]}
     />

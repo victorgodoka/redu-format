@@ -1,0 +1,139 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import { DEFAULT_BANLIST, type Banlist } from "./events.ts";
+import type { NexusDeckLists } from "./nexus-parse.ts";
+import {
+  DEFAULT_COPIES,
+  stripRarity,
+  validateDeck,
+  type DeckValidationError,
+  type DeckValidationResult,
+  type ValidatedDeck,
+} from "./validateDecks.ts";
+
+/*
+ * Server-side only, and kept that way by the node:fs read below rather than by
+ * a `server-only` guard, so the validator stays runnable from a plain node test.
+ */
+
+/** Copies each TCG banlist status allows. Anything unlisted plays at the usual three. */
+const BAN_COPIES: Record<string, number> = {
+  forbidden: 0,
+  limited: 1,
+  "semi-limited": 2,
+};
+
+/** How far down from a written id to look for the real card - alt arts sit a few ids above the print. */
+const ALT_ART_SEARCH = 5;
+
+type TcgCard = { name: string; tcg: boolean; ban: string | null };
+
+type RawCard = {
+  id: number;
+  name: string;
+  banlist_info?: { ban_tcg?: string };
+  misc_info?: { formats?: string[]; tcg_date?: string }[];
+};
+
+/**
+ * lib/cardinfo.json is the source of truth for the modern game - 24MB of it,
+ * so it is read once, on the first TCG deck anyone validates, and reduced to
+ * the three fields that decide legality. A REDU-only site never pays for it,
+ * and the parsed dump is dropped as soon as the index is built.
+ */
+let index: Map<number, TcgCard> | null = null;
+
+function cards(): Map<number, TcgCard> {
+  if (index) return index;
+
+  const file = path.join(process.cwd(), "lib", "cardinfo.json");
+  const dump = JSON.parse(readFileSync(file, "utf8")) as { data: RawCard[] };
+
+  const built = new Map<number, TcgCard>();
+  for (const card of dump.data) {
+    const misc = card.misc_info?.[0];
+    built.set(card.id, {
+      name: card.name,
+      // Released to the TCG at all: either the format list says so, or there
+      // is a real TCG release date on file.
+      tcg: Boolean(misc?.formats?.includes("TCG") || isDate(misc?.tcg_date)),
+      ban: card.banlist_info?.ban_tcg?.toLowerCase() ?? null,
+    });
+  }
+
+  index = built;
+  return built;
+}
+
+function isDate(value: string | undefined): boolean {
+  return typeof value === "string" && !Number.isNaN(Date.parse(value));
+}
+
+/**
+ * The card a written id means. Nexus hands out one id per alternate art, a
+ * few above the printed passcode, so a miss walks back down before giving up.
+ */
+function resolve(id: number): number | null {
+  const pool = cards();
+  for (let candidate = id; candidate >= id - ALT_ART_SEARCH; candidate--) {
+    if (pool.has(candidate)) return candidate;
+  }
+  return null;
+}
+
+export function validateTcgDeck(deck: NexusDeckLists): DeckValidationResult {
+  const pool = cards();
+  const errors: DeckValidationError[] = [];
+  const unknown = new Set<number>();
+  const copies = new Map<number, number>();
+
+  for (const written of [...deck.main, ...deck.extra, ...deck.side]) {
+    const printed = stripRarity(written);
+    const id = resolve(printed);
+    if (id === null) {
+      unknown.add(printed);
+      continue;
+    }
+    copies.set(id, (copies.get(id) ?? 0) + 1);
+  }
+
+  for (const [id, count] of copies) {
+    const card = pool.get(id)!;
+
+    if (!card.tcg) {
+      errors.push({ type: "not-tcg", cardId: id, cardName: card.name });
+      continue;
+    }
+
+    const allowed = card.ban ? (BAN_COPIES[card.ban] ?? DEFAULT_COPIES) : DEFAULT_COPIES;
+    if (count > allowed) {
+      errors.push({
+        type: "banlist",
+        cardId: id,
+        cardName: card.name,
+        section: card.ban ?? "unrestricted",
+        allowedCopies: allowed,
+        actualCopies: count,
+      });
+    }
+  }
+
+  if (unknown.size > 0) errors.push({ type: "unknown", cardIds: [...unknown] });
+
+  return { valid: errors.length === 0, errors };
+}
+
+/** Checks a deck against whichever banlist the tournament runs. Player dashboards never come through here - they are always REDU. */
+export function validateDeckFor(
+  banlist: Banlist | undefined,
+  deck: NexusDeckLists,
+): DeckValidationResult {
+  return (banlist ?? DEFAULT_BANLIST) === "tcg-2026-05" ? validateTcgDeck(deck) : validateDeck(deck);
+}
+
+export function validateDecksFor(
+  banlist: Banlist | undefined,
+  decks: readonly NexusDeckLists[],
+): ValidatedDeck[] {
+  return decks.map((deck) => ({ ...deck, ...validateDeckFor(banlist, deck) }));
+}

@@ -665,14 +665,24 @@ input[type="number"]::-webkit-inner-spin-button {
 
 /* --- admin-provided tournament banner + description --- */
 
+/* Full-bleed: the banner is the top of the page, so it runs edge to edge by
+   cancelling the wrap's gutter instead of sitting inside it. */
 .event-banner {
   display: block;
-  width: 100%;
+  width: calc(100% + 2 * var(--gutter));
   max-height: 640px;
   object-fit: cover;
+  border-block: 1px solid var(--c-line);
+  margin: 20px calc(-1 * var(--gutter)) 28px;
+}
+
+/* The admin form's preview of an uploaded banner sits inside a field, so it
+   keeps the plain framed look rather than bleeding out of the form. */
+.form__field .event-banner {
+  width: 100%;
+  margin: 0 0 10px;
   border: 1px solid var(--c-line);
   border-radius: 2px;
-  margin: 16px 0;
 }
 
 .event-list.event-banner {
@@ -2191,9 +2201,41 @@ input:not([type="file"]):read-only{
   outline: none;
 }
 
+/* The event blurb is admin-written markdown, so it needs real prose spacing:
+   room from the panel edge, and headings/lists/rules that read as such. */
+.notice.event-description {
+  padding: clamp(20px, 3vw, 32px);
+}
+
 .event__description {
-  line-height: 1.2;
+  line-height: 1.6;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
+}
+
+.event__description h1,
+.event__description h2,
+.event__description h3 {
+  margin: 10px 0 0;
+  line-height: 1.2;
+}
+
+.event__description ul,
+.event__description ol {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding-left: 1.4em;
+}
+
+.event__description hr {
+  width: 100%;
+  margin: 2px 0;
+  border: 0;
+  border-top: 1px solid var(--c-line);
+}
+
+.event__description a {
+  color: var(--c-accent);
 }

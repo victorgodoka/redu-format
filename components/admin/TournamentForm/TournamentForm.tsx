@@ -9,6 +9,8 @@ import Label from "@/components/ui/Label";
 import Select from "@/components/ui/Select";
 import Textarea from "@/components/ui/Textarea";
 import {
+  BANLISTS,
+  DEFAULT_BANLIST,
   DEFAULT_CLEANUP_MINUTES,
   DEFAULT_ROUND_MINUTES,
   DURATION_MODES,
@@ -16,6 +18,7 @@ import {
   recommendedTopCut,
   SEAT_OPTIONS,
   STRUCTURES,
+  type Banlist,
   type DurationMode,
   type Engine,
   type Structure,
@@ -230,6 +233,16 @@ export default function TournamentForm({
           defaultValue={tournament ? toLocalDate(tournament.startsAt) : undefined}
           required
         />
+      </FormField>
+
+      <FormField label="Banlist" htmlFor="banlist">
+        <Select id="banlist" name="banlist" defaultValue={tournament?.banlist ?? DEFAULT_BANLIST}>
+          {(Object.keys(BANLISTS) as Banlist[]).map((value) => (
+            <option key={value} value={value}>
+              {BANLISTS[value].label}
+            </option>
+          ))}
+        </Select>
       </FormField>
 
       <FormGroup>
