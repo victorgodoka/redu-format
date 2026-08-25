@@ -180,7 +180,11 @@ export const fetchProfile = cache(async function fetchProfile(
   const profile: NexusProfile = {
     name,
     userId: parseUserId(user_id),
-    avatar: avatar,
+    // Nexus does not always send a URL here - some accounts come back with a
+    // bare number - and this value is stored, rendered and served on to other
+    // sites. cleanAvatar keeps it to an https URL on a known avatar host, or
+    // nothing at all.
+    avatar: cleanAvatar(avatar),
     ...parseContributor(contributor),
     decks: (Array.isArray(deck) ? deck : [])
       .map(parseDeck)

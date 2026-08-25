@@ -375,12 +375,42 @@ See [Authentication and sessions](#authentication-and-sessions).
 | Route | Method | Auth | Purpose |
 |---|---|---|---|
 | `/api/cron/round-deadlines` | GET | `Bearer $CRON_SECRET` | Closes overdue matches and resolves no-shows across every tournament. |
+| `/api/leaderboard` | GET | public | The leaderboard as JSON, for other sites. See below. |
 | `/api/auth/logout` | GET | session | Destroys the player session. |
 | `/api/discord/interactions` | POST | Ed25519 signature (`DISCORD_BOT_PUBLIC_KEY`) | Bot interactions webhook (ping + slash commands). |
 | `/events/[slug]/banner` | GET | public | Serves the banner bytes straight from the database. |
 | `/login/discord`, `/login/callback` | GET | — | Player OAuth. |
 | `/admin/login`, `/admin/callback` | GET | — | Admin OAuth. |
 | `/admin/logout` | POST | admin session | Destroys the admin session (it is a form, not a link). |
+
+### Public leaderboard API
+
+`GET /api/leaderboard` serves the same rows `/leaderboard` renders, as JSON, for anyone who wants to show them elsewhere. Read-only, no key, `Access-Control-Allow-Origin: *` so it can be fetched from a browser on another origin, and `Cache-Control: public, s-maxage=300` so a CDN absorbs the traffic instead of the connection pool.
+
+Query parameters: `page` (default 1) and `limit` (default 20, capped at 100).
+
+```json
+{
+  "page": 1,
+  "pages": 3,
+  "limit": 20,
+  "total": 7,
+  "players": [
+    {
+      "rank": 1,
+      "name": "BeastModeB",
+      "avatar": "https://duelingnexus.com/uploads/avatars/....png",
+      "points": 100,
+      "events": 1,
+      "wins": 3,
+      "losses": 0,
+      "bestPlacement": 1
+    }
+  ]
+}
+```
+
+`rank` is the position on the whole board, not on the page. `avatar` is an https URL on a known avatar host, or `null`. No internal ids are exposed; the Dueling Nexus name is the only identifier, so a renamed account is a new row to a consumer that keys on it.
 
 ## External integrations
 

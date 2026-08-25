@@ -8,7 +8,7 @@ import PageHeading from "@/components/ui/PageHeading";
 import Panel from "@/components/ui/Panel";
 import Wrap from "@/components/ui/Wrap";
 import { getLeaderboard, LEADERBOARD_PAGE_SIZE } from "@/lib/leaderboard";
-import { DEFAULT_AVATAR } from "@/lib/nexus-parse";
+import { cleanAvatar, DEFAULT_AVATAR } from "@/lib/nexus-parse";
 
 export const metadata: Metadata = {
   title: "REDU Format leaderboard | Duelist rankings",
@@ -88,7 +88,7 @@ export default async function LeaderboardPage({
                             <span className="leaderboard__duelist">
                               <FallbackImage
                                 className="leaderboard__avatar"
-                                src={row.avatarUrl || DEFAULT_AVATAR}
+                                src={cleanAvatar(row.avatarUrl) || DEFAULT_AVATAR}
                                 fallbackSrc={DEFAULT_AVATAR}
                                 alt=""
                                 width={32}
