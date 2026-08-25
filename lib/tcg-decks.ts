@@ -26,6 +26,14 @@ const BAN_COPIES: Record<string, number> = {
 /** How far down from a written id to look for the real card - alt arts sit a few ids above the print. */
 const ALT_ART_SEARCH = 5;
 
+/**
+ * An English print code: set prefix, the EN region tag, and a number
+ * ("DUAD-EN056"). A card carrying one was printed for the TCG, which is the
+ * evidence that arrives first - a set can be out for weeks before the dump's
+ * `formats`/`tcg_date` catch up with it.
+ */
+const TCG_SET_CODE = /^[A-Z0-9]+-EN\d+$/i;
+
 type TcgCard = { name: string; tcg: boolean; ban: string | null };
 
 type RawCard = {
@@ -33,6 +41,7 @@ type RawCard = {
   name: string;
   banlist_info?: { ban_tcg?: string };
   card_images?: { id: number }[];
+  card_sets?: { set_code?: string }[];
   misc_info?: { formats?: string[]; tcg_date?: string }[];
 };
 
@@ -60,9 +69,13 @@ function load(): NonNullable<typeof index> {
     const misc = card.misc_info?.[0];
     cards.set(card.id, {
       name: card.name,
-      // Released to the TCG at all: either the format list says so, or there
-      // is a real TCG release date on file.
-      tcg: Boolean(misc?.formats?.includes("TCG") || isDate(misc?.tcg_date)),
+      // Released to the TCG at all: the format list says so, there is a real
+      // TCG release date on file, or it carries an English print code.
+      tcg: Boolean(
+        misc?.formats?.includes("TCG") ||
+          isDate(misc?.tcg_date) ||
+          card.card_sets?.some((set) => TCG_SET_CODE.test(set.set_code ?? "")),
+      ),
       ban: card.banlist_info?.ban_tcg?.toLowerCase() ?? null,
     });
     for (const image of card.card_images ?? []) {

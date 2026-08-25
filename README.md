@@ -1,53 +1,53 @@
 # REDU Format
 
-Site e sistema de torneios de Yu-Gi-Oh! para o formato REDU (retrô, banlist 2012.10 / Wind-Up), com suporte a torneios de outros formatos (hoje: TCG). Inscrição, validação de deck contra a banlist do evento, chaveamento, reporte de resultado pelos próprios jogadores, verificação automática de duelos na Dueling Nexus, ranking e premiação por código de resgate.
+Site and tournament system for Yu-Gi-Oh! REDU Format (retro, 2012.10 / Wind-Up banlist), with support for tournaments on other formats (today: TCG). Signup, deck validation against the event's banlist, bracket, player self-reported results, automatic duel verification on Dueling Nexus, ranking, and prizing by redemption code.
 
-- **Stack:** Next.js 16 (App Router, Server Components e Server Actions), React 19, TypeScript, MariaDB/MySQL.
-- **Sem API REST própria:** as páginas leem direto dos serviços no servidor e escrevem por Server Action. As poucas rotas HTTP que existem estão listadas em [Rotas HTTP](#rotas-http).
-- **Identidade:** login por Discord (site e admin), identidade de jogo pela Dueling Nexus.
+- **Stack:** Next.js 16 (App Router, Server Components and Server Actions), React 19, TypeScript, MariaDB/MySQL.
+- **No REST API of its own:** pages read straight from server-side services and write through Server Actions. The few HTTP routes that exist are listed under [HTTP routes](#http-routes).
+- **Identity:** Discord login (site and admin), in-game identity from Dueling Nexus.
 
-Documentação complementar: [estrutura de backend](docs/backend-structure.md) e [fluxo do torneio](docs/fluxo-do-torneio.md).
+Further documentation: [backend structure](docs/backend-structure.md) and [tournament flow](docs/fluxo-do-torneio.md) (both in Portuguese).
 
-## Sumário
+## Contents
 
-- [Requisitos](#requisitos)
-- [Rodando local](#rodando-local)
-- [Variáveis de ambiente](#variáveis-de-ambiente)
-- [Banco de dados](#banco-de-dados)
+- [Requirements](#requirements)
+- [Running locally](#running-locally)
+- [Environment variables](#environment-variables)
+- [Database](#database)
 - [Deploy](#deploy)
-- [Autenticação e sessões](#autenticação-e-sessões)
-- [Área administrativa](#área-administrativa)
-- [Site público](#site-público)
-- [Rotas HTTP](#rotas-http)
-- [Integrações externas](#integrações-externas)
-- [Validação de deck](#validação-de-deck)
-- [Premiação (prizing)](#premiação-prizing)
-- [Mensagens para jogadores](#mensagens-para-jogadores)
-- [Testes](#testes)
-- [Estrutura de pastas](#estrutura-de-pastas)
-- [Débito técnico](#débito-técnico)
+- [Authentication and sessions](#authentication-and-sessions)
+- [Admin area](#admin-area)
+- [Public site](#public-site)
+- [HTTP routes](#http-routes)
+- [External integrations](#external-integrations)
+- [Deck validation](#deck-validation)
+- [Prizing](#prizing)
+- [Messages to players](#messages-to-players)
+- [Tests](#tests)
+- [Folder structure](#folder-structure)
+- [Technical debt](#technical-debt)
 
 ---
 
-## Requisitos
+## Requirements
 
-| Item | Versão / detalhe | Por quê |
+| Item | Version / detail | Why |
 |---|---|---|
-| Node.js | **22 ou superior** | Next 16 exige ≥ 20.9; os testes usam `--experimental-strip-types` (Node 22.6+) para rodar TypeScript direto. |
-| pnpm | 9+ | O lockfile do repositório é `pnpm-lock.yaml`. `npm`/`yarn` funcionam mas ignoram o lock. |
-| MariaDB ou MySQL | MariaDB 10.6+ / MySQL 8+ | Usa `JSON`, `DATETIME(3)`, `INSERT ... ON DUPLICATE KEY UPDATE` e `INSERT IGNORE`. Em MariaDB, `JSON` é alias de `LONGTEXT` — o código já trata as duas formas de retorno do driver. |
-| Aplicação Discord | com bot no servidor | Login (OAuth2 `identify`) e leitura de cargo do membro para autorizar admins. |
-| Saída HTTPS | `duelingnexus.com`, `discord.com` | Perfil/decks/replays da Nexus e API do Discord. Ambiente sem saída externa não funciona. |
+| Node.js | **22 or newer** | Next 16 requires ≥ 20.9; the tests use `--experimental-strip-types` (Node 22.6+) to run TypeScript directly. |
+| pnpm | 9+ | The repository's lockfile is `pnpm-lock.yaml`. `npm`/`yarn` work but ignore the lock. |
+| MariaDB or MySQL | MariaDB 10.6+ / MySQL 8+ | Uses `JSON`, `DATETIME(3)`, `INSERT ... ON DUPLICATE KEY UPDATE` and `INSERT IGNORE`. On MariaDB, `JSON` is an alias for `LONGTEXT` — the code already handles both shapes the driver returns. |
+| Discord application | with a bot in the server | Login (OAuth2 `identify`) and reading the member's role to authorise admins. |
+| Outbound HTTPS | `duelingnexus.com`, `discord.com` | Nexus profile/decks/replays and the Discord API. An environment without outbound access will not work. |
 
-Não é necessário Redis (rate limit é tabela), nem storage de arquivos (banners de torneio são gravados como `MEDIUMBLOB` no banco), nem serviço de e-mail (as mensagens ao jogador são entregues na caixa de entrada interna do site).
+No Redis needed (rate limiting is a table), no file storage (tournament banners are stored as `MEDIUMBLOB` in the database), and no mail service (player messages are delivered to the site's own inbox).
 
-## Rodando local
+## Running locally
 
 ```bash
 pnpm install
 ```
 
-Crie um `.env.local` na raiz com as variáveis da seção seguinte, e então:
+Create a `.env.local` at the root with the variables from the next section, then:
 
 ```bash
 pnpm db:migrate
@@ -57,57 +57,57 @@ pnpm db:migrate
 pnpm dev
 ```
 
-O site sobe em `http://localhost:3000`.
+The site comes up at `http://localhost:3000`.
 
-Outros scripts:
+Other scripts:
 
-| Script | O que faz |
+| Script | What it does |
 |---|---|
-| `pnpm dev` | Servidor de desenvolvimento (Turbopack). |
-| `pnpm build` | Build de produção. |
-| `pnpm start` | Sobe o build de produção. Requer `pnpm build` antes. |
-| `pnpm lint` | ESLint (config `eslint-config-next`). |
-| `pnpm test` | Suíte de testes em `node:test`. Parte dos testes toca o banco — veja [Testes](#testes). |
-| `pnpm db:migrate` | Aplica as migrations pendentes. Idempotente. |
-| `pnpm db:seed` | Hoje só chama as migrations; não existe massa de dados de exemplo. |
+| `pnpm dev` | Development server (Turbopack). |
+| `pnpm build` | Production build. |
+| `pnpm start` | Serves the production build. Requires `pnpm build` first. |
+| `pnpm lint` | ESLint (`eslint-config-next`). |
+| `pnpm test` | Test suite on `node:test`. Part of it touches the database — see [Tests](#tests). |
+| `pnpm db:migrate` | Applies pending migrations. Idempotent. |
+| `pnpm db:seed` | Today it only runs the migrations; there is no sample data. |
 
-> `db:migrate`, `db:seed` e `test` leem `--env-file=.env.local`. Em CI, ou você gera esse arquivo, ou roda o script equivalente com as variáveis já exportadas no ambiente.
+> `db:migrate`, `db:seed` and `test` read `--env-file=.env.local`. In CI, either generate that file or run the equivalent command with the variables already exported in the environment.
 
-## Variáveis de ambiente
+## Environment variables
 
-**Nenhuma variável do projeto é prefixada com `NEXT_PUBLIC_`**, ou seja, nada é embutido no bundle do navegador. Todas são lidas apenas no servidor. Ainda assim, a coluna "sensível" abaixo separa o que é segredo de verdade (vaza = comprometimento) do que é apenas configuração (aparece na URL de OAuth, no HTML ou é público por natureza).
+**No variable in this project is prefixed with `NEXT_PUBLIC_`**, so nothing is inlined into the browser bundle. Every one of them is read on the server only. Even so, the "secret" column below separates what is a real secret (leaking it is a compromise) from what is merely configuration (it shows up in the OAuth URL, in the HTML, or is public by nature).
 
-### Segredos — nunca versionar, nunca logar
+### Secrets — never commit, never log
 
-| Variável | Sensível | Descrição |
+| Variable | Secret | Description |
 |---|---|---|
-| `DATABASE_URL` | **Sim** | `mysql://usuario:senha@host:porta/banco`. Credencial completa do banco. |
-| `AUTH_SECRET` | **Sim** | Chave HMAC (HS256) que assina o JWT da sessão de admin. Trocar invalida todas as sessões de admin. |
-| `SESSION_SECRET` | **Sim** | Chave de criptografia da sessão do jogador (iron-session). **Mínimo de 32 caracteres** — o app lança erro em runtime se for menor. Trocar desloga todo mundo. Gere com `openssl rand -base64 32`. |
-| `DISCORD_CLIENT_SECRET` | **Sim** | Client secret da aplicação Discord, usado na troca do `code` por token. |
-| `DISCORD_BOT_TOKEN` | **Sim** | Token do bot. Usado para ler o cargo do membro no servidor (autorização de admin). |
-| `CRON_SECRET` | **Sim** | Bearer que autoriza `GET /api/cron/round-deadlines`. Sem ele definido, a rota responde 401 para todo mundo. |
+| `DATABASE_URL` | **Yes** | `mysql://user:password@host:port/database`. Full database credential. |
+| `AUTH_SECRET` | **Yes** | HMAC key (HS256) signing the admin session JWT. Rotating it invalidates every admin session. |
+| `SESSION_SECRET` | **Yes** | Encryption key for the player session (iron-session). **At least 32 characters** — the app throws at runtime if it is shorter. Rotating it signs everyone out. Generate with `openssl rand -base64 32`. |
+| `DISCORD_CLIENT_SECRET` | **Yes** | Client secret of the Discord application, used to exchange the `code` for a token. |
+| `DISCORD_BOT_TOKEN` | **Yes** | Bot token. Used to read a member's role in the server (admin authorisation). |
+| `CRON_SECRET` | **Yes** | Bearer that authorises `GET /api/cron/round-deadlines`. If it is unset, the route answers 401 to everyone. |
 
-### Configuração — não são segredos
+### Configuration — not secrets
 
-| Variável | Sensível | Descrição |
+| Variable | Secret | Description |
 |---|---|---|
-| `DISCORD_CLIENT_ID` | Não | ID da aplicação Discord. Aparece na URL de autorização. |
-| `DISCORD_OAUTH_URL` | Não | Endpoint de autorização, normalmente `https://discord.com/api/oauth2/authorize`. |
-| `DISCORD_API_URL` | Não | Base da API, normalmente `https://discord.com/api/v10`. |
-| `DISCORD_GUILD_ID` | Não | Servidor onde o cargo de moderação é verificado. |
-| `DISCORD_MOD_ROLE_ID` | Não | Cargo que dá acesso ao `/admin`. Não é segredo, mas não há motivo para publicar. |
-| `DISCORD_REDIRECT_URI` | Não | Callback **do admin**: `https://SEU_DOMINIO/admin/callback`. Precisa estar cadastrado na aplicação Discord. |
-| `DISCORD_PLAYER_REDIRECT_URI` | Não | Callback **do jogador**. Opcional: se ausente, é derivado como `/login/callback` na mesma origem do `DISCORD_REDIRECT_URI`. **Também precisa estar cadastrado na aplicação Discord.** |
-| `DISCORD_BOT_PUBLIC_KEY` | Não | Chave pública da aplicação, usada para verificar a assinatura das interações do bot. É pública por definição. |
+| `DISCORD_CLIENT_ID` | No | Discord application id. Appears in the authorisation URL. |
+| `DISCORD_OAUTH_URL` | No | Authorisation endpoint, normally `https://discord.com/api/oauth2/authorize`. |
+| `DISCORD_API_URL` | No | API base, normally `https://discord.com/api/v10`. |
+| `DISCORD_GUILD_ID` | No | Server where the moderation role is checked. |
+| `DISCORD_MOD_ROLE_ID` | No | Role that grants access to `/admin`. Not a secret, but no reason to publish it either. |
+| `DISCORD_REDIRECT_URI` | No | **Admin** callback: `https://YOUR_DOMAIN/admin/callback`. Must be registered on the Discord application. |
+| `DISCORD_PLAYER_REDIRECT_URI` | No | **Player** callback. Optional: when absent it is derived as `/login/callback` on the same origin as `DISCORD_REDIRECT_URI`. **It also has to be registered on the Discord application.** |
+| `DISCORD_BOT_PUBLIC_KEY` | No | Application public key, used to verify the signature of bot interactions. Public by definition. |
 
-Exemplo de `.env.local`:
+Example `.env.local`:
 
 ```bash
-DATABASE_URL=mysql://redu:senha@localhost:3306/redu
-AUTH_SECRET=troque-isto
-SESSION_SECRET=troque-isto-por-32-caracteres-ou-mais
-CRON_SECRET=troque-isto
+DATABASE_URL=mysql://redu:password@localhost:3306/redu
+AUTH_SECRET=change-me
+SESSION_SECRET=change-me-to-32-characters-or-more
+CRON_SECRET=change-me
 
 DISCORD_CLIENT_ID=000000000000000000
 DISCORD_CLIENT_SECRET=xxxxx
@@ -121,78 +121,78 @@ DISCORD_REDIRECT_URI=http://localhost:3000/admin/callback
 DISCORD_PLAYER_REDIRECT_URI=http://localhost:3000/login/callback
 ```
 
-As variáveis do Discord são lidas de forma estrita (`requiredEnv`): faltando qualquer uma, a request que precisar dela lança erro — o build passa, o runtime não.
+The Discord variables are read strictly (`requiredEnv`): with any of them missing, the request that needs it throws — the build passes, the runtime does not.
 
-## Banco de dados
+## Database
 
-Migrations são arquivos `.sql` numerados em `lib/backend/db/migrations/`, aplicados em ordem de nome pelo runner em `lib/backend/db/migrate.ts`, que registra o que já rodou na tabela `_migrations`. O runner remove comentários `--` e quebra o arquivo por `;`, então **evite `;` dentro de literais** e não use `DELIMITER`/procedures.
+Migrations are numbered `.sql` files in `lib/backend/db/migrations/`, applied in filename order by the runner in `lib/backend/db/migrate.ts`, which records what has already run in the `_migrations` table. The runner strips `--` comments and splits the file on `;`, so **avoid `;` inside literals** and do not use `DELIMITER`/procedures.
 
-Para criar uma migration: adicione `NNN_descricao.sql` com o próximo número e rode `pnpm db:migrate`. Não edite uma migration já aplicada — crie a próxima.
+To add a migration: create `NNN_description.sql` with the next number and run `pnpm db:migrate`. Never edit a migration that has already been applied — write the next one.
 
-### Mapa das tabelas
+### Table map
 
-**Torneios e inscrição**
+**Tournaments and signup**
 
-| Tabela | Conteúdo |
+| Table | Contents |
 |---|---|
-| `tournaments` | O evento: nome, descrição (markdown), banner (bytes + mime), início, estrutura, rounds, top cut, formato de partida, engine, **banlist**, vagas, inscrição (grátis/paga), host, status (`scheduled`/`running`/`finished`/`cancelled`), `has_prizing`, `prizes_sent_at`. |
-| `registrations` | Uma linha por inscrito: nome exibido, deck (uuid + nome), snapshot da lista no cadastro e a travada no início, pagamento, origem (`public_signup`/`admin_manual`), drop, desqualificação, faltas. |
-| `saved_tournaments` | "Salvar evento" do jogador. Guardado por slug, não por FK — funciona também para eventos estáticos. |
-| `tournament_prizes` | Códigos de resgate: tier, código, para quem foi e quando. |
+| `tournaments` | The event: name, description (markdown), banner (bytes + mime), start, structure, rounds, top cut, match format, engine, **banlist**, seats, entry (free/paid), host, status (`scheduled`/`running`/`finished`/`cancelled`), `has_prizing`, `prizes_sent_at`. |
+| `registrations` | One row per entrant: display name, deck (uuid + name), the list snapshot taken at signup and the one locked at the start, payment, source (`public_signup`/`admin_manual`), drop, disqualification, absences. |
+| `saved_tournaments` | The player's "save event". Stored by slug, not by FK — it works for static events too. |
+| `tournament_prizes` | Redemption codes: tier, code, who it went to and when. |
 
-**Resultados**
+**Results**
 
-| Tabela | Conteúdo |
+| Table | Contents |
 |---|---|
-| `tournament_brackets` | O estado do chaveamento serializado pela lib `tournament-organizer`, um blob JSON por torneio. É a fonte de verdade do bracket. |
-| `tournament_placings` | Colocação final congelada no encerramento: lugar, pontos, ranking points e o retrospecto (`wins`/`losses`/`draws`). É o read model do leaderboard. |
-| `match_reports` | Auto-reporte dos jogadores. As linhas somem quando a partida resolve; duas linhas divergentes = partida contestada. |
-| `match_deadlines` | Relógio próprio das partidas (a engine não tem noção de tempo). |
-| `match_flags` | No-show e contestação em aberto. |
-| `redo_requests` | Pedido de refazer duelo caído por desconexão. |
+| `tournament_brackets` | Bracket state serialised by the `tournament-organizer` library, one JSON blob per tournament. It is the source of truth for the bracket. |
+| `tournament_placings` | Final standings frozen at completion: place, points, ranking points and the match record (`wins`/`losses`/`draws`). This is the leaderboard's read model. |
+| `match_reports` | Player self-reports. Rows disappear once a match resolves; two disagreeing rows = a contested match. |
+| `match_deadlines` | The matches' own clock (the engine has no notion of time). |
+| `match_flags` | Open no-show calls and contested results. |
+| `redo_requests` | Request to replay a duel lost to a disconnect. |
 
-**Jogadores e identidade**
+**Players and identity**
 
-| Tabela | Conteúdo |
+| Table | Contents |
 |---|---|
-| `players` | Conta do jogador: chave de identidade Nexus (sha256 do token), user id e nome Nexus, avatar, contributor, `discord_user_id` e o `nexus_token` vinculado. |
-| `discord_accounts` | O que o Discord informou no login: username, display name, avatar, primeiro acesso e último login. Registro apenas — nada no site exibe esses dados. |
-| `admins` | Admins que já logaram, com o token Nexus vinculado por eles. |
-| `audit_logs` | Toda ação administrativa: quem, o quê, alvo, detalhe, quando. |
+| `players` | The player account: Nexus identity key (sha256 of the token), Nexus user id and name, avatar, contributor, `discord_user_id` and the linked `nexus_token`. |
+| `discord_accounts` | What Discord reported at login: username, display name, avatar, first seen and last login. Record only — nothing on the site displays it. |
+| `admins` | Admins who have signed in, with the Nexus token each of them linked. |
+| `audit_logs` | Every administrative action: who, what, target, detail, when. |
 
-**Comunicação**
+**Communication**
 
-| Tabela | Conteúdo |
+| Table | Contents |
 |---|---|
-| `notifications` | Caixa de entrada do site (jogador e admin). `player_id` nulo = aviso global daquele público. `fingerprint` único evita reenvio do mesmo alerta. |
-| `notification_reads` | Leitura por leitor — um aviso global lido por um admin continua não lido para os outros. |
+| `notifications` | The site's inbox (player and admin). A null `player_id` means a global alert for that audience. The unique `fingerprint` keeps the same alert from being re-sent. |
+| `notification_reads` | Read state per reader — a global alert read by one admin stays unread for every other admin. |
 
-**Cache e infraestrutura**
+**Cache and infrastructure**
 
-| Tabela | Conteúdo |
+| Table | Contents |
 |---|---|
-| `nexus_profile_cache` | Cache compartilhado do perfil Nexus (o cache em memória não atravessa instâncias serverless). |
-| `nexus_replay_cache` | Replays já vistos, para não refetchar. |
-| `nexus_fetch_log` | Cache + lock das chamadas à Nexus: duas requisições concorrentes nunca chamam a API duas vezes. |
-| `duel_slots` / `duel_attempts` | Cada game dentro de uma partida e as tentativas de casá-lo com um replay real. |
-| `deck_snapshots` | Histórico de listas por round. |
-| `rate_limits` | Janela fixa por chave (`login:IP`, `nexus-link:IP`). Substitui Redis. |
+| `nexus_profile_cache` | Shared cache of the Nexus profile (an in-memory cache does not cross serverless instances). |
+| `nexus_replay_cache` | Replays already seen, so none is fetched twice. |
+| `nexus_fetch_log` | Cache + lock for calls to Nexus: two concurrent requests never call the API twice. |
+| `duel_slots` / `duel_attempts` | Each game inside a match, and the attempts to match it to a real replay. |
+| `deck_snapshots` | Per-round history of deck lists. |
+| `rate_limits` | Fixed window per key (`login:IP`, `nexus-link:IP`). Stands in for Redis. |
 
 ## Deploy
 
-O projeto é um app Next.js **com servidor** (Server Components, Server Actions, `after()`, acesso a banco). Não dá para exportar como site estático e não roda só no edge.
+This is a Next.js app **with a server** (Server Components, Server Actions, `after()`, database access). It cannot be exported as a static site and does not run on the edge alone.
 
-### O que o servidor precisa ter
+### What the server needs
 
-1. **Runtime Node.js 22+** capaz de rodar `next start` (ou o adaptador da sua plataforma).
-2. **Banco MariaDB/MySQL alcançável** pela aplicação, com as migrations aplicadas.
-3. **Saída HTTPS** para `duelingnexus.com` e `discord.com`.
-4. **Origem HTTPS estável e pública** — os dois callbacks de OAuth precisam estar cadastrados na aplicação Discord (`/admin/callback` e `/login/callback`).
-5. **~512 MB de memória** por instância, no mínimo. O validador de TCG carrega `lib/cardinfo.json` (24 MB) uma vez por processo, sob demanda, e reduz para um índice pequeno — o pico de parsing é o que dita esse número. Torneios só REDU nunca pagam esse custo.
-6. **Agendador** capaz de bater em `GET /api/cron/round-deadlines` com o header `Authorization: Bearer $CRON_SECRET`. Pode ser cron da plataforma, cron do sistema com `curl`, ou qualquer scheduler externo.
-7. **O arquivo `lib/cardinfo.json` presente ao lado do build.** Ele é lido em runtime via `fs`, não importado. Em `next build` + `next start` no mesmo diretório do repositório isso já acontece; em plataformas que fazem *file tracing* e sobem só o necessário (Vercel, `output: standalone`), o `next.config.ts` já declara `outputFileTracingIncludes` para incluí-lo.
+1. **A Node.js 22+ runtime** able to run `next start` (or your platform's adapter).
+2. **A reachable MariaDB/MySQL database**, with migrations applied.
+3. **Outbound HTTPS** to `duelingnexus.com` and `discord.com`.
+4. **A stable, public HTTPS origin** — both OAuth callbacks have to be registered on the Discord application (`/admin/callback` and `/login/callback`).
+5. **~512 MB of memory** per instance, minimum. The TCG validator loads `lib/cardinfo.json` (24 MB) once per process, on demand, and reduces it to a small index — the parsing peak is what sets that number. REDU-only tournaments never pay it.
+6. **A scheduler** able to hit `GET /api/cron/round-deadlines` with the `Authorization: Bearer $CRON_SECRET` header. Platform cron, system cron with `curl`, or any external scheduler.
+7. **`lib/cardinfo.json` present next to the build.** It is read at runtime through `fs`, not imported. With `next build` + `next start` in the repository directory that already holds; on platforms that trace files and ship only what is needed (Vercel, `output: standalone`), `next.config.ts` already declares `outputFileTracingIncludes` to include it.
 
-### Passos
+### Steps
 
 ```bash
 pnpm install --frozen-lockfile
@@ -201,305 +201,305 @@ pnpm build
 pnpm start
 ```
 
-Coloque a aplicação atrás de HTTPS. Em produção (`NODE_ENV=production`) os cookies são emitidos com `secure: true` — sob HTTP puro o navegador os descarta e o login não completa.
+Put the app behind HTTPS. In production (`NODE_ENV=production`) cookies are issued with `secure: true` — over plain HTTP the browser drops them and login never completes.
 
-### Notas por plataforma
+### Platform notes
 
-- **Vercel:** o `vercel.json` já declara o cron (`0 12 * * *`) e a Vercel injeta o `Authorization` a partir do `CRON_SECRET`. O plano Hobby limita a um disparo diário — o suficiente porque o cron é *backstop*, não o relógio principal (ver [Rounds e prazos](#rounds-e-prazos)).
-- **Docker / VPS / Node gerenciado:** funciona com `next start` atrás de um proxy reverso. Se usar `output: "standalone"`, confirme que `lib/cardinfo.json` foi copiado junto. Configure o cron do sistema para o endpoint acima.
-- **Escalonamento horizontal:** é seguro. Não existe estado em memória de processo que precise ser compartilhado — cache de perfil, rate limit e lock de fetch já vivem no banco. O pool de conexões é pequeno de propósito (3 por instância) justamente por causa de muitas instâncias concorrentes.
+- **Vercel:** `vercel.json` already declares the cron (`0 12 * * *`) and Vercel injects the `Authorization` header from `CRON_SECRET`. The Hobby plan allows one run a day — enough, because the cron is a *backstop*, not the main clock (see [Rounds and deadlines](#rounds-and-deadlines)).
+- **Docker / VPS / managed Node:** works with `next start` behind a reverse proxy. If you use `output: "standalone"`, confirm `lib/cardinfo.json` was copied along. Point the system cron at the endpoint above.
+- **Horizontal scaling:** safe. There is no in-process state that needs sharing — profile cache, rate limit and fetch lock all live in the database. The connection pool is deliberately small (3 per instance) precisely because of many concurrent instances.
 
-## Autenticação e sessões
+## Authentication and sessions
 
-São **duas sessões independentes**, com cookies e regras diferentes. Uma não desloga a outra.
+There are **two independent sessions**, with different cookies and different rules. Signing out of one does not sign out of the other.
 
-### Sessão do jogador — cookie `redu_session`
+### Player session — `redu_session` cookie
 
-- Criptografada com iron-session (`SESSION_SECRET`), `httpOnly`, `sameSite=lax`, TTL de 7 dias.
-- Guarda: identidade Discord (`userId`, `username`, `displayName`, `avatar`), o **token Nexus**, e um snapshot de nome/avatar/contributor usado como fallback de render.
-- O token Nexus fica dentro do cookie criptografado porque é a única credencial que lê os decks do jogador. O cliente recebe apenas o texto cifrado.
+- Encrypted with iron-session (`SESSION_SECRET`), `httpOnly`, `sameSite=lax`, 7-day TTL.
+- Holds: the Discord identity (`userId`, `username`, `displayName`, `avatar`), the **Nexus token**, and a name/avatar/contributor snapshot used as a render fallback.
+- The Nexus token rides inside the encrypted cookie because it is the only credential that can read a player's decks. The client only ever holds ciphertext.
 
-**Fluxo:**
+**Flow:**
 
-1. `/login` → botão **Continue with Discord** → `/login/discord` monta a URL de autorização (`scope=identify`) e grava dois cookies temporários (`player_oauth_state`, `player_next`, escopo `/login`, 10 min).
-2. Discord redireciona para `/login/callback`. O `state` é conferido, o `code` é trocado por token e o perfil é lido.
-3. **Nenhum cargo ou servidor é verificado** — qualquer conta Discord válida entra.
-4. Os dados do Discord são gravados em `discord_accounts` (upsert a cada login).
-5. Se aquela conta Discord já tem um token Nexus vinculado (`players.nexus_token`) e ele ainda funciona, a sessão é completada e o jogador cai onde queria ir. Se o token foi revogado, ele é apagado do banco ali mesmo.
-6. Sem token válido, o jogador vai para `/login/nexus`, cola o token, e ele é validado contra a Nexus, vinculado ao Discord e guardado para os próximos logins.
+1. `/login` → **Continue with Discord** → `/login/discord` builds the authorisation URL (`scope=identify`) and writes two short-lived cookies (`player_oauth_state`, `player_next`, scoped to `/login`, 10 min).
+2. Discord redirects to `/login/callback`. The `state` is checked, the `code` exchanged for a token, and the profile read.
+3. **No role or server membership is checked** — any valid Discord account gets in.
+4. The Discord data is written to `discord_accounts` (upserted on every login).
+5. If that Discord account already has a Nexus token linked (`players.nexus_token`) and it still works, the session is completed and the player lands where they were headed. If the token has been revoked, it is dropped from the database right there.
+6. Without a valid token the player goes to `/login/nexus`, pastes it, and it is validated against Nexus, tied to the Discord account and kept for future logins.
 
-**O portão da área logada é o token Nexus.** Toda página logada checa `session.token`; sem ele, redireciona para `/login`, que por sua vez manda para `/login/nexus` quando já existe sessão Discord. Ou seja: logar no Discord identifica, mas não abre nada até existir um token Nexus válido.
+**The gate to the signed-in area is the Nexus token.** Every signed-in page checks `session.token`; without it, the visitor is sent to `/login`, which forwards to `/login/nexus` when a Discord session already exists. In other words: signing in with Discord identifies you, but opens nothing until a valid Nexus token exists.
 
-Se a Nexus rejeitar o token depois (revogado, conta apagada), o `SiteHeader` detecta na primeira renderização seguinte e o overlay `SessionExpiredRedirect` destrói a sessão e devolve o jogador ao login.
+If Nexus later rejects the token (revoked, account deleted), `SiteHeader` catches it on the next render and the `SessionExpiredRedirect` overlay destroys the session and returns the player to login.
 
-### Sessão de admin — cookie `admin_session`
+### Admin session — `admin_session` cookie
 
-- JWT HS256 assinado com `AUTH_SECRET` (`jose`), `httpOnly`, `sameSite=lax`, TTL de 1 dia.
-- Guarda: `userId`, `username`, `displayName` do Discord e, se houver, o token Nexus vinculado pelo admin.
+- HS256 JWT signed with `AUTH_SECRET` (`jose`), `httpOnly`, `sameSite=lax`, 1-day TTL.
+- Holds: `userId`, `username`, `displayName` from Discord and, if there is one, the Nexus token the admin linked.
 
-**Fluxo:** `/admin` → `/admin/login` → Discord → `/admin/callback`, que exige **cargo `DISCORD_MOD_ROLE_ID` no servidor `DISCORD_GUILD_ID`** (lido com o bot). Sem o cargo, volta para a home sem sessão. Com o cargo: upsert em `admins`, criação do JWT, e — se o admin já vinculou um token Nexus — a sessão pública é criada junto, com a mesma identidade Discord.
+**Flow:** `/admin` → `/admin/login` → Discord → `/admin/callback`, which requires the **`DISCORD_MOD_ROLE_ID` role in the `DISCORD_GUILD_ID` server** (read with the bot). Without the role, back to the home page with no session. With it: upsert into `admins`, JWT created, and — if the admin has already linked a Nexus token — the public session is created too, carrying the same Discord identity.
 
-**Proteção das rotas:** `proxy.ts` (o middleware do Next 16) intercepta `/admin/:path*`. Só `/admin`, `/admin/login`, `/admin/callback` e `/admin/logout` passam sem sessão; qualquer outra rota exige JWT válido. Assim uma página admin nova nasce protegida, e a request rejeitada nunca chega a renderizar markup protegido. O destino original viaja no `next` para o retorno pós-login.
+**Route protection:** `proxy.ts` (Next 16's middleware) intercepts `/admin/:path*`. Only `/admin`, `/admin/login`, `/admin/callback` and `/admin/logout` pass without a session; every other route requires a valid JWT. A new admin page is therefore protected the moment it exists, and a rejected request never renders protected markup. The original destination travels in `next` for the post-login return.
 
-## Área administrativa
+## Admin area
 
-Tudo abaixo de `/admin` renderiza dentro do `AdminShell` e roda atrás do middleware. Toda ação relevante grava em `audit_logs` via `recordAction` — quem fez, em qual alvo e o quê.
+Everything under `/admin` renders inside `AdminShell` and runs behind the middleware. Every meaningful action is written to `audit_logs` through `recordAction` — who did it, on which target, and what.
 
 ### `/admin/dashboard`
 
-- **Lê:** `tournaments` (próximos eventos), perfil Nexus do admin (via cache), `notifications` (contagem de não lidos).
-- **Escreve:** vínculo do token Nexus do admin.
-- **Ações:** `linkNexusToken` (valida o token na Nexus, grava em `admins.nexus_token` e cria também a sessão de jogador), `unlinkNexusToken`.
-- **Por que existe:** a verificação automática de duelos precisa de *algum* token válido para consultar a Nexus. É esse token compartilhado que ela usa.
+- **Reads:** `tournaments` (upcoming events), the admin's Nexus profile (through the cache), `notifications` (unread count).
+- **Writes:** the admin's Nexus token link.
+- **Actions:** `linkNexusToken` (validates the token against Nexus, stores it in `admins.nexus_token` and creates the player session too), `unlinkNexusToken`.
+- **Why it exists:** automatic duel verification needs *some* valid token to query Nexus. That shared token is what it uses.
 
-### `/admin/tournaments` e `/admin/tournaments/new`
+### `/admin/tournaments` and `/admin/tournaments/new`
 
-- **Lê:** `tournaments`.
-- **Escreve:** `tournaments` (incluindo os bytes do banner).
-- **Espera do formulário:** nome, descrição em markdown, banner (arquivo ≤ 5 MB, imagem), data/hora + timezone (convertidos para UTC na gravação), **banlist**, estrutura, rounds, top cut, vagas, formato de partida, engine, modo de duração, relógios de round, inscrição (grátis/paga com valor e moeda), host, URL de inscrição e a flag de premiação.
-- **Regras que o servidor aplica** (não confie no formulário): rounds só valem para Swiss; o tamanho do top cut é **derivado** do número de vagas, nunca digitado; cada modo de duração lê só o relógio que usa; o slug é único, gerado a partir do nome.
-- **Ações:** `createTournamentAction`, `updateTournamentAction`, `cancelTournamentAction` (mantém histórico, não gera placings nem pontua), `deleteTournamentAction`.
+- **Reads:** `tournaments`.
+- **Writes:** `tournaments` (including the banner bytes).
+- **Expects from the form:** name, markdown description, banner (image file ≤ 5 MB), date/time + timezone (converted to UTC on write), **banlist**, structure, rounds, top cut, seats, match format, engine, duration mode, round clocks, entry (free/paid with amount and currency), host, signup URL and the prizing flag.
+- **Rules the server enforces** (never trust the form): rounds only mean anything for Swiss; the top cut size is **derived** from the seat count, never typed; each duration mode reads only the clock it uses; the slug is unique, generated from the name.
+- **Actions:** `createTournamentAction`, `updateTournamentAction`, `cancelTournamentAction` (keeps the history, generates no placings and scores nothing), `deleteTournamentAction`.
 
 ### `/admin/tournaments/[slug]`
 
-Edição do torneio, painel de premiação (quando ligada) e as ações destrutivas.
+Tournament editing, the prizing panel (when enabled) and the destructive actions.
 
-- **Lê:** `tournaments`, `tournament_prizes`.
-- **Escreve:** `tournaments`, `tournament_prizes`, `notifications` (no envio da premiação).
-- **Ações:** as de edição acima, mais `addPrizesAction`, `removePrizeAction` e `sendPrizesAction`.
+- **Reads:** `tournaments`, `tournament_prizes`.
+- **Writes:** `tournaments`, `tournament_prizes`, `notifications` (when prizing is sent).
+- **Actions:** the editing ones above, plus `addPrizesAction`, `removePrizeAction` and `sendPrizesAction`.
 
 ### `/admin/tournaments/[slug]/participants`
 
-- **Lê:** `registrations` (join com `tournaments`), estado do bracket.
-- **Escreve:** `registrations`, `notifications`, `audit_logs`.
-- **Ações:** adicionar participante manual (nome + uuid do deck), trocar/forçar deck, confirmar ou contestar pagamento, remover, desqualificar (notifica o jogador) e reinstaurar.
-- **Detalhe:** inscrição manual não tem conta vinculada — não recebe notificação nem código de premiação, porque não há caixa de entrada para onde enviar.
+- **Reads:** `registrations` (joined with `tournaments`), bracket state.
+- **Writes:** `registrations`, `notifications`, `audit_logs`.
+- **Actions:** add a manual participant (name + deck uuid), change/override a deck, confirm or contest payment, remove, disqualify (notifies the player) and reinstate.
+- **Detail:** a manual entry has no linked account — it gets no notification and no prize code, because there is no inbox to send to.
 
 ### `/admin/tournaments/[slug]/bracket`
 
-- **Lê:** `tournament_brackets`, `registrations`, `match_deadlines`, `match_flags`, `match_reports`.
-- **Escreve:** as mesmas, mais `tournament_placings` e `deck_snapshots` no encerramento.
-- **Ações:** `startBracketAction` (fecha inscrições, trava as listas de deck, gera o round 1), `enterResultAction` (override do moderador), `dismissNoShowAdminAction`, `nextRoundAction`, `extendRoundAction`, `updateBracketStatusAction` (força a verificação na Nexus agora), `completeBracketAction` (congela colocações, retrospecto e ranking points; marca o torneio como `finished`).
+- **Reads:** `tournament_brackets`, `registrations`, `match_deadlines`, `match_flags`, `match_reports`.
+- **Writes:** the same, plus `tournament_placings` and `deck_snapshots` at completion.
+- **Actions:** `startBracketAction` (closes signups, locks the deck lists, generates round 1), `enterResultAction` (moderator override), `dismissNoShowAdminAction`, `nextRoundAction`, `extendRoundAction`, `updateBracketStatusAction` (forces the Nexus check right now), `completeBracketAction` (freezes placings, match records and ranking points; marks the tournament `finished`).
 
 ### `/admin/messages`
 
-- **Lê:** `tournaments` (para o seletor) e `players` (nomes Nexus para o autocomplete, 500 mais recentes).
-- **Escreve:** `notifications`.
-- **Espera:** título, corpo em markdown e o público — todos os jogadores, o grid de um torneio, ou jogadores específicos escolhidos por nome Nexus.
-- **Envia:** para "todos", **uma** notificação global; para os demais, uma por jogador. Toda mensagem sai assinada com o nome do admin remetente. Nomes que não casam com nenhuma conta voltam listados na resposta em vez de derrubar o envio inteiro.
+- **Reads:** `tournaments` (for the selector) and `players` (Nexus names for the autocomplete, 500 most recent).
+- **Writes:** `notifications`.
+- **Expects:** title, markdown body and the audience — every player, one tournament's field, or specific players picked by Nexus name.
+- **Sends:** for "everyone", **one** global notification; otherwise one per player. Every message goes out signed with the sending admin's name. Names matching no account come back listed in the response instead of failing the whole send.
 
 ### `/admin/inbox`
 
-Feed de alertas do sistema para a moderação: deck alterado durante torneio, desqualificação automática, no-show, resultado contestado. Lê `notifications` + `notification_reads`; abrir a mensagem é o que marca como lida.
+The system's alert feed for moderation: deck changed mid-tournament, automatic disqualification, no-show, contested result. Reads `notifications` + `notification_reads`; opening a message is what marks it read.
 
 ### `/admin/logs`
 
-Auditoria completa com filtro por ator, ação e alvo, paginada de 25 em 25. Lê `audit_logs` e `admins`.
+Full audit trail, filterable by actor, action and target, paginated 25 at a time. Reads `audit_logs` and `admins`.
 
-## Site público
+## Public site
 
 ### `/` — home
 
-Estática: o que é o formato, FAQ, evento em destaque. Não consulta banco.
+Static: what the format is, FAQ, featured event. No database access.
 
-### `/events` — lista de torneios
+### `/events` — tournament list
 
-- **Consome:** `tournaments`, e, se logado, as inscrições e os salvos do jogador.
-- **Efeito colateral:** dispara a verificação de duelos ativos em background (`after()`), respeitando o cache/lock de 5 minutos por torneio.
-- Filtros de estrutura, data e vagas, com paginação.
+- **Consumes:** `tournaments`, and, when signed in, the player's signups and saved events.
+- **Side effect:** kicks off verification of active duels in the background (`after()`), respecting the 5-minute cache/lock per tournament.
+- Filters by structure, date and seats, with pagination.
 
-### `/events/[slug]` — página do torneio
+### `/events/[slug]` — tournament page
 
-Renderiza em três variantes conforme o status: **próximo**, **em andamento** e **encerrado**.
+Renders in three variants depending on status: **upcoming**, **running** and **finished**.
 
-- **Consome:** `tournaments`, `registrations`, `tournament_brackets`, `tournament_placings`, `match_*`, `redo_requests`, `saved_tournaments` e o perfil Nexus do visitante.
-- **O jogador logado vê e faz:** seu round atual, sala/hash do duelo, reportar resultado, contestar, chamar no-show, pedir/aceitar/recusar refazer duelo caído.
-- **Efeitos colaterais:** fecha partidas vencidas e roda a verificação de duelos, ambos em background.
-- Mostra a banlist do evento junto dos outros dados.
+- **Consumes:** `tournaments`, `registrations`, `tournament_brackets`, `tournament_placings`, `match_*`, `redo_requests`, `saved_tournaments` and the visitor's Nexus profile.
+- **A signed-in player sees and does:** their current round, the duel room/hash, report a result, contest, call a no-show, request/accept/reject a redo of a disconnected duel.
+- **Side effects:** closes overdue matches and runs duel verification, both in the background.
+- Shows the event's banlist alongside the other facts.
 
-### `/events/[slug]/signup` — inscrição
+### `/events/[slug]/signup` — signup
 
-- **Consome:** `tournaments`, `registrations` e os decks do perfil Nexus.
-- **Valida:** tamanho do deck e a legalidade **contra a banlist daquele torneio**. Decks ilegais aparecem desabilitados no seletor, com o motivo escrito.
-- **Filtros do seletor:** busca por nome do deck e um "só decks legais para este evento". Um deck já escolhido continua escolhido mesmo que o filtro o esconda — a página avisa quando isso acontece.
-- **Grava:** `registrations` com o snapshot da lista no momento da inscrição — é esse snapshot que a checagem de deck alterado compara depois.
-- Exige login: sem sessão, vai para o login e volta.
+- **Consumes:** `tournaments`, `registrations` and the decks from the Nexus profile.
+- **Validates:** deck size and legality **against that tournament's banlist**. Illegal decks appear disabled in the picker, with the reason spelled out.
+- **Picker filters:** search by deck name and an "only decks legal for this event" toggle. A deck already selected stays selected even when the filter hides it — the page says so when that happens.
+- **Writes:** `registrations` with the list snapshot taken at signup — that snapshot is what the deck-change check compares against later.
+- Requires login: with no session, off to login and back.
 
-### `/dashboard` — painel do jogador
+### `/dashboard` — player dashboard
 
-- **Consome:** perfil e decks da Nexus, `tournaments`, `registrations`, `tournament_placings`, `notifications`, round atual.
-- Lista os decks **sempre validados pela banlist REDU** (a escolha de formato é por torneio, não do painel), inscrições, histórico de colocações e o round em andamento.
-- **Ações:** atualizar perfil (refetch forçado na Nexus), sair, desfazer "salvar evento".
+- **Consumes:** Nexus profile and decks, `tournaments`, `registrations`, `tournament_placings`, `notifications`, current round.
+- Lists decks **always validated against the REDU banlist** (the format choice belongs to a tournament, not to the dashboard), signups, placing history and the round in progress.
+- **Actions:** refresh profile (forced refetch from Nexus), sign out, undo "save event".
 
-### `/inbox` — caixa de entrada do jogador
+### `/inbox` — player inbox
 
-Mensagens dirigidas a ele mais os avisos globais. Corpo renderizado como markdown. Abrir marca como lida (por leitor).
+Messages addressed to them plus global alerts. Body rendered as markdown. Opening marks it read (per reader).
 
 ### `/leaderboard`
 
-Tabela paginada de 20 em 20 com rank, avatar, nome, pontos, número de eventos, W/L total e melhor colocação. Lê `tournament_placings` agregado por jogador — sem reconstruir bracket nenhum, porque o retrospecto é congelado no encerramento do torneio.
+Table paginated 20 at a time with rank, avatar, name, points, event count, total W/L and best placement. Reads `tournament_placings` aggregated per player — rebuilding no bracket at all, because the match record is frozen when the tournament completes.
 
 ### `/banlist`, `/rulings`
 
-Conteúdo estático do formato REDU, servido de `lib/`.
+Static REDU Format content, served from `lib/`.
 
 ### `/login`, `/login/nexus`
 
-Ver [Autenticação e sessões](#autenticação-e-sessões).
+See [Authentication and sessions](#authentication-and-sessions).
 
-### O que é guardado sobre o jogador
+### What is stored about a player
 
-| Dado | Onde | Observação |
+| Data | Where | Note |
 |---|---|---|
-| Token Nexus | cookie criptografado + `players.nexus_token` | Credencial. Nunca renderizado, nunca enviado ao cliente em claro, nunca incluído em notificação. |
-| Nome, avatar, contributor da Nexus | `players` + snapshot na sessão | É a identidade exibida em todo o site. |
-| Username, display name e avatar do Discord | `discord_accounts` | Registro apenas — nada player-facing lê essa tabela. |
-| Listas de deck | `registrations.deck_snapshot`, `deck_snapshots` | Base da checagem de deck alterado durante o torneio. |
-| Resultados | `tournament_placings`, `tournament_brackets` | Histórico permanente. |
+| Nexus token | encrypted cookie + `players.nexus_token` | A credential. Never rendered, never sent to the client in the clear, never included in a notification. |
+| Nexus name, avatar, contributor | `players` + session snapshot | This is the identity shown everywhere on the site. |
+| Discord username, display name and avatar | `discord_accounts` | Record only — nothing player-facing reads that table. |
+| Deck lists | `registrations.deck_snapshot`, `deck_snapshots` | The basis of the mid-tournament deck-change check. |
+| Results | `tournament_placings`, `tournament_brackets` | Permanent history. |
 
-## Rotas HTTP
+## HTTP routes
 
-| Rota | Método | Autenticação | Função |
+| Route | Method | Auth | Purpose |
 |---|---|---|---|
-| `/api/cron/round-deadlines` | GET | `Bearer $CRON_SECRET` | Fecha partidas vencidas e resolve no-shows em todos os torneios. |
-| `/api/auth/logout` | GET | sessão | Destrói a sessão do jogador. |
-| `/api/discord/interactions` | POST | assinatura Ed25519 (`DISCORD_BOT_PUBLIC_KEY`) | Webhook de interações do bot (ping + slash commands). |
-| `/events/[slug]/banner` | GET | pública | Serve os bytes do banner direto do banco. |
-| `/login/discord`, `/login/callback` | GET | — | OAuth do jogador. |
-| `/admin/login`, `/admin/callback` | GET | — | OAuth do admin. |
-| `/admin/logout` | POST | sessão de admin | Destrói a sessão de admin (é um form, não um link). |
+| `/api/cron/round-deadlines` | GET | `Bearer $CRON_SECRET` | Closes overdue matches and resolves no-shows across every tournament. |
+| `/api/auth/logout` | GET | session | Destroys the player session. |
+| `/api/discord/interactions` | POST | Ed25519 signature (`DISCORD_BOT_PUBLIC_KEY`) | Bot interactions webhook (ping + slash commands). |
+| `/events/[slug]/banner` | GET | public | Serves the banner bytes straight from the database. |
+| `/login/discord`, `/login/callback` | GET | — | Player OAuth. |
+| `/admin/login`, `/admin/callback` | GET | — | Admin OAuth. |
+| `/admin/logout` | POST | admin session | Destroys the admin session (it is a form, not a link). |
 
-## Integrações externas
+## External integrations
 
 ### Dueling Nexus
 
-Não há API oficial nem chave: as leituras usam o token do próprio jogador (ou o token compartilhado vinculado por um admin) contra os endpoints públicos.
+There is no official API and no key: reads use the player's own token (or the shared token an admin linked) against the public endpoints.
 
-- **Perfil e decks** (`get-info.php`): a Nexus responde HTTP 200 mesmo com token inválido, então só o corpo (`success: true`) decide. Cache em dois níveis: memória do processo (1 min) e tabela `nexus_profile_cache`.
-- **Replays** (`get-replay-info.php`): usados para verificar automaticamente o resultado dos duelos. Cada torneio tem um cache/lock de 5 minutos em `nexus_fetch_log` — duas requisições simultâneas nunca disparam duas chamadas.
-- **Deck lock:** a lista registrada é congelada no início do torneio; a cada visita, round e login, o deck é comparado com o que está na Nexus. Deck editado durante o torneio gera desqualificação automática e notifica jogador e moderação.
+- **Profile and decks** (`get-info.php`): Nexus answers HTTP 200 even for an invalid token, so only the body (`success: true`) decides. Two cache levels: process memory (1 min) and the `nexus_profile_cache` table.
+- **Replays** (`get-replay-info.php`): used to verify duel results automatically. Each tournament has a 5-minute cache/lock in `nexus_fetch_log` — two simultaneous requests never fire two calls.
+- **Deck lock:** the registered list is frozen when the tournament starts; on every visit, round and login the deck is compared to what Nexus reports. A deck edited mid-tournament is disqualified automatically, and both the player and moderation are notified.
 
 ### Discord
 
-- **OAuth2** (`identify`) para os dois logins.
-- **Bot** para ler o cargo do membro e autorizar admins.
-- **Webhook de interações** em `/api/discord/interactions`, com verificação de assinatura.
+- **OAuth2** (`identify`) for both logins.
+- **Bot** to read the member's role and authorise admins.
+- **Interactions webhook** at `/api/discord/interactions`, with signature verification.
 
-### Rounds e prazos
+### Rounds and deadlines
 
-O relógio do round é calculado a partir de prazos persistidos (`match_deadlines`), não de um timer em memória. Isso significa que o round fecha na hora certa mesmo que nada tenha "varrido" o banco ainda. A varredura acontece em três lugares: no cron diário, sempre que alguém abre uma página de torneio ativo, e a cada reporte de jogador.
+The round clock is computed from persisted deadlines (`match_deadlines`), not from an in-memory timer. That means a round closes on time even if nothing has swept the database yet. The sweep happens in three places: the daily cron, every time someone opens an active tournament page, and on every player report.
 
-## Validação de deck
+## Deck validation
 
-Cada torneio declara sua banlist e é ela que decide a validação na inscrição. O painel do jogador é sempre REDU.
+Every tournament declares its banlist, and that is what decides validation at signup. The player dashboard is always REDU.
 
-**REDU (2012.10 / Wind-Up)** — `lib/validateDecks.ts`, sobre a biblioteca congelada em `lib/cardLib.ts`:
+**REDU (2012.10 / Wind-Up)** — `lib/validateDecks.ts`, over the frozen library in `lib/cardLib.ts`:
 
-- pool de cartas do formato (carta fora do pool é ilegal);
-- banlist do formato, com todas as impressões de uma carta contando juntas;
-- errata: cartas com errata só valem na impressão pré-errata.
+- the format's card pool (a card outside it is illegal);
+- the format's banlist, with every printing of a card counting together;
+- errata: an errata'd card is only legal in its pre-errata printing.
 
-**TCG (2026.05)** — `lib/tcg-decks.ts`, sobre `lib/cardinfo.json`:
+**TCG (2026.05)** — `lib/tcg-decks.ts`, over `lib/cardinfo.json`:
 
-- rarity removida do id (`id % 100000000000`) — vale para os dois validadores;
-- carta legal se `misc_info[0].formats` contém `TCG` **ou** `misc_info[0].tcg_date` é uma data válida;
-- cópias limitadas por `banlist_info.ban_tcg` (forbidden 0, limited 1, semi-limited 2, resto 3);
-- id não encontrado: primeiro procura em `card_images` (é lá que ficam os ids de arte alternativa), depois tenta decrementando 1, até 5 vezes, para impressões que o `card_images` não lista;
-- ids que continuam sem match aparecem juntos numa linha só, pedindo para o jogador revisar artes alternativas e avisar a moderação;
-- carta que existe mas nunca saiu no TCG é apontada pelo nome, não como id desconhecido.
+- rarity stripped off the id (`id % 100000000000`) — this applies to both validators **and to deck snapshots**, on write and on read: buying the same card in another rarity must not read as a deck edit and disqualify a player mid-tournament;
+- a card is legal if `misc_info[0].formats` contains `TCG`, **or** `misc_info[0].tcg_date` is a valid date, **or** any `card_sets[].set_code` is an English print code (`XXXX-EN000`) — a set can be out for weeks before the dump's format list and release date catch up with it;
+- copies limited by `banlist_info.ban_tcg` (forbidden 0, limited 1, semi-limited 2, everything else 3);
+- id not found: look in `card_images` first (that is where alternate art ids live), then walk down by 1, up to 5 times, for printings `card_images` does not list;
+- ids that still match nothing are reported together on a single line, asking the player to check alternate arts and contact moderation;
+- a card that exists but never came out in the TCG is named, rather than reported as an unknown id.
 
-## Premiação (prizing)
+## Prizing
 
-Ligada por torneio (`has_prizing`). Os códigos são cadastrados em lote — uma linha `[código] [tipo]` por vez, `+` adiciona outra e um "Save codes" grava todas — enquanto o torneio está agendado ou em andamento, e congelam quando ele encerra.
+Enabled per tournament (`has_prizing`). Codes are entered as a batch — one `[code] [type]` row at a time, `+` adds another and one "Save codes" stores them all — while the tournament is scheduled or running, and freeze once it finishes. Clicking `+` also stashes what has been typed in `localStorage` (`redu:prize-codes:{slug}`), which is restored when the page is opened again and cleared once the codes are actually saved.
 
-**Faixas:** Winner = 1º; Runner-up = 2º; Top 4 = 3º–4º; Top 8 = 5º–8º; Top 16 = 9º–16º; Top 32 = 17º–32º; Participação = todo o resto que terminou.
+**Tiers:** Winner = 1st; Runner-up = 2nd; Top 4 = 3rd–4th; Top 8 = 5th–8th; Top 16 = 9th–16th; Top 32 = 17th–32nd; Participation = everyone else who finished.
 
-**Envio** (botão *Send prizing*, só com o torneio encerrado): cada jogador recebe **um** código — o da sua faixa, se ainda houver, senão um de participação. Código de faixa nunca vaza para fora dela; os de participação são sorteados. Drops e desqualificados não recebem nada, nem participação. Inscrição manual sem conta também não, por não ter caixa de entrada. O envio é único: um clique duplo não manda duas vezes, porque a operação é reivindicada em `prizes_sent_at` antes de qualquer entrega.
+**Sending** (the *Send prizing* button, only once the tournament is finished): each player receives **one** code — the one for their tier if any is left, otherwise a participation code. A tier code never leaks outside its tier; participation codes are dealt at random. Drops and disqualifications receive nothing, participation included. A manual entry with no account receives nothing either, having no inbox. The send happens once: a double click cannot send twice, because the operation is claimed on `prizes_sent_at` before anything is delivered.
 
-## Mensagens para jogadores
+## Messages to players
 
-Entrega interna, pela caixa de entrada do site (`/inbox`) — **não há envio de e-mail**. O corpo aceita markdown, renderizado da mesma forma que a descrição do torneio.
+Delivered internally, through the site inbox (`/inbox`) — **there is no email**. The body accepts markdown, rendered the same way a tournament description is.
 
-Segurança do markdown: HTML cru na origem é escapado antes da conversão, e links com esquema executável são neutralizados. Isso vale para todas as caixas de entrada porque os alertas do sistema citam nomes de deck e de jogador — texto que o próprio jogador escolhe.
+Markdown safety: raw HTML in the source is escaped before conversion, and links with executable schemes are neutralised. This applies to every inbox, because system alerts quote deck names and player names — text the player chooses themselves.
 
-## Testes
+## Tests
 
 ```bash
 pnpm test
 ```
 
-Roda `node:test` direto sobre os arquivos TypeScript. **Parte da suíte precisa de banco** (`lib/tournaments.test.ts`, `lib/results.test.ts`, `lib/player.test.ts`, `lib/registration.test.ts`, entre outros): eles usam a `DATABASE_URL` do `.env.local` e limpam as tabelas que tocam. Aponte para um banco descartável, nunca para produção.
+Runs `node:test` directly over the TypeScript files. **Part of the suite needs a database** (`lib/tournaments.test.ts`, `lib/results.test.ts`, `lib/player.test.ts`, `lib/registration.test.ts`, among others): they use the `DATABASE_URL` from `.env.local` and clear the tables they touch. Point it at a throwaway database, never at production.
 
-Os testes puros — sem banco — podem rodar isolados:
+The pure tests — no database — can run on their own:
 
 ```bash
-node --experimental-strip-types --test lib/prizing.test.ts lib/tcg-decks.test.ts lib/validateDecks.test.ts lib/rounds.test.ts lib/cards.test.ts
+node --experimental-strip-types --test lib/prizing.test.ts lib/tcg-decks.test.ts lib/validateDecks.test.ts lib/rounds.test.ts lib/cards.test.ts lib/deck-diff.test.ts
 ```
 
-## Estrutura de pastas
+## Folder structure
 
 ```
-app/                      rotas (App Router), páginas e Server Actions
-  admin/(protected)/      área administrativa, atrás do middleware
-  api/                    rotas HTTP (cron, logout, webhook do Discord)
-  events/                 lista, página do torneio e inscrição
-  login/                  OAuth do jogador e vínculo do token Nexus
+app/                      routes (App Router), pages and Server Actions
+  admin/(protected)/      admin area, behind the middleware
+  api/                    HTTP routes (cron, logout, Discord webhook)
+  events/                 list, tournament page and signup
+  login/                  player OAuth and Nexus token linking
 components/
-  admin/                  componentes da área administrativa
-  site/                   componentes do site público
-  ui/                     primitivos compartilhados (Button, Panel, Markdown...)
+  admin/                  admin area components
+  site/                   public site components
+  ui/                     shared primitives (Button, Panel, Markdown...)
 lib/
-  auth.ts                 sessão do jogador, perfil Nexus, cache
-  auth/                   sessão de admin (JWT) e estado de OAuth
+  auth.ts                 player session, Nexus profile, cache
+  auth/                   admin session (JWT) and OAuth state
   backend/
     db/                   pool, migrations, runner
-    repositories/         acesso a tabelas, SQL fica aqui
-    services/             regras de negócio, orquestram repositórios
-  events.ts               tipos e helpers do domínio de torneio
-  validateDecks.ts        validação REDU
-  tcg-decks.ts            validação TCG
-  prizing.ts              faixas de premiação e distribuição de códigos
-  cardLib.ts              biblioteca de cartas do formato REDU (gerada)
-  cardinfo.json           dump completo de cartas, fonte de verdade do TCG
-docs/                     documentação de arquitetura e fluxo do torneio
-proxy.ts                  middleware do Next 16, protege /admin
+    repositories/         table access, SQL lives here
+    services/             business rules, orchestrate repositories
+  events.ts               tournament domain types and helpers
+  validateDecks.ts        REDU validation
+  tcg-decks.ts            TCG validation
+  prizing.ts              prize tiers and code distribution
+  cardLib.ts              REDU format card library (generated)
+  cardinfo.json           full card dump, source of truth for TCG
+docs/                     architecture and tournament flow documentation
+proxy.ts                  Next 16 middleware, protects /admin
 ```
 
-A regra de camadas: **página/action → serviço → repositório → banco**. SQL só existe em `lib/backend/repositories`. Páginas não falam com repositório direto.
+The layering rule: **page/action → service → repository → database**. SQL exists only in `lib/backend/repositories`. Pages never talk to a repository directly.
 
 ---
 
-## Débito técnico
+## Technical debt
 
-Itens conhecidos, em aberto, em ordem de impacto estrutural.
+Known open items, in order of structural impact.
 
-### 1. Tornar o projeto agnóstico ao produto ("white label")
+### 1. Make the project product-agnostic ("white label")
 
-Hoje o REDU está soldado em tudo: nome, textos, banlist padrão, home, FAQ, página de banlist, regras de pontuação e até o vocabulário do domínio. Deveria ser possível rodar a mesma base para qualquer comunidade ou jogo, trocando tema, conteúdo e regras de formato por configuração — com o núcleo de torneio (inscrição, chaveamento, resultado, ranking) sem saber de que jogo se trata.
+Today REDU is welded into everything: the name, the copy, the default banlist, the home page, the FAQ, the banlist page, the scoring rules, even the domain vocabulary. It should be possible to run this same codebase for any community or game, swapping theme, content and format rules through configuration — with the tournament core (signup, bracket, results, ranking) not knowing which game it is running.
 
-### 2. Melhorar o cadastro de torneios e validar melhor a estrutura
+### 2. Better tournament creation and structural validation
 
-O formulário aceita combinações que não deveriam existir e valida campo a campo, não o conjunto. Falta validação de estrutura de verdade: coerência entre estrutura, rounds, top cut e número de vagas; janelas de inscrição; pré-visualização do que será gerado; e regras próprias por tipo de evento. Também falta separar "rascunho" de "publicado".
+The form accepts combinations that should not exist, and it validates field by field rather than the whole. Real structural validation is missing: coherence between structure, rounds, top cut and seat count; signup windows; a preview of what will be generated; and rules of its own per event type. Separating "draft" from "published" is missing too.
 
-### 3. Backend agnóstico a banco de dados
+### 3. Database-agnostic backend
 
-O SQL está isolado nos repositórios, o que já ajuda, mas é MariaDB/MySQL explícito (`INSERT IGNORE`, `ON DUPLICATE KEY UPDATE`, tipos `JSON` que voltam como texto). Trocar de banco hoje significa reescrever todo o diretório de repositórios. O caminho é uma interface de persistência com implementações por banco, ou uma camada de query que absorva essas diferenças.
+SQL is isolated in the repositories, which already helps, but it is explicitly MariaDB/MySQL (`INSERT IGNORE`, `ON DUPLICATE KEY UPDATE`, `JSON` columns that come back as text). Switching databases today means rewriting the whole repository directory. The way out is a persistence interface with per-database implementations, or a query layer that absorbs those differences.
 
-### 4. Novos formatos sem depender do JSON gigante
+### 4. New formats without depending on the giant JSON
 
-`lib/cardinfo.json` tem 24 MB e é carregado inteiro para virar um índice pequeno. Funciona, mas não escala para vários formatos: cada novo formato tenderia a trazer o seu próprio dump. O ideal é uma fonte de dados de cartas indexada (banco ou índice compacto gerado em build), com formatos declarados como dados — pool + banlist + erratas — em vez de código.
+`lib/cardinfo.json` is 24 MB and is loaded whole to become a small index. It works, but it does not scale to several formats: each new one would tend to bring its own dump. The right shape is an indexed card data source (a database, or a compact index generated at build time), with formats declared as data — pool + banlist + errata — instead of code.
 
-### 5. Melhorar a UI do site de modo geral
+### 5. General UI improvements
 
-Consistência de espaçamento e tipografia, hierarquia das páginas de torneio, densidade das tabelas, estados vazios, responsividade das telas mais pesadas (bracket, participantes) e acessibilidade. Falta também um passe de design system: hoje há CSS global, módulos e classes utilitárias convivendo.
+Spacing and typography consistency, hierarchy on the tournament pages, table density, empty states, responsiveness on the heaviest screens (bracket, participants) and accessibility. A design-system pass is missing as well: global CSS, CSS modules and utility classes currently coexist.
 
-### 6. Melhorar o tratamento de erros
+### 6. Better error handling
 
-Qualquer erro de backend hoje vira a tela genérica do Next ("this page couldn't load"), sem explicação nem caminho de saída. Falta: `error.tsx` por rota com mensagem útil e ação de retry, distinção entre falha nossa e indisponibilidade da Nexus/Discord, mensagens de Server Action padronizadas na interface, e log estruturado do lado do servidor para o mesmo incidente ser rastreável.
+Any backend error today turns into Next's generic screen ("this page couldn't load"), with no explanation and no way forward. Missing: a per-route `error.tsx` with a useful message and a retry action, a distinction between our own failure and Nexus/Discord being unavailable, standardised Server Action messages in the interface, and structured server-side logging so the same incident is traceable.
 
-### Outros pontos menores já identificados
+### Other smaller items already identified
 
-- O registro de auditoria do login de admin (`admin.login`) está comentado em `app/admin/callback/route.ts` — logins não aparecem no log.
-- Não existe fluxo de "trocar token Nexus" para o jogador fora do momento em que o token quebra.
-- `pnpm db:seed` não gera massa de exemplo, o que torna o onboarding local mais lento do que precisaria.
-- Os testes que tocam banco não têm isolamento próprio: rodam contra a `DATABASE_URL` configurada e limpam tabelas.
+- The audit entry for admin login (`admin.login`) is commented out in `app/admin/callback/route.ts` — logins do not show up in the log.
+- There is no "change my Nexus token" flow for a player outside the moment the token breaks.
+- `pnpm db:seed` generates no sample data, which makes local onboarding slower than it needs to be.
+- The database-backed tests have no isolation of their own: they run against the configured `DATABASE_URL` and clear tables.

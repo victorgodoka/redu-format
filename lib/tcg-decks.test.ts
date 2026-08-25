@@ -30,6 +30,13 @@ test("copies are held to the TCG banlist", () => {
   assert.equal(forbidden.errors[0]?.type, "banlist");
 });
 
+test("an English print code counts as TCG, even before formats/tcg_date catch up", () => {
+  // "Artmage Masterwork -Succession-": no TCG format and no tcg_date in the
+  // dump, but it is printed as DUAD-EN056, so it is legal.
+  const FRESH_PRINT = 37517035;
+  assert.equal(validateTcgDeck(deck([FRESH_PRINT])).valid, true);
+});
+
 test("a card that never reached the TCG is called out by name, not as a missing id", () => {
   const result = validateTcgDeck(deck([OCG_ONLY]));
   assert.equal(result.errors[0]?.type, "not-tcg");
