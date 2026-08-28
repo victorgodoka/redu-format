@@ -1,23 +1,25 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import AdminPageHead from "@/components/admin/AdminPageHead";
+import CancelTournamentButton from "@/components/admin/CancelTournamentButton";
 import CopyLinkButton from "@/components/admin/CopyLinkButton";
-import DeleteButton from "@/components/admin/DeleteButton";
+import DeleteTournamentButton from "@/components/admin/DeleteTournamentButton";
 import PrizingPanel from "@/components/admin/PrizingPanel";
 import StatBar from "@/components/admin/StatBar";
 import TournamentForm from "@/components/admin/TournamentForm";
 import Button from "@/components/ui/Button";
 import Notice from "@/components/ui/Notice";
 import { listPrizes } from "@/lib/backend/services/prizing.service";
+import { STRUCTURES, type TournamentStatus } from "@/lib/events";
 import { getTournament } from "@/lib/tournaments";
-import {
-  addPrizesAction,
-  cancelTournamentAction,
-  deleteTournamentAction,
-  removePrizeAction,
-  sendPrizesAction,
-  updateTournamentAction,
-} from "../actions";
+import { updateTournamentAction } from "../actions";
+
+const STATUS_LABEL: Record<TournamentStatus, string> = {
+  scheduled: "Scheduled",
+  running: "Running",
+  finished: "Finished",
+  cancelled: "Cancelled",
+};
 
 export const metadata: Metadata = {
   title: "Edit tournament | REDU Format",
@@ -33,15 +35,28 @@ export default async function EditTournamentPage({
 }) {
   const { slug } = await params;
   const { error, sent, unclaimed } = await searchParams;
+
   const tournament = await getTournament(slug);
   if (!tournament) notFound();
 
   const prizes = tournament.hasPrizing ? await listPrizes(slug) : [];
 
+  const structureLabel =
+    STRUCTURES[tournament.structure].label +
+    (tournament.structure === "swiss" && tournament.topCut ? " + Top Cut" : "");
+  const eyebrow = `${STATUS_LABEL[tournament.status]} · ${structureLabel} · ${
+    tournament.taken
+  } ${tournament.taken === 1 ? "player" : "players"}`;
+
   return (
     <>
       <AdminPageHead
-        title={tournament.name}
+        title={
+          <span className="admin-page-title">
+            <span className="admin-page-title__eyebrow">{eyebrow}</span>
+            {tournament.name}
+          </span>
+        }
         back={{ href: "/admin/tournaments", label: "← Back to tournaments" }}
       />
 
@@ -62,11 +77,9 @@ export default async function EditTournamentPage({
         <PrizingPanel
           slug={tournament.slug}
           status={tournament.status}
+          tournamentName={tournament.name}
           prizes={prizes}
           prizesSentAt={tournament.prizesSentAt ?? null}
-          addPrizesAction={addPrizesAction}
-          removePrizeAction={removePrizeAction}
-          sendPrizesAction={sendPrizesAction}
         />
       ) : null}
 
@@ -79,21 +92,13 @@ export default async function EditTournamentPage({
             </Button>
             <Button href={`/admin/tournaments/${tournament.slug}/bracket`}>Manage bracket</Button>
             {tournament.status === "scheduled" || tournament.status === "running" ? (
-              <DeleteButton
-                action={cancelTournamentAction}
-                hidden={{ slug: tournament.slug }}
-                confirmText={`Cancel ${tournament.name}? It won't generate placings or count for the ranking. This can't be undone.`}
-                label="Cancel tournament"
-              />
+              <CancelTournamentButton slug={tournament.slug} tournamentName={tournament.name} />
             ) : null}
-            <DeleteButton
-              action={deleteTournamentAction}
-              hidden={{ slug: tournament.slug }}
-              confirmText={`Delete ${tournament.name}? This cannot be undone.`}
-            />
+            <DeleteTournamentButton slug={tournament.slug} tournamentName={tournament.name} />
           </>
         }
       />
     </>
   );
 }
+

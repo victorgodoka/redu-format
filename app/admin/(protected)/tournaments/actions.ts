@@ -2,8 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { recordAction } from "@/lib/audit-log";
-import { getAdminSession } from "@/lib/auth/session";
+import { AuditLogEntry, recordAction } from "@/lib/audit-log";
+import { AdminActor, getAdminSession } from "@/lib/auth/session";
 import {
   DEFAULT_BANLIST,
   DEFAULT_CLEANUP_MINUTES,
@@ -29,16 +29,18 @@ import {
   updateTournament,
   type TournamentDraft,
 } from "@/lib/tournaments";
-
-export type TournamentFormState = { error?: string };
+import { actionError, ActionResult, actionSuccess } from "@/lib/actions-utils";
+import { tournamentErrors } from "@/lib/errors";
+import { logAction } from "@/lib/backend/services/audit.service";
+import { SuccessMessages } from "@/lib/success";
 
 const STRUCTURES: readonly Structure[] = ["swiss", "single-elim", "double-elim"];
 const MATCH_FORMATS = ["Bo1", "Bo3"] as const;
-const MAX_BANNER_BYTES = 5 * 1024 * 1024;
+const MAX_BANNER_BYTES = 2 * 1024 * 1024;
 
-async function readDraft(form: FormData): Promise<TournamentDraft | { error: string }> {
+async function readDraft(form: FormData): Promise<ActionResult<TournamentDraft>> {
   const name = String(form.get("name") ?? "").trim();
-  if (!name) return { error: "Name is required." };
+  if (!name) return actionError(tournamentErrors.tournament.missing.name)
 
   const description = String(form.get("description") ?? "").trim() || null;
 
@@ -49,8 +51,8 @@ async function readDraft(form: FormData): Promise<TournamentDraft | { error: str
   const bannerFile = form.get("banner");
   let banner: TournamentDraft["banner"];
   if (bannerFile instanceof File && bannerFile.size > 0) {
-    if (!bannerFile.type.startsWith("image/")) return { error: "Banner must be an image file." };
-    if (bannerFile.size > MAX_BANNER_BYTES) return { error: "Banner image must be under 5MB." };
+    if (!bannerFile.type.startsWith("image/")) return actionError(tournamentErrors.tournament.invalid.bannerSize)
+    if (bannerFile.size > MAX_BANNER_BYTES) return actionError(tournamentErrors.tournament.invalid.bannerType)
     banner = { data: Buffer.from(await bannerFile.arrayBuffer()), mime: bannerFile.type };
   } else if (form.get("removeBanner") === "on") {
     banner = null;
@@ -61,55 +63,55 @@ async function readDraft(form: FormData): Promise<TournamentDraft | { error: str
   const timeZone = String(form.get("timezone") ?? "").trim() || "UTC";
   const startsAt = date && time ? zonedDateTimeToUtc(date, time, timeZone) : null;
   if (!startsAt) {
-    return { error: "Pick a valid start date, time, and timezone." };
+    return actionError(tournamentErrors.tournament.invalid.startDate)
   }
 
   const structure = String(form.get("structure") ?? "") as Structure;
-  if (!STRUCTURES.includes(structure)) return { error: "Pick a structure." };
+  if (!STRUCTURES.includes(structure)) return actionError(tournamentErrors.tournament.missing.structure)
 
   const matchFormat = String(form.get("matchFormat") ?? "");
   if (!MATCH_FORMATS.includes(matchFormat as (typeof MATCH_FORMATS)[number])) {
-    return { error: "Pick a match format." };
+    return actionError(tournamentErrors.tournament.missing.format)
   }
 
   const engine = String(form.get("engine") ?? "") as Engine;
-  if (!(engine in ENGINES)) return { error: "Pick an engine." };
+  if (!(engine in ENGINES)) return actionError(tournamentErrors.tournament.missing.engine)
 
   // An older form post with no banlist field at all is REDU, same as every
   // tournament that existed before tournaments could be anything else.
   const banlistRaw = String(form.get("banlist") ?? DEFAULT_BANLIST);
-  if (!isBanlist(banlistRaw)) return { error: "Pick a banlist." };
+  if (!isBanlist(banlistRaw)) return actionError(tournamentErrors.tournament.missing.banlist)
 
   // Rounds only means anything for Swiss - elimination brackets size
   // themselves from the field, same as startBracket() already treats it
   // (results.service.ts always passes rounds: 0 for non-Swiss structures).
   const rounds = structure === "swiss" ? Number(form.get("rounds")) : 0;
   if (structure === "swiss" && (!Number.isInteger(rounds) || rounds <= 0)) {
-    return { error: "Rounds must be a positive whole number." };
+    return actionError(tournamentErrors.tournament.invalid.roundLength)
   }
 
   // Standard same-day is the default for anything that doesn't say otherwise,
   // including an older form post that has no such field at all.
   const durationMode = String(form.get("durationMode") ?? "same_day") as DurationMode;
-  if (!(durationMode in DURATION_MODES)) return { error: "Pick a tournament duration mode." };
+  if (!(durationMode in DURATION_MODES)) return actionError(tournamentErrors.tournament.invalid.durationMode)
 
   // Each mode reads only the clock it actually uses; the other keeps its
   // default so a mode switch later finds a sane value rather than a zero.
   const roundMinutes =
     durationMode === "same_day" ? Number(form.get("roundMinutes")) : DEFAULT_ROUND_MINUTES;
   if (!Number.isInteger(roundMinutes) || roundMinutes <= 0) {
-    return { error: "Round length must be a positive whole number of minutes." };
+    return actionError(tournamentErrors.tournament.invalid.roundLength)
   }
 
   const cleanupMinutes =
     durationMode === "same_day" ? Number(form.get("cleanupMinutes")) : DEFAULT_CLEANUP_MINUTES;
   if (!Number.isInteger(cleanupMinutes) || cleanupMinutes < 0) {
-    return { error: "Cleanup period must be a whole number of minutes." };
+    return actionError(tournamentErrors.tournament.invalid.cleanup)
   }
 
   const roundLimitDays = durationMode === "long" ? Number(form.get("roundLimitDays")) : 1;
   if (!Number.isInteger(roundLimitDays) || roundLimitDays <= 0) {
-    return { error: "Round deadline must be a positive whole number of days." };
+    return actionError(tournamentErrors.tournament.invalid.roundDeadline)
   }
 
   const seatsRaw = String(form.get("seats") ?? "");
@@ -119,7 +121,7 @@ async function readDraft(form: FormData): Promise<TournamentDraft | { error: str
   } else {
     seats = Number(seatsRaw);
     if (!SEAT_OPTIONS.includes(seats as (typeof SEAT_OPTIONS)[number])) {
-      return { error: "Pick a seat count." };
+      return actionError(tournamentErrors.tournament.invalid.seatCount)
     }
   }
 
@@ -137,7 +139,7 @@ async function readDraft(form: FormData): Promise<TournamentDraft | { error: str
     const amount = Number(form.get("entryAmount"));
     const currency = String(form.get("entryCurrency") ?? "USD").trim();
     if (!Number.isFinite(amount) || amount <= 0) {
-      return { error: "Entry amount must be greater than zero." };
+      return actionError(tournamentErrors.tournament.invalid.entry)
     }
     entry = { type: "paid", amount, currency };
   } else {
@@ -148,8 +150,7 @@ async function readDraft(form: FormData): Promise<TournamentDraft | { error: str
 
   const host = String(form.get("host") ?? "").trim() || "Dueling Nexus";
   const signupUrl = String(form.get("signupUrl") ?? "").trim() || slugify(name);
-
-  return {
+  return actionSuccess<TournamentDraft>({
     name,
     description,
     banner,
@@ -169,7 +170,7 @@ async function readDraft(form: FormData): Promise<TournamentDraft | { error: str
     host,
     signupUrl,
     hasPrizing,
-  };
+  });
 }
 
 function seatsLabel(seats: number | null): string {
@@ -177,60 +178,61 @@ function seatsLabel(seats: number | null): string {
 }
 
 /** Every action here runs behind the admin middleware, so a session always exists. */
-async function actor() {
-  const session = await getAdminSession();
-  return {
-    actorId: session?.userId ?? "unknown",
-    actorUsername: session?.username ?? "unknown",
-    actorDisplayName: session?.displayName ?? "unknown",
-  };
+export async function getAdminActor(): Promise<AdminActor | null> {
+  try {
+    const session = await getAdminSession();
+    if (!session) return null
+
+    return {
+      actorId: session.userId,
+      actorUsername: session.username,
+      actorDisplayName: session.displayName,
+    };
+  }
+  catch {
+    return null
+  }
 }
 
 export async function createTournamentAction(
-  _prev: TournamentFormState,
+  _prevState: ActionResult,
   form: FormData,
-): Promise<TournamentFormState> {
+): Promise<ActionResult> {
   const draft = await readDraft(form);
-  if ("error" in draft) return draft;
+  if (!draft.success) return draft;
 
-  const tournament = await createTournament(draft);
-  await recordAction({
-    ...(await actor()),
+  const tournament = await createTournament(draft.data!);
+
+  await logAction({
     action: "tournament.create",
     target: tournament.slug,
     detail: `Created tournament "${tournament.name}" (${tournament.structure}, ${seatsLabel(tournament.seats)} seats)`,
-  });
+  }, ["/admin/tournaments", "/events"]);
 
-  revalidatePath("/admin/tournaments");
-  revalidatePath("/events");
-  redirect(`/admin/tournaments/${tournament.slug}`);
+  return actionSuccess(undefined, SuccessMessages.tournament.created);
 }
 
 export async function updateTournamentAction(
-  _prev: TournamentFormState,
+  _prevState: ActionResult,
   form: FormData,
-): Promise<TournamentFormState> {
+): Promise<ActionResult> {
   const slug = String(form.get("slug") ?? "");
   const draft = await readDraft(form);
-  if ("error" in draft) return draft;
+  if (!draft.success) return draft;
 
   const before = await getTournament(slug);
-  const updated = await updateTournament(slug, draft);
-  if (!updated) return { error: "That tournament no longer exists." };
+  const updated = await updateTournament(slug, draft.data!);
+  if (!updated) return actionError(tournamentErrors.tournament.failedTo.update)
 
-  await recordAction({
-    ...(await actor()),
+  await logAction({
     action: "tournament.update",
     target: updated.slug,
     detail: before
       ? `Updated tournament "${before.name}" -> "${updated.name}" (${before.taken}/${seatsLabel(before.seats)} -> ${updated.taken}/${seatsLabel(updated.seats)} seats)`
       : `Updated tournament "${updated.name}"`,
-  });
+  }, ["/admin/tournaments", `/admin/tournaments/${slug}`, `/admin/tournaments/${updated.slug}`, "/events"]);
 
-  revalidatePath("/admin/tournaments");
-  revalidatePath(`/admin/tournaments/${slug}`);
-  revalidatePath("/events");
-  redirect(`/admin/tournaments/${updated.slug}`);
+  return actionSuccess(undefined, SuccessMessages.tournament.updated);
 }
 
 /**
@@ -240,50 +242,43 @@ export async function updateTournamentAction(
  * cancelTournament() throws for anything else (already finished or
  * cancelled), which surfaces as a plain redirect back with nothing recorded.
  */
-export async function cancelTournamentAction(form: FormData) {
+export async function cancelTournamentAction(form: FormData): Promise<ActionResult> {
   const slug = String(form.get("slug") ?? "");
   const before = await getTournament(slug);
-  if (!before) redirect("/admin/tournaments");
+  if (!before) return actionError(tournamentErrors.tournament.notFound);
 
   try {
     await cancelTournament(slug);
   } catch {
     revalidatePath(`/admin/tournaments/${slug}`);
-    redirect(`/admin/tournaments/${slug}`);
+    return actionError(tournamentErrors.tournament.failedTo.cancel)
   }
 
-  await recordAction({
-    ...(await actor()),
+  await logAction({
     action: "tournament.cancel",
     target: slug,
     detail: `Cancelled tournament "${before.name}" (was ${before.status})`,
-  });
-
-  revalidatePath("/admin/tournaments");
-  revalidatePath(`/admin/tournaments/${slug}`);
-  revalidatePath("/events");
-  redirect(`/admin/tournaments/${slug}`);
+  }, ["/admin/tournaments", `/admin/tournaments/${slug}`, "/events"]);
+  return actionSuccess(undefined, SuccessMessages.tournament.cancelled);
 }
 
-export async function deleteTournamentAction(form: FormData) {
+export async function deleteTournamentAction(form: FormData): Promise<ActionResult> {
   const slug = String(form.get("slug") ?? "");
   const before = await getTournament(slug);
+  if (!before) return actionError(tournamentErrors.tournament.notFound);
+
   const deleted = await deleteTournament(slug);
+  if (!deleted) return actionError(tournamentErrors.tournament.failedTo.delete);
 
-  if (deleted) {
-    await recordAction({
-      ...(await actor()),
-      action: "tournament.delete",
-      target: slug,
-      detail: before
-        ? `Deleted tournament "${before.name}" (had ${before.taken}/${seatsLabel(before.seats)} seats filled)`
-        : `Deleted tournament "${slug}"`,
-    });
-  }
+  await logAction({
+    action: "tournament.delete",
+    target: slug,
+    detail: before
+      ? `Deleted tournament "${before.name}" (had ${before.taken}/${seatsLabel(before.seats)} seats filled)`
+      : `Deleted tournament "${slug}"`,
+  }, ["/admin/tournaments", "/events"]);
 
-  revalidatePath("/admin/tournaments");
-  revalidatePath("/events");
-  redirect("/admin/tournaments");
+  return actionSuccess(undefined, SuccessMessages.tournament.deleted);
 }
 
 /**
@@ -293,7 +288,7 @@ export async function deleteTournamentAction(form: FormData) {
  * right after someone clicks "+". The service refuses once the tournament is
  * finished.
  */
-export async function addPrizesAction(form: FormData) {
+export async function addPrizesAction(form: FormData): Promise<ActionResult> {
   const slug = String(form.get("slug") ?? "");
   const codes = form.getAll("code").map((v) => String(v).trim());
   const tiers = form.getAll("tier").map((v) => String(v));
@@ -303,71 +298,57 @@ export async function addPrizesAction(form: FormData) {
     .filter((entry) => entry.code !== "");
 
   if (entries.length === 0) {
-    redirect(`/admin/tournaments/${slug}?error=${encodeURIComponent("Enter at least one code.")}`);
+    return actionError(tournamentErrors.tournament.missing.code);
   }
   if (!entries.every((entry) => isPrizeTier(entry.tier))) {
-    redirect(`/admin/tournaments/${slug}?error=${encodeURIComponent("Pick a prize type for every code.")}`);
+    return actionError(tournamentErrors.tournament.missing.prizeType);
   }
 
   try {
     await addPrizes(slug, entries as { tier: PrizeTier; code: string }[]);
   } catch (error) {
-    redirect(`/admin/tournaments/${slug}?error=${encodeURIComponent(message(error))}`);
+    return actionError(tournamentErrors.tournament.prizing.failedTo.add);
   }
 
-  await recordAction({
-    ...(await actor()),
-    action: "prize.add",
-    target: slug,
-    detail: `Added ${entries.length} prize code(s): ${entries.map((e) => e.tier).join(", ")}`,
-  });
-
-  revalidatePath(`/admin/tournaments/${slug}`);
-  redirect(`/admin/tournaments/${slug}`);
+  return actionSuccess(undefined, SuccessMessages.prizing.added);
 }
 
-export async function removePrizeAction(form: FormData) {
+export async function removePrizeAction(form: FormData): Promise<ActionResult> {
   const slug = String(form.get("slug") ?? "");
   const prizeId = String(form.get("prizeId") ?? "");
 
-  if (await removePrize(slug, prizeId)) {
-    await recordAction({
-      ...(await actor()),
+  try {
+    await removePrize(slug, prizeId)
+  
+    await logAction({
       action: "prize.remove",
       target: slug,
       detail: "Removed a prize code",
-    });
+    }, [`/admin/tournaments/${slug}`]);
+  } catch (error) {
+    return actionError(tournamentErrors.tournament.prizing.failedTo.remove);
   }
 
-  revalidatePath(`/admin/tournaments/${slug}`);
-  redirect(`/admin/tournaments/${slug}`);
+  return actionSuccess(undefined, SuccessMessages.prizing.removed);
 }
 
 /** The one-shot mailing, once the tournament is over. See sendPrizes(). */
-export async function sendPrizesAction(form: FormData) {
+export async function sendPrizesAction(form: FormData): Promise<ActionResult> {
   const slug = String(form.get("slug") ?? "");
 
   let result;
   try {
     result = await sendPrizes(slug);
   } catch (error) {
-    redirect(`/admin/tournaments/${slug}?error=${encodeURIComponent(message(error))}`);
+    return actionError(tournamentErrors.tournament.prizing.failedTo.send)
   }
 
-  await recordAction({
-    ...(await actor()),
+  await logAction({
     action: "prize.send",
     target: slug,
     detail: `Sent ${result.sent} prize code(s), ${result.unclaimed} left unclaimed`,
-  });
+  }, [`/admin/tournaments/${slug}`]);
 
-  revalidatePath(`/admin/tournaments/${slug}`);
-  redirect(
-    `/admin/tournaments/${slug}?sent=${result.sent}&unclaimed=${result.unclaimed}`,
-  );
+  return actionSuccess(undefined, SuccessMessages.prizing.sent);
 }
 
-/** The service's own message when it refuses (closed prizing, already sent), or a generic one. */
-function message(error: unknown): string {
-  return error instanceof Error ? error.message : "Something went wrong.";
-}

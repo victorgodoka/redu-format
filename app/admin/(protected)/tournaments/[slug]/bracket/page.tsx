@@ -3,22 +3,24 @@ import { notFound } from "next/navigation";
 import { after } from "next/server";
 import AdminPageHead from "@/components/admin/AdminPageHead";
 import BracketRounds from "@/components/admin/BracketRounds";
-import DeleteButton from "@/components/admin/DeleteButton";
+import CompleteBracketButton from "@/components/admin/BracketRounds/CompleteBracketButton";
+import ExtendRoundForm from "@/components/admin/BracketRounds/ExtendRoundForm";
+import NextRoundButton from "@/components/admin/BracketRounds/NextRoundButton";
+import RepairRoundButton from "@/components/admin/BracketRounds/RepairRoundButton";
 import StartBracketForm from "@/components/admin/StartBracketForm";
 import StatBar from "@/components/admin/StatBar";
+import SwissBracketView from "@/components/admin/SwissBracketView";
 import Button from "@/components/ui/Button";
 import EmptyState from "@/components/ui/EmptyState";
 import { verifyTournament } from "@/lib/backend/services/duel-verification.service";
-import { closeOverdueMatches, getBracketView, getPlacings } from "@/lib/backend/services/results.service";
-import { DURATION_MODES, formatDate, formatTime } from "@/lib/events";
-import { getTournament } from "@/lib/tournaments";
 import {
-  completeBracketAction,
-  extendRoundAction,
-  nextRoundAction,
-  repairRoundAction,
-  updateBracketStatusAction,
-} from "./actions";
+  closeOverdueMatches,
+  getBracketView,
+  getPlacingsWithTiebreak,
+} from "@/lib/backend/services/results.service";
+import { DURATION_MODES, formatDate, formatTime, STRUCTURES } from "@/lib/events";
+import { getTournament, listParticipants } from "@/lib/tournaments";
+import { updateBracketStatusAction } from "./actions";
 
 export const metadata: Metadata = {
   title: "Tournament bracket | REDU Format",
@@ -30,57 +32,95 @@ export default async function BracketPage({
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; tab?: string; round?: string }>;
 }) {
   const { slug } = await params;
-  const { error } = await searchParams;
+  const { error, tab, round } = await searchParams;
 
   const tournament = await getTournament(slug);
   if (!tournament) notFound();
 
-  // Settle anything the clock already decided - but *after* the response, not
-  // during the render. Writing results mid-render makes the HTML and the RSC
-  // payload disagree about which matches are settled, which surfaces as a
-  // hydration mismatch in the result form.
   if (tournament.status === "running") {
     after(() => closeOverdueMatches(slug).catch(() => null));
     after(() => verifyTournament(slug).catch(() => null));
   }
 
   const view = await getBracketView(slug);
-  const placings = view?.status === "complete" ? await getPlacings(slug) : [];
+  const placings = view?.status === "complete" ? await getPlacingsWithTiebreak(slug) : [];
 
   const hasOpenMatches = view
     ? view.matches.some((m) => m.active && !m.hasResult && !m.bye)
     : false;
 
-  // Named so the extend-deadline control never reads as a bare "extend
-  // round" with no idea which one - double elim can have more than one side
-  // open at once, so this joins every round currently taking reports.
   const openRoundLabel = view
     ? [...new Set(view.matches.filter((m) => m.active && !m.hasResult && !m.bye).map((m) => m.round))]
         .map((r) => view.matches.find((m) => m.round === r)?.label ?? `Round ${r}`)
         .join(" & ")
     : "";
 
-  // A locked round can always be advanced by hand: in a same-day tournament
-  // that just skips the rest of the cleanup window, and in a long-duration one
-  // it is the only way the next round ever starts.
   const canStartNextRound = view !== null && view.status !== "complete" && (!hasOpenMatches || view.clock.locked);
 
-  // Re-pairing is a Swiss-only escape hatch, and only while the Swiss rounds
-  // are still what the tournament is running - once the top cut exists it was
-  // cut from these standings and cannot be unwound from here.
   const canRepairRound =
     view !== null &&
     view.status === "stage-one" &&
     tournament.structure === "swiss" &&
     view.round >= 1;
 
+  const structureLabel =
+    STRUCTURES[tournament.structure].label + (tournament.structure === "swiss" && tournament.topCut ? " + Top Cut" : "");
+  const eyebrow = `${structureLabel} · ${tournament.taken} ${tournament.taken === 1 ? "player" : "players"}`;
+
+  const defaultRound = view
+    ? view.status === "stage-one"
+      ? String(view.round)
+      : view.topCutFormat !== null
+        ? "topcut"
+        : String(view.stageOneRounds)
+    : "1";
+  const selectedRound = round ?? defaultRound;
+  const selectedTab = tab === "standings" ? "standings" : "bracket";
+
+  const bracketActions = view ? (
+    <>
+      {view.status !== "complete" && hasOpenMatches ? (
+        <StatBar
+          actions={
+            <ExtendRoundForm slug={slug} openRoundLabel={openRoundLabel} />
+          }
+        />
+      ) : null}
+      {canStartNextRound ? (
+        <StatBar
+          actions={
+            <>
+              <NextRoundButton
+                slug={slug}
+                label={view.clock.locked && hasOpenMatches ? "Start next round now" : "Generate next round"}
+              />
+              <CompleteBracketButton slug={slug} />
+            </>
+          }
+        />
+      ) : null}
+      {canRepairRound ? (
+        <StatBar
+          actions={
+            <RepairRoundButton slug={slug} round={view.round} />
+          }
+        />
+      ) : null}
+    </>
+  ) : null;
+
   return (
     <>
       <AdminPageHead
-        title={`${tournament.name} · Bracket`}
+        title={
+          <span className="admin-page-title">
+            <span className="admin-page-title__eyebrow">{eyebrow}</span>
+            {tournament.name}
+          </span>
+        }
         back={{ href: `/admin/tournaments/${slug}`, label: "← Back to tournament" }}
       />
 
@@ -121,77 +161,28 @@ export default async function BracketPage({
               anyone who registers afterward won&apos;t be added automatically.
             </>
           }
-          action={<StartBracketForm slug={slug} />}
-        />
-      ) : (
-        <BracketRounds
-          slug={slug}
-          view={view}
-          placings={placings}
-          actions={
-            <>
-              {view.status !== "complete" && hasOpenMatches ? (
-                <StatBar
-                  actions={
-                    <form action={extendRoundAction} className="extend-round">
-                      <input type="hidden" name="slug" value={slug} />
-                      <span className="extend-round__label">Extend {openRoundLabel} deadline</span>
-                      <div className="extend-round__row">
-                        <input
-                          type="number"
-                          name="amount"
-                          min={1}
-                          placeholder="e.g. 4"
-                          required
-                          aria-label="Amount of time to extend the deadline by"
-                        />
-                        <select name="unit" defaultValue="hours" aria-label="Unit">
-                          <option value="hours">Hours</option>
-                          <option value="days">Days</option>
-                        </select>
-                        <Button type="submit">Extend</Button>
-                      </div>
-                    </form>
-                  }
-                />
-              ) : null}
-              {canStartNextRound ? (
-                <StatBar
-                  actions={
-                    <>
-                      <form action={nextRoundAction}>
-                        <input type="hidden" name="slug" value={slug} />
-                        <Button type="submit">
-                          {view.clock.locked && hasOpenMatches
-                            ? "Start next round now"
-                            : "Generate next round"}
-                        </Button>
-                      </form>
-                      <form action={completeBracketAction}>
-                        <input type="hidden" name="slug" value={slug} />
-                        <Button variant="solid" type="submit">
-                          Complete tournament
-                        </Button>
-                      </form>
-                    </>
-                  }
-                />
-              ) : null}
-              {canRepairRound ? (
-                <StatBar
-                  actions={
-                    <DeleteButton
-                      action={repairRoundAction}
-                      hidden={{ slug }}
-                      label={`Re-pair round ${view.round}`}
-                      confirmText={`Re-pair round ${view.round}? Every match in it is voided - results, reports and duel rooms included - and the round is drawn again from the current standings, including anyone who registered after the bracket was generated. Swiss pairings are not deterministic, so who plays whom will likely change even if nothing else did. Players are notified. This cannot be undone.`}
-                    />
-                  }
-                />
-              ) : null}
-            </>
+          action={
+            <StartBracketForm
+              slug={slug}
+              participants={await listParticipants(slug)}
+              seedable={tournament.structure !== "swiss"}
+            />
           }
         />
+      ) : tournament.structure === "swiss" ? (
+        <>
+          {bracketActions}
+          <SwissBracketView
+            slug={slug}
+            view={view}
+            placings={placings}
+            topCut={tournament.topCut}
+            tab={selectedTab}
+            round={selectedRound}
+          />
+        </>
+      ) : (
+        <BracketRounds slug={slug} view={view} placings={placings} actions={bracketActions} />
       )}
     </>
   );

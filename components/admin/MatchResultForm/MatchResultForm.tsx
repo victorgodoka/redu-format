@@ -1,13 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { useActionState, useEffect, useState } from "react";
+import { useToast } from "@/components/ui/Toast";
 import Button from "@/components/ui/Button";
 import FormGroup from "@/components/ui/FormGroup";
 import Label from "@/components/ui/Label";
+import Notice from "@/components/ui/Notice";
 import Select from "@/components/ui/Select";
 import { enterResultAction } from "@/app/admin/(protected)/tournaments/[slug]/bracket/actions";
+import type { ActionResult } from "@/lib/actions-utils";
 
 type PlayerOption = { name: string; defaultValue: "1" | "0" | "draw" };
+
+const initialState: ActionResult = { success: true };
 
 /**
  * A moderator writing the real result. There are no draws in this system, so
@@ -35,12 +40,23 @@ export default function MatchResultForm({
   /** Games that win the series: 2 for Bo3, 1 for Bo1. */
   winningGames: number;
 }) {
+  const [state, dispatch] = useActionState(enterResultAction, initialState);
+  const { toast } = useToast();
   const [editing, setEditing] = useState(!hasResult);
   const [winner, setWinner] = useState(player1.defaultValue === "1" ? "player1" : "player2");
   const [loserGames, setLoserGames] = useState("0");
 
+  useEffect(() => {
+    if (state.success === false && state.error) {
+      toast.error("Error", state.error);
+    }
+    if (state.success === true && state.description) {
+      toast.success("Success", state.description);
+    }
+  }, [state, toast]);
+
   return (
-    <form action={enterResultAction} className="payment-controls__confirm">
+    <form action={dispatch} className="payment-controls__confirm">
       <input type="hidden" name="slug" value={slug} />
       <input type="hidden" name="matchId" value={matchId} />
       <input type="hidden" name="winnerGames" value={winningGames} />
@@ -98,6 +114,10 @@ export default function MatchResultForm({
           <input type="checkbox" name="confirmRepair" />
           <span>Changing the winner here also voids any already-played matches it fed - check this to proceed anyway</span>
         </Label>
+      ) : null}
+
+      {state.success === false && state.error ? (
+        <Notice variant="error" className="full-width">{state.error}</Notice>
       ) : null}
     </form>
   );

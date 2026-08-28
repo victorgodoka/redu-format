@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState, useState, useSyncExternalStore } from "react";
+import { useActionState, useState, useSyncExternalStore, useEffect } from "react";
+import { useToast } from "@/components/ui/Toast";
 import Button from "@/components/ui/Button";
 import FormField from "@/components/ui/FormField";
 import FormGroup from "@/components/ui/FormGroup";
@@ -8,6 +9,7 @@ import Input from "@/components/ui/Input";
 import Label from "@/components/ui/Label";
 import Select from "@/components/ui/Select";
 import Textarea from "@/components/ui/Textarea";
+import Notice from "@/components/ui/Notice";
 import {
   BANLISTS,
   DEFAULT_BANLIST,
@@ -24,7 +26,7 @@ import {
   type Structure,
 } from "@/lib/events";
 import type { TournamentEvent } from "@/lib/tournaments";
-import type { TournamentFormState } from "@/app/admin/(protected)/tournaments/actions";
+import type { ActionResult } from "@/lib/actions-utils";
 
 const MATCH_FORMATS = ["Bo1", "Bo3"] as const;
 
@@ -108,7 +110,7 @@ function toLocalTime(iso: string) {
   return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-const initial: TournamentFormState = {};
+const initialState: ActionResult = { success: true };
 
 export default function TournamentForm({
   action,
@@ -116,16 +118,14 @@ export default function TournamentForm({
   defaultHost,
   isEditing,
 }: {
-  action: (
-    state: TournamentFormState,
-    form: FormData,
-  ) => Promise<TournamentFormState>;
+  action: (state: ActionResult, formData: FormData) => Promise<ActionResult>;
   tournament?: TournamentEvent;
   /** Display name (fallback username) of the admin creating a new tournament - unused when editing, since the field already has a real value. */
   defaultHost?: string;
   isEditing?: boolean;
 }) {
-  const [state, formAction, pending] = useActionState(action, initial);
+  const [state, dispatch] = useActionState(action, initialState);
+  const { toast } = useToast();
 
   const [structure, setStructure] = useState<Structure>(
     tournament?.structure ?? "swiss",
@@ -187,8 +187,17 @@ export default function TournamentForm({
   const topCutSize =
     seatsNumber !== null ? recommendedTopCut(seatsNumber) : null;
 
+  useEffect(() => {
+    if (state.success === false && state.error) {
+      toast.error("Error", state.error);
+    }
+    if (state.success === true && state.description) {
+      toast.success("Success", state.description);
+    }
+  }, [state, toast]);
+
   return (
-    <form action={formAction} className="form form--grid">
+    <form action={dispatch} className="form form--grid">
       {isEditing && tournament ? (
         <input type="hidden" name="slug" value={tournament.slug} />
       ) : null}
@@ -533,16 +542,13 @@ export default function TournamentForm({
         />
       </FormField>
 
-      {state.error ? (
-        <p role="alert" className="form__error">
-          {state.error}
-        </p>
+      {state.success === false && state.error ? (
+        <Notice variant="error" className="full-width">{state.error}</Notice>
       ) : null}
 
       <Button
         variant="solid"
         type="submit"
-        pending={pending}
         pendingLabel={isEditing ? "Saving..." : "Creating..."}
       >
         {isEditing ? "Save changes" : "Create tournament"}

@@ -1,7 +1,6 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import { recordAction } from "@/lib/audit-log";
 import {
   disqualifyRegistration,
@@ -15,11 +14,16 @@ import { NEXUS_DECK_INFO_URL } from "@/lib/nexus-parse";
 import { isHttpUrl } from "@/lib/safe-url";
 import {
   addParticipant,
+  linkParticipant,
   listParticipants,
   removeParticipant,
   setParticipantDeck,
   setParticipantPayment,
 } from "@/lib/tournaments";
+import { tournamentErrors } from "@/lib/errors";
+import { actionError, ActionResult, actionSuccess } from "@/lib/actions-utils";
+import { logAction } from "@/lib/backend/services/audit.service";
+import { SuccessMessages } from "@/lib/success";
 
 /**
  * Confirms a Dueling Nexus deck UUID is real and public before it's stored -
@@ -60,10 +64,6 @@ async function actor() {
   };
 }
 
-function errorRedirect(slug: string, message: string): never {
-  redirect(`/admin/tournaments/${slug}/participants?error=${encodeURIComponent(message)}`);
-}
-
 /**
  * Adds a registration by hand. When the name matches a registered duelist -
  * which is what the form's autocomplete is for - the registration is linked to
@@ -72,33 +72,31 @@ function errorRedirect(slug: string, message: string): never {
  * leaderboard all treat them as the player they are. A name nobody here owns
  * still goes in as a plain entry, which is all it can be.
  */
-export async function addParticipantAction(form: FormData) {
+export async function addParticipantAction(
+  _prevState: ActionResult,
+  form: FormData
+): Promise<ActionResult> {
   const slug = String(form.get("slug") ?? "");
   const name = String(form.get("name") ?? "").trim();
   const deckUuid = String(form.get("deckName") ?? "").trim();
-  if (!slug || !name || !deckUuid) return;
+
+  if (!slug || !name || !deckUuid) return actionError(tournamentErrors.participant.add.missingRequiredFields);
 
   const check = await verifyDeckUuid(deckUuid);
-  if (!check.ok) errorRedirect(slug, check.error);
+  if (!check.ok) return actionError(check.error);
 
   const player = await findPlayerByName(name);
-
+  if (!player) return actionError(tournamentErrors.participant.add.playerNotFound(name));
   try {
     await addParticipant(slug, {
-      // The account's own Nexus name, not whatever casing was typed.
       name: player?.nexusName ?? name,
-      deckName: deckUuid,
-      player: player
-        ? { id: player.id, identityKey: player.nexusIdentityKey, deckId: deckUuid }
-        : undefined,
+      player: { id: player.id, identityKey: player.nexusIdentityKey, deckId: deckUuid }
     });
   } catch (err) {
-    // uq_registrations_tournament_player: the same account cannot hold two
-    // registrations in one tournament. Saying so beats a 500.
     if (err instanceof Error && err.message.includes("Duplicate")) {
-      errorRedirect(slug, `${player?.nexusName ?? name} is already registered for this tournament.`);
+      return actionError(tournamentErrors.participant.add.alreadyRegistered(player?.nexusName ?? name));
     }
-    errorRedirect(slug, err instanceof Error ? err.message : "Could not add that participant.");
+    return actionError(err instanceof Error ? err.message : tournamentErrors.participant.add.addFailed);
   }
 
   await recordAction({
@@ -110,27 +108,71 @@ export async function addParticipantAction(form: FormData) {
       : `Added participant "${name}" (no linked account) to "${slug}" with deck ${deckUuid}`,
   });
 
+  revalidatePath(
+    `/admin/tournaments/${slug}/participants`
+  );
+
+  return actionSuccess(undefined, SuccessMessages.participant.added);
+}
+
+/**
+ * Links an already-added, unlinked participant to a real account after the
+ * fact - for when the name typed in at add-time didn't match (a typo, a name
+ * that has since changed), which otherwise leaves them permanently unable to
+ * see their own lobby or receive prize codes and ranking points. Reuses
+ * addParticipantAction's exact-match-by-name lookup; the deck the account
+ * plays stays whatever was already registered.
+ */
+export async function linkParticipantAction(form: FormData): Promise<ActionResult> {
+  const slug = String(form.get("slug") ?? "");
+  const participantId = String(form.get("participantId") ?? "");
+  const name = String(form.get("name") ?? "").trim();
+  if (!slug || !participantId || !name) return actionError(tournamentErrors.participant.link.missingRequiredFields);
+
+  const before = (await listParticipants(slug)).find((p) => p.id === participantId);
+  if (!before) return actionError(tournamentErrors.participant.link.participantNotFound);
+  if (before.playerId) return actionError(tournamentErrors.participant.link.alreadyLinked(before.name, before.playerId));
+
+  const player = await findPlayerByName(name);
+  if (!player) return actionError(tournamentErrors.participant.link.playerNotFound(name));
+
+  const linked = await linkParticipant(participantId, {
+    id: player.id,
+    identityKey: player.nexusIdentityKey,
+    deckName: before.deckName,
+    deckId: before.deckUUID,
+  });
+
+  if (!linked) return actionError(tournamentErrors.participant.link.linkFailed);
+
+  await recordAction({
+    ...(await actor()),
+    action: "participant.link",
+    target: slug,
+    detail: `Linked "${before.name}" in "${slug}" to the account "${player.nexusName}"`,
+  });
+
   revalidatePath(`/admin/tournaments/${slug}/participants`);
-  redirect(`/admin/tournaments/${slug}/participants`);
+  return actionSuccess(undefined, SuccessMessages.participant.linked);
 }
 
 /** Deck can only change before the bracket starts - past that, results already depend on who's holding what. */
-export async function editParticipantDeckAction(form: FormData) {
+export async function editParticipantDeckAction(form: FormData): Promise<ActionResult> {
   const slug = String(form.get("slug") ?? "");
   const participantId = String(form.get("participantId") ?? "");
   const deckUuid = String(form.get("deckName") ?? "").trim();
-  if (!slug || !participantId || !deckUuid) return;
+  if (!slug || !participantId || !deckUuid) return actionError(tournamentErrors.participant.deck.missingRequiredFields);
 
   if (await hasBracket(slug)) {
-    errorRedirect(slug, "This tournament has already started - the deck can't be changed anymore.");
+    return actionError(tournamentErrors.participant.deck.tournamentStarted);
   }
 
   const check = await verifyDeckUuid(deckUuid);
-  if (!check.ok) errorRedirect(slug, check.error);
+  if (!check.ok) return actionError(check.error);
 
   const before = (await listParticipants(slug)).find((p) => p.id === participantId);
   const updated = await setParticipantDeck(slug, participantId, deckUuid);
-  if (!updated) errorRedirect(slug, "That participant no longer exists.");
+  if (!updated) return actionError(tournamentErrors.participant.deck.participantNotFound);
 
   await recordAction({
     ...(await actor()),
@@ -142,7 +184,7 @@ export async function editParticipantDeckAction(form: FormData) {
   });
 
   revalidatePath(`/admin/tournaments/${slug}/participants`);
-  redirect(`/admin/tournaments/${slug}/participants`);
+  return actionSuccess(undefined, SuccessMessages.participant.deckUpdated);
 }
 
 /**
@@ -152,18 +194,18 @@ export async function editParticipantDeckAction(form: FormData) {
  * case, logged under its own audit action so it's never confused with a
  * routine pre-start edit.
  */
-export async function overrideParticipantDeckAction(form: FormData) {
+export async function overrideParticipantDeckAction(form: FormData): Promise<ActionResult> {
   const slug = String(form.get("slug") ?? "");
   const participantId = String(form.get("participantId") ?? "");
   const deckUuid = String(form.get("deckName") ?? "").trim();
-  if (!slug || !participantId || !deckUuid) return;
+  if (!slug || !participantId || !deckUuid) return actionError(tournamentErrors.participant.deck.missingRequiredFields);
 
   const check = await verifyDeckUuid(deckUuid);
-  if (!check.ok) errorRedirect(slug, check.error);
+  if (!check.ok) return actionError(check.error);
 
   const before = (await listParticipants(slug)).find((p) => p.id === participantId);
   const updated = await setParticipantDeck(slug, participantId, deckUuid);
-  if (!updated) errorRedirect(slug, "That participant no longer exists.");
+  if (!updated) return actionError(tournamentErrors.participant.deck.participantNotFound);
 
   await recordAction({
     ...(await actor()),
@@ -175,7 +217,7 @@ export async function overrideParticipantDeckAction(form: FormData) {
   });
 
   revalidatePath(`/admin/tournaments/${slug}/participants`);
-  redirect(`/admin/tournaments/${slug}/participants`);
+  return actionSuccess(undefined, SuccessMessages.participant.deckUpdated);
 }
 
 /**
@@ -184,18 +226,18 @@ export async function overrideParticipantDeckAction(form: FormData) {
  * path out of a contested state). Requires a proof from one source or the
  * other - there is nothing to confirm otherwise.
  */
-export async function confirmPaymentAction(form: FormData) {
+export async function confirmPaymentAction(form: FormData): Promise<ActionResult> {
   const slug = String(form.get("slug") ?? "");
   const participantId = String(form.get("participantId") ?? "");
   const newProofUrl = String(form.get("proofUrl") ?? "").trim();
-  if (!slug || !participantId) return;
-  if (newProofUrl && !isHttpUrl(newProofUrl)) return;
+  if (!slug || !participantId) return actionError(tournamentErrors.participant.payment.missingParticipant);
+  if (newProofUrl && !isHttpUrl(newProofUrl)) return actionError(tournamentErrors.participant.payment.invalidProofUrl);
 
   const before = (await listParticipants(slug)).find((p) => p.id === participantId);
-  if (!before) return;
+  if (!before) return actionError(tournamentErrors.participant.payment.missingParticipant);
 
   const proofUrl = newProofUrl || before.proofUrl;
-  if (!proofUrl) return;
+  if (!proofUrl) return actionError(tournamentErrors.participant.payment.missingProof);
 
   const who = await actor();
   const updated = await setParticipantPayment(slug, participantId, {
@@ -203,7 +245,7 @@ export async function confirmPaymentAction(form: FormData) {
     proofUrl,
     by: who.actorDisplayName,
   });
-  if (!updated) return;
+  if (!updated) return actionError(tournamentErrors.participant.payment.confirmFailed);
 
   await recordAction({
     ...who,
@@ -215,16 +257,18 @@ export async function confirmPaymentAction(form: FormData) {
   });
 
   revalidatePath(`/admin/tournaments/${slug}/participants`);
+  return actionSuccess(undefined, SuccessMessages.participant.paymentConfirmed);
 }
 
 /** Disputes a confirmed entry; it goes back to waiting until re-approved. */
-export async function contestPaymentAction(form: FormData) {
+export async function contestPaymentAction(form: FormData): Promise<ActionResult> {
   const slug = String(form.get("slug") ?? "");
   const participantId = String(form.get("participantId") ?? "");
-  if (!slug || !participantId) return;
+  if (!slug || !participantId) return actionError(tournamentErrors.participant.payment.confirmFailed);
 
   const before = (await listParticipants(slug)).find((p) => p.id === participantId);
-  if (!before || before.paymentStatus !== "confirmed") return;
+  if (!before) return actionError(tournamentErrors.participant.payment.missingParticipant);
+  if (before.paymentStatus !== "confirmed") return actionError(tournamentErrors.participant.payment.invalidPaymentState);
 
   const who = await actor();
   const updated = await setParticipantPayment(slug, participantId, {
@@ -232,7 +276,7 @@ export async function contestPaymentAction(form: FormData) {
     proofUrl: before.proofUrl,
     by: who.actorDisplayName,
   });
-  if (!updated) return;
+  if (!updated) return actionError(tournamentErrors.participant.payment.contestFailed);
 
   await recordAction({
     ...who,
@@ -242,6 +286,7 @@ export async function contestPaymentAction(form: FormData) {
   });
 
   revalidatePath(`/admin/tournaments/${slug}/participants`);
+  return actionSuccess(undefined, SuccessMessages.participant.paymentContested);
 }
 
 /**
@@ -251,38 +296,35 @@ export async function contestPaymentAction(form: FormData) {
  * as results.service's dropFromStartedTournament used by the public
  * self-drop flow.
  */
-export async function removeParticipantAction(form: FormData) {
+export async function removeParticipantAction(form: FormData): Promise<ActionResult> {
   const slug = String(form.get("slug") ?? "");
   const participantId = String(form.get("participantId") ?? "");
-  if (!slug || !participantId) return;
+  if (!slug || !participantId) return actionError(tournamentErrors.participant.remove.missingParticipant);
 
   const before = (await listParticipants(slug)).find((p) => p.id === participantId);
-  if (!before) return;
+  if (!before) return actionError(tournamentErrors.participant.remove.participantNotFound);
 
   if (await hasBracket(slug)) {
     await dropFromStartedTournament(slug, participantId);
-    await recordAction({
-      ...(await actor()),
+    await logAction({
       action: "participant.drop",
       target: slug,
       detail: `Dropped "${before.name}" from "${slug}" (tournament already in progress)`,
-    });
-    revalidatePath(`/admin/tournaments/${slug}/participants`);
-    revalidatePath(`/admin/tournaments/${slug}/bracket`);
-    return;
+    }, [`/admin/tournaments/${slug}/participants`, `/admin/tournaments/${slug}/bracket`]);
+    
+    return actionSuccess(undefined, SuccessMessages.drop(before.name));
   }
 
   const removed = await removeParticipant(slug, participantId);
   if (removed) {
-    await recordAction({
-      ...(await actor()),
+    await logAction({
       action: "participant.remove",
       target: slug,
       detail: `Removed participant "${before.name}" from "${slug}"`,
-    });
+    }, [`/admin/tournaments/${slug}/participants`]);
   }
 
-  revalidatePath(`/admin/tournaments/${slug}/participants`);
+  return actionSuccess(undefined, SuccessMessages.drop(before.name));
 }
 
 /**
@@ -291,39 +333,36 @@ export async function removeParticipantAction(form: FormData) {
  * reason, out of the bracket, and the player is told why. Reversible via
  * reinstateParticipantAction.
  */
-export async function disqualifyParticipantAction(form: FormData) {
+export async function disqualifyParticipantAction(form: FormData): Promise<ActionResult> {
   const slug = String(form.get("slug") ?? "");
   const participantId = String(form.get("participantId") ?? "");
   const reason = String(form.get("reason") ?? "").trim();
-  if (!slug || !participantId) return;
-  if (!reason) errorRedirect(slug, "A disqualification needs a reason - the player is told what it says.");
+  const actorDisplayName = String(form.get("actorDisplayName") ?? "").trim();
+  if (!slug || !participantId) return actionError(tournamentErrors.participant.disqualify.missingParticipant);
+  if (!reason) return actionError(tournamentErrors.participant.disqualify.missingReason);
 
   const before = (await listParticipants(slug)).find((p) => p.id === participantId);
-  if (!before) return;
+  if (!before) return actionError(tournamentErrors.participant.disqualify.participantNotFound);
 
-  const who = await actor();
-  await disqualifyRegistration(slug, participantId, reason, who.actorDisplayName);
+  await disqualifyRegistration(slug, participantId, reason, actorDisplayName);
 
-  await recordAction({
-    ...who,
+  await logAction({
     action: "participant.disqualify",
     target: slug,
     detail: `Disqualified "${before.name}" from "${slug}": ${reason}`,
-  });
+  }, [`/admin/tournaments/${slug}/participants`, `/admin/tournaments/${slug}/bracket`, `/events/${slug}`]);
 
-  revalidatePath(`/admin/tournaments/${slug}/participants`);
-  revalidatePath(`/admin/tournaments/${slug}/bracket`);
-  revalidatePath(`/events/${slug}`);
+  return actionSuccess(undefined, SuccessMessages.dqed(before.name));
 }
 
-/** Undoes a disqualification. Matches conceded while they were out stay as they are - correct those individually. */
-export async function reinstateParticipantAction(form: FormData) {
+/** Undoes a disqualification or a drop. Matches conceded while they were out stay as they are - correct those individually. */
+export async function reinstateParticipantAction(form: FormData): Promise<ActionResult> {
   const slug = String(form.get("slug") ?? "");
   const participantId = String(form.get("participantId") ?? "");
-  if (!slug || !participantId) return;
+  if (!slug || !participantId) return actionError(tournamentErrors.participant.reinstate.missingParticipant);
 
   const before = (await listParticipants(slug)).find((p) => p.id === participantId);
-  if (!before) return;
+  if (!before) return actionError(tournamentErrors.participant.reinstate.participantNotFound);
 
   const who = await actor();
   await reinstateRegistration(slug, participantId);
@@ -332,10 +371,11 @@ export async function reinstateParticipantAction(form: FormData) {
     ...who,
     action: "participant.reinstate",
     target: slug,
-    detail: `Reinstated "${before.name}" in "${slug}" (was: ${before.dqReason ?? "disqualified"})`,
+    detail: `Reinstated "${before.name}" in "${slug}" (was: ${before.dqReason ?? (before.droppedAt ? "dropped" : "disqualified")})`,
   });
 
   revalidatePath(`/admin/tournaments/${slug}/participants`);
   revalidatePath(`/admin/tournaments/${slug}/bracket`);
   revalidatePath(`/events/${slug}`);
+  return actionSuccess(undefined, SuccessMessages.participant.reinstated);
 }

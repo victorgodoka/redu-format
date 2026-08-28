@@ -1,5 +1,4 @@
 import AdminList, { AdminRow } from "@/components/admin/AdminList";
-import DeleteButton from "@/components/admin/DeleteButton";
 import Badge from "@/components/ui/Badge";
 import EmptyState from "@/components/ui/EmptyState";
 import { formatDate, formatTime } from "@/lib/events";
@@ -7,31 +6,21 @@ import type { PrizeRow } from "@/lib/backend/services/prizing.service";
 import { PRIZE_TIERS } from "@/lib/prizing";
 import type { TournamentStatus } from "@/lib/tournaments";
 import PrizeCodeFields from "./PrizeCodeFields";
+import RemovePrizeButton from "./RemovePrizeButton";
+import SendPrizesButton from "./SendPrizesButton";
 
-type FormAction = (form: FormData) => void | Promise<void>;
-
-/**
- * The prize codes for one tournament: entered in a batch while it is still
- * scheduled or running, then mailed out in a single pass once it is finished.
- * Only the code entry needs client state (rows come and go); the list and the
- * buttons stay server-rendered.
- */
 export default function PrizingPanel({
   slug,
+  tournamentName,
   status,
   prizes,
   prizesSentAt,
-  addPrizesAction,
-  removePrizeAction,
-  sendPrizesAction,
 }: {
   slug: string;
+  tournamentName: string;
   status: TournamentStatus;
   prizes: PrizeRow[];
   prizesSentAt: string | null;
-  addPrizesAction: FormAction;
-  removePrizeAction: FormAction;
-  sendPrizesAction: FormAction;
 }) {
   const open = status === "scheduled" || status === "running";
   const unsent = prizes.filter((p) => !p.sentAt).length;
@@ -40,7 +29,7 @@ export default function PrizingPanel({
     <div className="section__content" style={{ marginTop: "24px" }}>
       <h2 className="section__subtitle">Prizing</h2>
 
-      {open ? <PrizeCodeFields slug={slug} action={addPrizesAction} /> : null}
+      {open ? <PrizeCodeFields slug={slug} /> : null}
 
       <p className="form__hint">
         Winner is 1st, Runner-up is 2nd, and each Top X covers the places down to the next tier
@@ -70,12 +59,7 @@ export default function PrizingPanel({
               </AdminRow.Main>
               {open && !prize.sentAt ? (
                 <AdminRow.Actions>
-                  <DeleteButton
-                    action={removePrizeAction}
-                    hidden={{ slug, prizeId: prize.id }}
-                    confirmText={`Remove the code ${prize.code}?`}
-                    label="Remove"
-                  />
+                  <RemovePrizeButton slug={slug} prizeId={prize.id} prizeCode={prize.code} />
                 </AdminRow.Actions>
               ) : null}
             </AdminRow>
@@ -89,13 +73,7 @@ export default function PrizingPanel({
             Prizing was sent on {formatDate(prizesSentAt)} {formatTime(prizesSentAt)}.
           </p>
         ) : (
-          <DeleteButton
-            action={sendPrizesAction}
-            hidden={{ slug }}
-            confirmText={`Send ${unsent} prize code(s) to the players' inboxes? This can only be done once.`}
-            label="Send prizing"
-            variant="solid"
-          />
+          <SendPrizesButton slug={slug} unsentCount={unsent} />
         )
       ) : null}
     </div>

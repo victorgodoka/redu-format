@@ -5,7 +5,7 @@ export default function Notice({
   children,
   className,
 }: {
-  variant?: "done" | "warn";
+  variant?: "done" | "warn" | "error";
   children: ReactNode;
   className?: string;
 }) {

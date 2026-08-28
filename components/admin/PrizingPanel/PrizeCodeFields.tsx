@@ -1,17 +1,20 @@
 "use client";
 
-import { useState, useSyncExternalStore } from "react";
+import { useState, useSyncExternalStore, useActionState, useEffect } from "react";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import Label from "@/components/ui/Label";
+import Notice from "@/components/ui/Notice";
 import Select from "@/components/ui/Select";
+import { useToast } from "@/components/ui/Toast";
+import { addPrizesAction } from "@/app/admin/(protected)/tournaments/actions";
+import type { ActionResult } from "@/lib/actions-utils";
 import { isPrizeTier, PRIZE_TIER_ORDER, PRIZE_TIERS, type PrizeTier } from "@/lib/prizing";
 
 type Row = { key: number; code: string; tier: PrizeTier };
 
 const blank = (key: number): Row => ({ key, code: "", tier: "participation" });
 
-/** Draft rows survive a reload, per tournament, until they are actually saved. */
 const draftKey = (slug: string) => `redu:prize-codes:${slug}`;
 
 function readDraft(slug: string): string | null {
@@ -28,21 +31,15 @@ function writeDraft(slug: string, rows: Row[]): void {
       draftKey(slug),
       JSON.stringify(rows.map(({ code, tier }) => ({ code, tier }))),
     );
-  } catch {
-    // Storage full or blocked. The codes are still in the form, so this only
-    // ever costs the convenience of surviving a reload, never a save.
-  }
+  } catch {}
 }
 
 function clearDraft(slug: string): void {
   try {
     window.localStorage.removeItem(draftKey(slug));
-  } catch {
-    /* nothing to clean up if it was never written */
-  }
+  } catch {}
 }
 
-/** Whatever is in storage is the admin's own typing, but it is still parsed defensively. */
 function parseDraft(raw: string | null): Row[] | null {
   if (!raw) return null;
   try {
@@ -65,41 +62,35 @@ function parseDraft(raw: string | null): Row[] | null {
   }
 }
 
-/** localStorage never changes behind this component's back, so there is nothing to subscribe to. */
 function subscribeNever() {
   return () => {};
 }
 
-/**
- * The code entry: a row per code, "+" for one more, and one Save that posts
- * the whole batch. Rows post as parallel `code`/`tier` arrays, paired back up
- * by position on the server - blank ones are dropped there rather than
- * blocking the save, so an extra empty row is harmless.
- *
- * Clicking "+" also stashes the rows in localStorage, so a tab closed
- * mid-entry does not cost the codes already typed; saving clears it.
- */
-export default function PrizeCodeFields({
-  slug,
-  action,
-}: {
-  slug: string;
-  action: (form: FormData) => void | Promise<void>;
-}) {
-  // Same SSR-safe shape the tournament form uses for its Intl lists: the
-  // server (and first paint) sees no draft, the browser sees the stored one
-  // once hydrated. Reading it in render through this hook instead of in an
-  // effect is what keeps the two from disagreeing.
+const initialState: ActionResult = { success: true };
+
+export default function PrizeCodeFields({ slug }: { slug: string }) {
+  const [state, dispatch] = useActionState(addPrizesAction, initialState);
+  const { toast } = useToast();
+
   const stored = useSyncExternalStore(
     subscribeNever,
     () => readDraft(slug),
     () => null,
   );
 
-  // null until the admin edits something - up to that point the stored draft
-  // is what is on screen.
   const [edited, setEdited] = useState<Row[] | null>(null);
   const rows = edited ?? parseDraft(stored) ?? [blank(0)];
+
+  useEffect(() => {
+    if (state.success === false && state.error) {
+      toast.error("Error", state.error);
+    }
+    if (state.success === true && state.description) {
+      toast.success("Success", state.description);
+      clearDraft(slug);
+      setEdited(null); // Reset form to show blank row
+    }
+  }, [state, toast, slug]);
 
   function update(key: number, patch: Partial<Row>) {
     setEdited(rows.map((row) => (row.key === key ? { ...row, ...patch } : row)));
@@ -112,13 +103,11 @@ export default function PrizeCodeFields({
   }
 
   return (
-    <form action={action} className="form" onSubmit={() => clearDraft(slug)}>
+    <form action={dispatch} className="form">
       <input type="hidden" name="slug" value={slug} />
 
       {rows.map((row, i) => (
         <div className="prize-row" key={row.key}>
-          {/* Only the first row shows a visible label; every row still names
-              its own controls, so a screen reader reads them all the same. */}
           <div className="form__field">
             {i === 0 ? <Label htmlFor={`code-${row.key}`}>Redemption code</Label> : null}
             <Input
@@ -172,6 +161,10 @@ export default function PrizeCodeFields({
           ) : null}
         </div>
       ))}
+
+      {state.success === false && state.error && (
+        <Notice variant="error">{state.error}</Notice>
+      )}
 
       <Button variant="solid" type="submit">
         Save codes
