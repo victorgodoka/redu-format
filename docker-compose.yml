@@ -1,0 +1,9 @@
+# Production: app only. DATABASE_URL comes from the host environment.
+services:
+  app:
+    build: .
+    ports: ["3000:3000"]
+    restart: unless-stopped
+    env_file: .env.local
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL in the environment}

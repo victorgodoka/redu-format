@@ -1,0 +1,37 @@
+# Development: hot-reloading app against a throwaway MySQL in Docker.
+#   docker compose -f docker-compose.dev.yml up
+services:
+  db:
+    image: mysql:8
+    environment:
+      MYSQL_ROOT_PASSWORD: redu
+      MYSQL_DATABASE: redu
+    ports: ["3306:3306"]
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-predu"]
+      interval: 5s
+      retries: 20
+    volumes: [db:/var/lib/mysql]
+
+  app:
+    build:
+      context: .
+      target: dev
+    ports: ["3000:3000"]
+    env_file: .env.local
+    # Overrides whatever .env.local says - real env beats node --env-file.
+    environment:
+      DATABASE_URL: mysql://root:redu@db:3306/redu
+    volumes:
+      # Your working tree, live: edits on the host reload the app in the
+      # container. node_modules/.next stay container-only (host has
+      # Windows-built binaries, and .next must not be shared).
+      - .:/app
+      - /app/node_modules
+      - /app/.next
+    command: sh -c "pnpm db:migrate && pnpm dev"
+    depends_on:
+      db: {condition: service_healthy}
+
+volumes:
+  db:
