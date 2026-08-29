@@ -3,8 +3,7 @@ import FallbackImage from "@/components/ui/FallbackImage";
 import WikiLink from "@/components/ui/WikiLink";
 import { CARD_ART, CARD_IMAGE } from "@/lib/banlist";
 import { Card, cardsByIds } from "@/lib/cards";
-
-const EDITOR = "https://duelingnexus.com/editor";
+import { NEXUS_EDITOR_URL } from "@/lib/nexus-parse";
 
 export type StandingsDeck = {
   id: string;
@@ -125,7 +124,7 @@ function DeckCard({ deck }: { deck: StandingsDeck }) {
         <div className="deck__actions">
           <a
             className="btn btn--solid"
-            href={`${EDITOR}/${deck.id}`}
+            href={`${NEXUS_EDITOR_URL}/${deck.id}`}
             target="_blank"
             rel="noopener noreferrer"
           >

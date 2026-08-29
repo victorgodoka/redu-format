@@ -7,11 +7,12 @@ const LABEL: Record<ParticipantStatus, { text: string; tone: BadgeTone }> = {
   registered: { text: "Registered", tone: "neutral" },
   active: { text: "Still in", tone: "positive" },
   eliminated: { text: "Eliminated", tone: "muted" },
+  dropped: { text: "Dropped", tone: "muted" },
   disqualified: { text: "Disqualified", tone: "negative" },
 };
 
 /** Registered first, then still-in players, then everyone who is out - the order the list is actually read in. */
-const ORDER: ParticipantStatus[] = ["active", "registered", "eliminated", "disqualified"];
+const ORDER: ParticipantStatus[] = ["active", "registered", "eliminated", "dropped", "disqualified"];
 
 /**
  * Who is signed up, and where they stand - the participant list a Challonge

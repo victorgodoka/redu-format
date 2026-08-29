@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import Button from "@/components/ui/Button";
 import { login, type LoginState } from "@/app/login/actions";
+import { NEXUS_PROFILE_URL } from "@/lib/nexus-parse";
 
 const initial: LoginState = {};
 
@@ -25,7 +26,7 @@ export default function LoginForm({ next }: { next: string }) {
       />
       <p className="form__hint">
         You can view your token by going to your{" "}
-        <a href="https://duelingnexus.com/profile" target="_blank" rel="noopener noreferrer">
+        <a href={NEXUS_PROFILE_URL} target="_blank" rel="noopener noreferrer">
           Dueling Nexus profile
         </a>
         , selecting the options menu on the top right of the screen with the

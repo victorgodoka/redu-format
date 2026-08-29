@@ -5,6 +5,7 @@ import Wrap from "@/components/ui/Wrap";
 import { DISCORD_URL } from "@/lib/site";
 import styles from "./Hero.module.css";
 import Image from "next/image";
+import { NEXUS_URL } from "@/lib/nexus-parse";
 
 export default function Hero() {
   return (
@@ -24,7 +25,7 @@ export default function Hero() {
           on Dueling Nexus.
         </Lede>
         <div className={styles.actions}>
-          <a className="btn btn--solid" href={'https://duelingnexus.com/'} target="_blank" rel="noopener noreferrer">
+          <a className="btn btn--solid" href={NEXUS_URL} target="_blank" rel="noopener noreferrer">
             Start dueling today
           </a>
           <Link className="btn" href="/events">

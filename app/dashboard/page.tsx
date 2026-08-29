@@ -24,7 +24,7 @@ import { countUnread, playerReader } from "@/lib/backend/services/notifications.
 import { getRedoStatus } from "@/lib/backend/services/redo.service";
 import { closeOverdueMatches, getMyRound, getPlacingsForPlayer } from "@/lib/backend/services/results.service";
 import { Card } from "@/lib/cards";
-import { DEFAULT_AVATAR } from "@/lib/nexus-parse";
+import { DEFAULT_AVATAR, NEXUS_URL } from "@/lib/nexus-parse";
 import { formatDate, formatTime, isPast } from "@/lib/events";
 import { listTournaments } from "@/lib/tournaments";
 import { validateDecks } from "@/lib/validateDecks";
@@ -35,8 +35,6 @@ export const metadata: Metadata = {
   title: "Dashboard | REDU Format",
   robots: { index: false, follow: false },
 };
-
-const EDITOR = "https://duelingnexus.com/editor";
 
 export default async function DashboardPage() {
   const session = await getSession();
@@ -187,8 +185,8 @@ export default async function DashboardPage() {
             <Button variant="solid" href="/events">
               Browse events
             </Button>
-            <a className="btn" href={EDITOR} target="_blank" rel="noopener noreferrer">
-              Deck editor
+            <a className="btn" href={NEXUS_URL} target="_blank" rel="noopener noreferrer">
+              Build your deck
             </a>
           </div>
 
@@ -229,8 +227,8 @@ export default async function DashboardPage() {
                 <EmptyState
                   message="No decks on this account yet. Build one in the Dueling Nexus editor and it will show up here."
                   action={
-                    <a className="btn" href={EDITOR} target="_blank" rel="noopener noreferrer">
-                      Open the editor
+                    <a className="btn" href={NEXUS_URL} target="_blank" rel="noopener noreferrer">
+                      Build your deck
                     </a>
                   }
                 />

@@ -18,7 +18,7 @@ import { findMySignup } from "@/lib/backend/services/registration.service";
 import { hasBracket } from "@/lib/backend/services/results.service";
 import { Card } from "@/lib/cards";
 import { formatDate, formatEntry, formatTime, isFinished, isPast, seatsLeft, STRUCTURES } from "@/lib/events";
-import { DEFAULT_AVATAR } from "@/lib/nexus-parse";
+import { DEFAULT_AVATAR, NEXUS_URL } from "@/lib/nexus-parse";
 import { getTournament } from "@/lib/tournaments";
 import { validateDecksFor } from "@/lib/tcg-decks";
 import { cancel, submitProof } from "./actions";
@@ -191,11 +191,11 @@ export default async function SignupPage({
                   </Lede>
                   <a
                     className="btn"
-                    href="https://duelingnexus.com/editor"
+                    href={NEXUS_URL}
                     target="_blank"
                     rel="noopener noreferrer"
                   >
-                    Open the editor
+                    Build your deck now!
                   </a>
                 </Notice>
               ) : (

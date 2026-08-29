@@ -17,6 +17,7 @@ import {
   requestRedoAction,
   submitMatchReportAction,
 } from "@/app/events/[slug]/report-actions";
+import { NEXUS_LOBBY_URL } from "@/lib/nexus-parse";
 
 function at(iso: string): string {
   return `${formatDate(iso)} at ${formatTime(iso)}`;
@@ -381,7 +382,7 @@ export default function MyRound({
         {match.roomHash ? (
           <a
             className="btn btn--solid"
-            href={`https://duelingnexus.com/duel/NA-${match.roomHash}`}
+            href={`${NEXUS_LOBBY_URL}/NA-${match.roomHash}`}
             target="_blank"
             rel="noopener noreferrer"
           >

@@ -6,7 +6,9 @@ import { after } from "next/server";
 import AdminList, { AdminRow } from "@/components/admin/AdminList";
 import Bracket from "@/components/site/Bracket";
 import BracketDownload from "@/components/site/BracketDownload";
+import Countdown from "@/components/site/Countdown";
 import EventBanner from "@/components/site/EventBanner";
+import LocalStartTime from "@/components/site/LocalStartTime";
 import MyRound from "@/components/site/MyRound";
 import NexusPoll from "@/components/site/NexusPoll";
 import ParticipantsPanel from "@/components/site/ParticipantsPanel";
@@ -124,7 +126,15 @@ function EventFacts({ event, past }: { event: TournamentEvent; past: boolean }) 
   return (
     <FactsList
       rows={[
-        { label: "Starts", value: `${formatDate(event.startsAt)}, ${formatTime(event.startsAt)}` },
+        {
+          label: "Starts",
+          value: (
+            <LocalStartTime
+              iso={event.startsAt}
+              fallback={`${formatDate(event.startsAt)}, ${formatTime(event.startsAt)}`}
+            />
+          ),
+        },
         { label: "Structure", value: STRUCTURES[event.structure].label },
         event.structure === "double-elim"
           ? { label: "Format", value: `${event.matchFormat} · ${event.roundLimitDays}-day deadline` }
@@ -572,6 +582,13 @@ function UpcomingEventPage({
             )}
 
             <EventFacts event={event} past={false} />
+            <p className="form__hint">
+              Starts in{" "}
+              <Countdown
+                to={event.startsAt}
+                fallback={`${formatDate(event.startsAt)} at ${formatTime(event.startsAt)}`}
+              />
+            </p>
           </aside>
         </div>
 
