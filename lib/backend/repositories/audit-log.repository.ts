@@ -9,6 +9,7 @@ export type AdminAction =
   | "tournament.delete"
   | "tournament.cancel"
   | "participant.add"
+  | "participant.link"
   | "participant.remove"
   | "participant.drop"
   | "participant.deck_update"
@@ -24,6 +25,7 @@ export type AdminAction =
   | "bracket.extend_round"
   | "bracket.no_show_dismissed"
   | "bracket.repair_round"
+  | "bracket.swap_players"
   | "participant.disqualify"
   | "participant.reinstate"
   | "prize.add"
@@ -39,6 +41,7 @@ export const ADMIN_ACTIONS: readonly AdminAction[] = [
   "tournament.delete",
   "tournament.cancel",
   "participant.add",
+  "participant.link",
   "participant.remove",
   "participant.drop",
   "participant.deck_update",
@@ -54,6 +57,7 @@ export const ADMIN_ACTIONS: readonly AdminAction[] = [
   "bracket.extend_round",
   "bracket.no_show_dismissed",
   "bracket.repair_round",
+  "bracket.swap_players",
   "participant.disqualify",
   "participant.reinstate",
   "prize.add",

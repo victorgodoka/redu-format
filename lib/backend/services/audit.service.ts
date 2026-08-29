@@ -1,3 +1,7 @@
+import { getAdminActor } from "@/app/admin/(protected)/tournaments/actions.ts";
+import { actionError } from "@/lib/actions-utils.ts";
+import { tournamentErrors } from "@/lib/errors.ts";
+import { revalidatePath } from "next/cache";
 import { getPool } from "../db/client.ts";
 import { AdminsRepository } from "../repositories/admins.repository.ts";
 import {
@@ -65,4 +69,18 @@ export async function resetAuditLog(): Promise<void> {
   const { audit, admins } = repos();
   await audit.clear();
   await admins.clear();
+}
+
+export const logAction = async (entry: Partial<AuditLogEntry>, paths?: string[]) => {
+  const actor = await getAdminActor();
+  if (!actor) return actionError(tournamentErrors.session.notFound)
+
+  await recordAction({
+    ...actor,
+    ...entry
+  } as AuditLogEntry);
+
+  paths && paths.length && paths.forEach(path => {
+    revalidatePath(path);
+  });
 }
