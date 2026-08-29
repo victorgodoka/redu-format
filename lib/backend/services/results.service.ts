@@ -17,6 +17,7 @@ import { TournamentBracketsRepository } from "../repositories/tournament-bracket
 import { TournamentsRepository } from "../repositories/tournaments.repository.ts";
 import { RegistrationsRepository } from "../repositories/registrations.repository.ts";
 import { generateNexusRoomHash } from "./nexus-room.ts";
+import type { Participant } from "./tournament.service.ts";
 import { enforceTournamentDecks, lockTournamentDecks, snapshotRoundDecks } from "./deck-watch.service.ts";
 import { roundClock, roundCutoffMs, shouldAutoAdvance, type RoundClock } from "../../rounds.ts";
 
@@ -673,22 +674,44 @@ export async function getBracketView(slug: string): Promise<BracketView | null> 
  * admin manual alike (matches how they're already unified everywhere else).
  * Throws if there's already a bracket, or too few registrations.
  */
-export async function startBracket(slug: string, event: TournamentEvent): Promise<void> {
+/**
+ * Reorders `participants` to match `seedOrder` (a list of registration IDs,
+ * top seed first) as far as it can - anyone in `seedOrder` but not currently
+ * registered is ignored, and anyone registered but missing from `seedOrder`
+ * (shouldn't happen; the list submitted the seed order is built from this
+ * same registration list) is appended at the end in their original order.
+ */
+function withSeedOrder(participants: Participant[], seedOrder: string[]): Participant[] {
+  const byId = new Map(participants.map((p) => [p.id, p]));
+  const seeded = seedOrder.map((id) => byId.get(id)).filter((p): p is Participant => p !== undefined);
+  const seededIds = new Set(seeded.map((p) => p.id));
+  return [...seeded, ...participants.filter((p) => !seededIds.has(p.id))];
+}
+
+export async function startBracket(slug: string, event: TournamentEvent, seedOrder?: string[]): Promise<void> {
   const { tournaments, brackets, registrations } = repos();
   const tournamentId = await tournaments.findIdBySlug(slug);
   if (!tournamentId) throw new Error(`Tournament "${slug}" does not exist`);
   if (event.status !== "scheduled") throw new Error(`Tournament "${slug}" can't be started from its current status`);
   if (await brackets.exists(tournamentId)) throw new Error(`Tournament "${slug}" already has a bracket`);
 
-  const participants = await registrations.findByTournamentSlug(slug);
+  let participants = await registrations.findByTournamentSlug(slug);
   const minPlayers = event.structure === "double-elim" ? 4 : 2;
   if (participants.length < minPlayers) {
     throw new Error(`Need at least ${minPlayers} registered participants to start`);
   }
+  if (seedOrder?.length) participants = withSeedOrder(participants, seedOrder);
+
+  // Seeding only shapes anything for elimination formats - the Swiss pairing
+  // library always shuffles round 1 regardless (see lib/round-repair.test.ts's
+  // note on non-determinism), and turning "sorting" on for it would also flip
+  // on a similar-rating avoidance heuristic keyed off the arbitrary seed value,
+  // which isn't what a seed order is for.
+  const seeded = event.structure !== "swiss" && Boolean(seedOrder?.length);
 
   const engine = new Manager().createTournament(event.name, {
     seating: false,
-    sorting: "none",
+    sorting: seeded ? "ascending" : "none",
     scoring: {
       bestOf: event.matchFormat === "Bo3" ? 3 : 1,
       win: 3,
@@ -719,9 +742,12 @@ export async function startBracket(slug: string, event: TournamentEvent): Promis
         : { format: null },
   }, tournamentId);
 
-  for (const participant of participants) {
-    engine.createPlayer(participant.name, participant.id);
-  }
+  participants.forEach((participant, index) => {
+    const player = engine.createPlayer(participant.name, participant.id);
+    // Ascending sort by value, so index 0 (the top seed) sorts first and
+    // lands in the "seed 1" slot the pairing library's bracket table expects.
+    if (seeded) player.set({ value: index });
+  });
 
   engine.startTournament();
   // The deck each player holds *right now* becomes the only legal list for
@@ -957,6 +983,84 @@ export function withoutRound(
   };
 }
 
+type ExportedMatch = ExportedTournamentValues["matches"][number];
+
+/**
+ * Swaps two players' pairings for the current round: whichever match each is
+ * currently in, they trade places - the opponent each was facing stays put
+ * and simply plays someone else. A no-op (returns `values` unchanged) if
+ * either id isn't in an active match, or if they're already facing each
+ * other.
+ *
+ * Pure and operates on the exported values, same reasoning as withField/
+ * withoutRound above: a player's own match record is a separate copy from
+ * the match's own player1/player2 slot (see PlayerValues.matches in the
+ * tournament-organizer types), and both have to move together or the two
+ * views of "who's playing whom" disagree.
+ */
+export function withSwappedPlayers(
+  values: ExportedTournamentValues,
+  playerAId: string,
+  playerBId: string,
+): ExportedTournamentValues {
+  const findSlot = (playerId: string) => {
+    for (const match of values.matches) {
+      if (match.player1.id === playerId) return { match, slot: "player1" as const };
+      if (match.player2.id === playerId) return { match, slot: "player2" as const };
+    }
+    return null;
+  };
+
+  const a = findSlot(playerAId);
+  const b = findSlot(playerBId);
+  if (!a || !b || a.match.id === b.match.id) return values;
+
+  const opponentOf = (match: ExportedMatch, slot: "player1" | "player2") =>
+    slot === "player1" ? match.player2.id : match.player1.id;
+  const opponentAId = opponentOf(a.match, a.slot);
+  const opponentBId = opponentOf(b.match, b.slot);
+
+  const matches = values.matches.map((m) => {
+    if (m.id === a.match.id) return { ...m, [a.slot]: { ...m[a.slot], id: playerBId } };
+    if (m.id === b.match.id) return { ...m, [b.slot]: { ...m[b.slot], id: playerAId } };
+    return m;
+  });
+
+  const players = values.players.map((p) => {
+    if (p.id === playerAId) {
+      return {
+        ...p,
+        matches: p.matches.map((rec) =>
+          rec.id === a.match.id ? { ...rec, id: b.match.id, opponent: opponentBId } : rec,
+        ),
+      };
+    }
+    if (p.id === playerBId) {
+      return {
+        ...p,
+        matches: p.matches.map((rec) =>
+          rec.id === b.match.id ? { ...rec, id: a.match.id, opponent: opponentAId } : rec,
+        ),
+      };
+    }
+    if (p.id === opponentAId) {
+      return {
+        ...p,
+        matches: p.matches.map((rec) => (rec.id === a.match.id ? { ...rec, opponent: playerBId } : rec)),
+      };
+    }
+    if (p.id === opponentBId) {
+      return {
+        ...p,
+        matches: p.matches.map((rec) => (rec.id === b.match.id ? { ...rec, opponent: playerAId } : rec)),
+      };
+    }
+    return p;
+  });
+
+  return { ...values, matches, players };
+}
+
 /**
  * Throws away the current Swiss round and pairs it again from the standings
  * as they stand now. This is the escape hatch for a round that went wrong -
@@ -1051,6 +1155,79 @@ export async function repairRound(slug: string): Promise<RoundRepair> {
   }
 
   return { round, voidedMatches: voidedIds.length, pairedMatches: paired.length, addedPlayers };
+}
+
+export type PlayerSwap = { matchAId: string; matchBId: string };
+
+/**
+ * A lighter touch than repairRound(): instead of voiding a whole round, swap
+ * one player each between two currently open, unreported matches - everyone
+ * else's pairing is untouched. Works for any active format, not just Swiss;
+ * an elimination bracket's path (who the winner/loser feeds into next) is
+ * keyed by match id, not by which player sits in it, so swapping who's in
+ * two not-yet-played matches doesn't disturb it.
+ *
+ * Same "operate on the exported values, then reload" approach repairRound
+ * uses, for the same reason: a player's own match record and the match's own
+ * player1/player2 slot are separate copies that must move together.
+ */
+export async function swapPlayers(slug: string, playerAId: string, playerBId: string): Promise<PlayerSwap> {
+  const tournamentId = await repos().tournaments.findIdBySlug(slug);
+  if (!tournamentId) throw new Error(`Tournament "${slug}" does not exist`);
+  const engine = await loadEngine(tournamentId);
+  if (!engine) throw new Error(`Tournament "${slug}" has no bracket yet`);
+
+  const matchFor = (playerId: string) =>
+    engine
+      .getMatches()
+      .find(
+        (m) =>
+          m.isActive() &&
+          !m.isBye() &&
+          (m.getPlayer1().id === playerId || m.getPlayer2().id === playerId),
+      );
+
+  const matchA = matchFor(playerAId);
+  const matchB = matchFor(playerBId);
+  if (!matchA || !matchB) {
+    throw new Error("Both players need to be in an open, unplayed match to swap.");
+  }
+  if (matchA.getId() === matchB.getId()) {
+    throw new Error("These two players are already paired against each other this round.");
+  }
+  if (matchA.hasEnded() || matchB.hasEnded()) {
+    throw new Error("A match that already has a result can't be swapped - correct the result instead.");
+  }
+
+  const swapped = withSwappedPlayers(engine.getValues(), playerAId, playerBId);
+  const repaired = new Manager().loadTournament(swapped);
+  await persistEngine(tournamentId, repaired);
+
+  // Everything keyed to the old pairing goes with it - a duel slot, report,
+  // or open no-show flag from before the swap would misattribute a duel to
+  // whoever's sitting in that match now. The match ids themselves (and their
+  // deadline clock) are untouched: nothing about the round's timing changed.
+  const matchIds = [matchA.getId(), matchB.getId()];
+  await repos().matchFlags.deleteForMatches(tournamentId, matchIds);
+  await repos().duelSlots.deleteForMatches(tournamentId, matchIds);
+  for (const matchId of matchIds) await repos().matchReports.clearForMatch(matchId);
+
+  for (const matchId of matchIds) {
+    const match = repaired.getMatch(matchId);
+    for (const id of [match.getPlayer1().id, match.getPlayer2().id]) {
+      if (!id) continue;
+      await notifyPlayer(id, {
+        kind: "round.repaired",
+        title: "Your opponent changed",
+        body:
+          "A Tournament Organizer swapped a pairing this round. Open the tournament page for your new " +
+          "opponent and duel room before you play. Anything already reported for the old pairing no longer counts.",
+        fingerprint: `player-swap|${matchId}|${id}`,
+      });
+    }
+  }
+
+  return { matchAId: matchA.getId(), matchBId: matchB.getId() };
 }
 
 export async function dropFromStartedTournament(slug: string, registrationId: string): Promise<void> {

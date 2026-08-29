@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { Manager } from "tournament-organizer/components";
 import type { ExportedTournamentValues } from "tournament-organizer/interfaces";
-import { withField, withoutRound } from "./backend/services/results.service.ts";
+import { withField, withoutRound, withSwappedPlayers } from "./backend/services/results.service.ts";
 
 /** A Swiss tournament shaped like the ones startBracket() creates, with no database in sight. */
 function swiss(players: number) {
@@ -189,4 +189,72 @@ test("players already in the bracket keep their record when the field is synced"
   for (const player of field.players) {
     assert.equal(player.matches.length, player.id === "p9" ? 0 : 1);
   }
+});
+
+/** The match id `playerId` currently sits in, plus their opponent's id. */
+function findPairing(values: ExportedTournamentValues, playerId: string) {
+  const match = values.matches.find((m) => m.player1.id === playerId || m.player2.id === playerId)!;
+  const opponentId = match.player1.id === playerId ? match.player2.id : match.player1.id;
+  return { matchId: match.id, opponentId };
+}
+
+test("swapping two players trades their opponents, keeping every other pairing intact", () => {
+  const engine = swiss(8);
+  const values = engine.getValues() as ExportedTournamentValues;
+
+  const [matchA, matchB] = values.matches.filter((m) => m.round === 1);
+  const playerA = matchA.player1.id!;
+  const playerB = matchB.player1.id!;
+  const untouchedA = matchA.player2.id!; // stays in matchA, faces playerB now
+  const untouchedB = matchB.player2.id!; // stays in matchB, faces playerA now
+
+  const swapped = withSwappedPlayers(values, playerA, playerB);
+
+  assert.deepEqual(findPairing(swapped, playerA), { matchId: matchB.id, opponentId: untouchedB });
+  assert.deepEqual(findPairing(swapped, playerB), { matchId: matchA.id, opponentId: untouchedA });
+  assert.deepEqual(findPairing(swapped, untouchedA), { matchId: matchA.id, opponentId: playerB });
+  assert.deepEqual(findPairing(swapped, untouchedB), { matchId: matchB.id, opponentId: playerA });
+
+  // Every other round-1 match is byte-for-byte untouched.
+  for (const match of values.matches.filter((m) => m.round === 1 && m.id !== matchA.id && m.id !== matchB.id)) {
+    assert.deepEqual(
+      swapped.matches.find((m) => m.id === match.id),
+      match,
+    );
+  }
+});
+
+test("swapping two players moves their own match record, not just the match's player slots", () => {
+  const engine = swiss(8);
+  const values = engine.getValues() as ExportedTournamentValues;
+
+  const [matchA, matchB] = values.matches.filter((m) => m.round === 1);
+  const playerA = matchA.player1.id!;
+  const playerB = matchB.player1.id!;
+
+  const swapped = withSwappedPlayers(values, playerA, playerB);
+
+  const recordFor = (id: string) => swapped.players.find((p) => p.id === id)!.matches;
+  assert.equal(recordFor(playerA).length, 1);
+  assert.equal(recordFor(playerA)[0].id, matchB.id);
+  assert.equal(recordFor(playerB).length, 1);
+  assert.equal(recordFor(playerB)[0].id, matchA.id);
+});
+
+test("swapping is a no-op if the two players are already paired against each other", () => {
+  const engine = swiss(8);
+  const values = engine.getValues() as ExportedTournamentValues;
+  const match = values.matches.find((m) => m.round === 1)!;
+
+  const swapped = withSwappedPlayers(values, match.player1.id!, match.player2.id!);
+  assert.deepEqual(swapped, values);
+});
+
+test("swapping is a no-op if either player has no active match", () => {
+  const engine = swiss(8);
+  const values = engine.getValues() as ExportedTournamentValues;
+  const match = values.matches.find((m) => m.round === 1)!;
+
+  const swapped = withSwappedPlayers(values, match.player1.id!, "nobody-registered");
+  assert.deepEqual(swapped, values);
 });

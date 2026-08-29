@@ -1,9 +1,15 @@
 /** Nexus serves avatars from its own uploads, or from ygopro.online for default ones. */
 const AVATAR_HOSTS = new Set(["duelingnexus.com", "ygopro.online"]);
 
-export const NEXUS_DECK_INFO_URL = "https://duelingnexus.com/api/get-deck-info.php";
-export const NEXUS_GET_INFO_URL = "https://duelingnexus.com/api/get-info.php";
-export const NEXUS_GET_REPLAY_INFO_URL = "https://duelingnexus.com/api/get-replay-info.php";
+export const NEXUS_URL = "https://duelingnexus.com";
+export const NEXUS_EDITOR_URL = `${NEXUS_URL}/editor`;
+export const NEXUS_LOBBY_URL = `${NEXUS_URL}/duel`;
+export const NEXUS_PROFILE_URL = `${NEXUS_URL}/profile`;
+export const NEXUS_WIKI_URL = `${NEXUS_URL}/wiki`;
+export const NEXUS_API_URL = `${NEXUS_URL}/api`;
+export const NEXUS_DECK_INFO_URL = `${NEXUS_API_URL}/get-deck-info.php`;
+export const NEXUS_GET_INFO_URL = `${NEXUS_API_URL}/get-info.php`;
+export const NEXUS_GET_REPLAY_INFO_URL = `${NEXUS_API_URL}/get-replay-info.php`;
 
 /** Nexus's own default avatar. Fallback whenever a profile's avatar 404s. */
 export const DEFAULT_AVATAR = "https://ygopro.online/assets/profile/Avatars/0.jpg";

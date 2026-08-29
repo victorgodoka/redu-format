@@ -1,5 +1,7 @@
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
+import { tournamentErrors } from "../errors";
+import { actionError, ActionResult, actionSuccess } from "../actions-utils";
 
 export const SESSION_COOKIE = "admin_session";
 
@@ -16,6 +18,12 @@ function getSecret(): Uint8Array {
   }
 
   return new TextEncoder().encode(secret);
+}
+
+export type AdminActor = {
+  actorId: string
+  actorUsername: string
+  actorDisplayName: string
 }
 
 export type AdminSession = {
@@ -100,9 +108,11 @@ export async function getAdminSession(): Promise<AdminSession | null> {
   const token = cookieStore.get(SESSION_COOKIE)?.value;
 
   if (!token) {
-    return null;
+    actionError(tournamentErrors.session.invalid.token)
+    return null
   }
 
+  actionSuccess();
   return verifyAdminToken(token);
 }
 

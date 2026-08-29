@@ -5,6 +5,7 @@ export {
   deleteTournament,
   getTournament,
   getTournamentBanner,
+  linkParticipant,
   listParticipants,
   listPublicParticipants,
   listTournaments,

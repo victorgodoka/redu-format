@@ -68,10 +68,14 @@ export class PlayersRepository {
     return rows[0] ? rowToPlayer(rows[0]) : null;
   }
 
-  /** Reconciliation lookup - see player.service.ts for why this exists. */
+  /**
+   * Reconciliation lookup - see player.service.ts for why this exists.
+   * Case/whitespace-insensitive: an admin typing a name by hand shouldn't
+   * silently miss an existing account over casing or a stray space.
+   */
   async findByName(name: string): Promise<Player | null> {
     const [rows] = await this.pool.query<PlayerRow[]>(
-      "SELECT * FROM players WHERE nexus_name = ? LIMIT 1",
+      "SELECT * FROM players WHERE LOWER(nexus_name) = LOWER(TRIM(?)) LIMIT 1",
       [name],
     );
     return rows[0] ? rowToPlayer(rows[0]) : null;

@@ -4,6 +4,7 @@ import { PlacingsRepository } from "../repositories/placings.repository.ts";
 import { PrizesRepository, type PrizeRow } from "../repositories/prizes.repository.ts";
 import { RegistrationsRepository } from "../repositories/registrations.repository.ts";
 import { TournamentsRepository } from "../repositories/tournaments.repository.ts";
+import { logAction } from "./audit.service.ts";
 import { notify } from "./notifications.service.ts";
 
 export type { PrizeRow };
@@ -44,13 +45,19 @@ export async function addPrizes(
   for (const entry of entries) {
     await prizes.insert(crypto.randomUUID(), id, entry.tier, entry.code);
   }
+
+  await logAction({
+    action: "prize.add",
+    target: slug,
+    detail: `Added ${entries.length} prize code(s): ${entries.map((e) => e.tier).join(", ")}`,
+  }, [`/admin/tournaments/${slug}`]);
   return entries.length;
 }
 
 export async function removePrize(slug: string, prizeId: string): Promise<boolean> {
   const { prizes, tournaments } = repos();
   const id = await tournaments.findIdBySlug(slug);
-  if (!id) return false;
+  if (!id) throw new Error("ID not found.");;
   return prizes.delete(id, prizeId);
 }
 

@@ -2,7 +2,7 @@ import { teardownTestDb } from "./backend/db/test-setup.ts";
 
 import assert from "node:assert/strict";
 import test from "node:test";
-import { findPlayerIdByToken, resolvePlayerId } from "./backend/services/player.service.ts";
+import { findPlayerByName, findPlayerIdByToken, resolvePlayerId } from "./backend/services/player.service.ts";
 
 test.after(teardownTestDb);
 
@@ -45,4 +45,20 @@ test("a different name with an unseen token creates a genuinely new player", asy
   const a = await resolvePlayerId("token-c", profile({ name: "PlayerC" }));
   const b = await resolvePlayerId("token-d", profile({ name: "PlayerD" }));
   assert.notEqual(a, b);
+});
+
+test("findPlayerByName matches regardless of casing or surrounding whitespace", async () => {
+  const id = await resolvePlayerId("token-e", profile({ name: "SwordSoul King" }));
+
+  const exact = await findPlayerByName("SwordSoul King");
+  const lowercased = await findPlayerByName("swordsoul king");
+  const padded = await findPlayerByName("  SwordSoul King  ");
+
+  assert.equal(exact?.id, id);
+  assert.equal(lowercased?.id, id);
+  assert.equal(padded?.id, id);
+});
+
+test("findPlayerByName finds nobody for a name that truly doesn't exist", async () => {
+  assert.equal(await findPlayerByName("Nobody Registered Here"), null);
 });
