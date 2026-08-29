@@ -140,7 +140,7 @@ export async function linkParticipantAction(form: FormData): Promise<ActionResul
     id: player.id,
     identityKey: player.nexusIdentityKey,
     deckName: before.deckName,
-    deckId: before.deckUUID,
+    deckId: before.deckUUID ?? "",
   });
 
   if (!linked) return actionError(tournamentErrors.participant.link.linkFailed);
@@ -261,7 +261,10 @@ export async function confirmPaymentAction(form: FormData): Promise<ActionResult
 }
 
 /** Disputes a confirmed entry; it goes back to waiting until re-approved. */
-export async function contestPaymentAction(form: FormData): Promise<ActionResult> {
+export async function contestPaymentAction(
+  _prevState: ActionResult,
+  form: FormData,
+): Promise<ActionResult> {
   const slug = String(form.get("slug") ?? "");
   const participantId = String(form.get("participantId") ?? "");
   if (!slug || !participantId) return actionError(tournamentErrors.participant.payment.confirmFailed);
@@ -356,7 +359,10 @@ export async function disqualifyParticipantAction(form: FormData): Promise<Actio
 }
 
 /** Undoes a disqualification or a drop. Matches conceded while they were out stay as they are - correct those individually. */
-export async function reinstateParticipantAction(form: FormData): Promise<ActionResult> {
+export async function reinstateParticipantAction(
+  _prevState: ActionResult,
+  form: FormData,
+): Promise<ActionResult> {
   const slug = String(form.get("slug") ?? "");
   const participantId = String(form.get("participantId") ?? "");
   if (!slug || !participantId) return actionError(tournamentErrors.participant.reinstate.missingParticipant);
