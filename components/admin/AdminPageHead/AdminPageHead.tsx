@@ -6,20 +6,22 @@ export default function AdminPageHead({
   title,
   back,
   action,
+  position,
 }: {
-  title: ReactNode;
+  title?: ReactNode;
+  position?: string;
   back?: { href: string; label: string };
   action?: ReactNode;
 }) {
   return (
     <div className={styles.head}>
-      <h1 className={styles.heading}>{title}</h1>
+      {title && <h1 className={styles.heading}>{title}</h1>}
       {back ? (
         <Link className={styles.back} href={back.href}>
           {back.label}
         </Link>
       ) : null}
-      {action ? <div className={styles.actions}>{action}</div> : null}
+      {action ? <div data-position={position} className={styles.actions}>{action}</div> : null}
     </div>
   );
 }

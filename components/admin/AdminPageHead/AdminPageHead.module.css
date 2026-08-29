@@ -22,6 +22,20 @@
   gap: 10px;
 }
 
+.actions[data-position=left] {
+  width: 100%;
+  align-items: center;
+  flex-wrap: nowrap;
+  justify-content: flex-start;
+}
+
+.actions[data-position=right] {
+  width: 100%;
+  align-items: center;
+  flex-wrap: nowrap;
+  justify-content: flex-end;
+}
+
 .back {
   font-family: var(--f-mono);
   font-size: 11px;

@@ -14,7 +14,7 @@ export default function AdminShell({
   children: ReactNode;
 }) {
   return (
-    <div className={styles.shell}>
+    <div className={`${styles.shell} admin-shell`}>
       <aside className={styles.rail}>
         <p className={styles.brand}>Admin</p>
         <AdminNav displayName={displayName} username={username} unread={unread} />
