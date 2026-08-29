@@ -1,0 +1,25 @@
+.admin-bracket__wrapper {
+
+}
+
+.admin-bracket__title {
+font-size: 30px;
+  font-weight: 800;
+  margin: 0px 0px 8px;
+  color: var(-white);
+  letter-spacing: -0.01em;
+}
+
+.admin-bracket__line {
+font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--c-accent);
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+.admin-bracket__subtitle {
+font-size: 14px;
+  color: var(--c-muted)
+}

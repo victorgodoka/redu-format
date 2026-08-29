@@ -1,3 +1,4 @@
+import { NEXUS_WIKI_URL } from "@/lib/nexus-parse";
 import type { ComponentPropsWithoutRef } from "react";
 
 interface WikiLinkProps extends ComponentPropsWithoutRef<"a"> {
@@ -5,7 +6,7 @@ interface WikiLinkProps extends ComponentPropsWithoutRef<"a"> {
 }
 
 export const WikiLink = ({ cardName, children, ...rest }: WikiLinkProps) => {
-  return <a href={`https://duelingnexus.com/wiki/${cardName}`} target="_blank" {...rest}>
+  return <a href={`${NEXUS_WIKI_URL}/${cardName}`} target="_blank" {...rest}>
     {children}
   </a>
 }

@@ -2212,10 +2212,93 @@ input[type="number"]::-webkit-inner-spin-button {
   margin: 0;
 }
 
+/* Prize type is a short enum (7 options): a narrower fixed column leaves the
+   redemption code field the room it actually needs. */
+.prize-row .form__field:last-of-type {
+  flex: 0 0 180px;
+}
+
+/* The prize-code editor reads as plain form controls, not the admin area's
+   usual mono-font/hairline-radius inputs - scoped to .prize-row so the rest
+   of the admin forms are untouched. */
+.prize-row input,
+.prize-row select {
+  border-radius: 8px;
+  font-family: var(--f-body);
+}
+
+.prizing {
+  margin-top: 24px;
+}
+
+.prizing__title {
+  margin: 0 0 24px;
+  font-family: var(--f-body);
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+/* Plain rounded cards, not the site's chamfered .panel - the redemption-code
+   list reads as data rows, not another cut-corner surface. */
+.prize-list {
+  display: grid;
+  gap: 10px;
+  margin: 20px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.prize-card {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 20px;
+  border: 1px solid var(--c-line-soft);
+  border-radius: 12px;
+  background: var(--c-panel);
+}
+
+.prize-card__code {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 15px;
+  color: var(--c-text);
+}
+
+.prize-card__meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.prize-card__status {
+  font-size: 13px;
+  color: var(--c-muted);
+}
+
+/* Unsent codes read as a neutral/gray pill here, not the site's usual gold
+   neutral badge - scoped to .prize-card so every other admin badge keeps
+   the single-hue accent system. */
+.prize-card .badge--neutral {
+  background: var(--c-line-soft);
+  border: 1px solid var(--c-line);
+  color: var(--c-muted);
+}
+
 .prize-row__btn {
   flex: 0 0 auto;
+  width: 38px;
+  height: 38px;
   min-width: 0;
-  padding: 10px 16px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   font-size: 16px;
   line-height: 1;
 }
@@ -2274,6 +2357,16 @@ input[type="number"]::-webkit-inner-spin-button {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 18px 20px;
+}
+
+.form__group--3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+@media (max-width: 760px) {
+  .form__group--3 {
+    grid-template-columns: 1fr;
+  }
 }
 
 .form-group * {

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Chakra_Petch, Geist, Geist_Mono } from "next/font/google";
 import { SITE_URL } from "@/lib/site";
 import "./globals.css";
+import { ToastProvider } from "@/components/ui/Toast";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -63,7 +64,11 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       {/* Extensions mutate <body> before hydration (e.g. adding a "vc-init"
           class). This only relaxes the check on body's own attributes; real
           mismatches inside the tree still surface. */}
-      <body suppressHydrationWarning>{children}</body>
+      <body suppressHydrationWarning>
+        <ToastProvider>
+          {children}
+        </ToastProvider>
+      </body>
     </html>
   );
 }
