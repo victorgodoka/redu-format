@@ -3,12 +3,16 @@ import AdminList, { AdminRow } from "@/components/admin/AdminList";
 import MatchResultForm from "@/components/admin/MatchResultForm";
 import Button from "@/components/ui/Button";
 import Countdown from "@/components/site/Countdown";
-import { dismissNoShowAdminAction } from "@/app/admin/(protected)/tournaments/[slug]/bracket/actions";
+import {
+  dismissNoShowAdminAction,
+  swapPlayersAction,
+} from "@/app/admin/(protected)/tournaments/[slug]/bracket/actions";
 import type {
   BracketPlayer,
   BracketView,
   getPlacings,
 } from "@/lib/backend/services/results.service";
+import { NEXUS_LOBBY_URL } from "@/lib/nexus-parse";
 
 type Placing = Awaited<ReturnType<typeof getPlacings>>[number];
 
@@ -47,6 +51,13 @@ export default function BracketRounds({
   });
   const titleFor = (round: number) =>
     view.matches.find((m) => m.round === round)?.label ?? `Round ${round}`;
+
+  // Every player currently sitting in an open, unreported match - the pool a
+  // swap can pull from. Swapping only ever makes sense between two matches
+  // that are both still to be played.
+  const swappable = view.matches.filter(
+    (m) => m.active && !m.bye && !m.hasResult && m.player1 && m.player2,
+  );
 
   return (
     <>
@@ -121,7 +132,7 @@ export default function BracketRounds({
                       {match.roomHash ? (
                         <a
                           className="admin-row__meta"
-                          href={`https://duelingnexus.com/duel/NA-${match.roomHash}`}
+                          href={`${NEXUS_LOBBY_URL}}/NA-${match.roomHash}`}
                           target="_blank"
                           rel="noopener noreferrer"
                         >
@@ -141,24 +152,62 @@ export default function BracketRounds({
                     ) : null}
 
                     {!match.bye && match.player1 && match.player2 && view.status !== "complete" ? (
-                      <MatchResultForm
-                        slug={slug}
-                        matchId={match.id}
-                        hasResult={match.hasResult}
-                        winningGames={view.winningGames}
-                        player1={{
-                          name: match.player1.name,
-                          defaultValue: match.hasResult
-                            ? resultOption(match.player1, match.player2)
-                            : "0",
-                        }}
-                        player2={{
-                          name: match.player2.name,
-                          defaultValue: match.hasResult
-                            ? resultOption(match.player2, match.player1)
-                            : "0",
-                        }}
-                      />
+                      <>
+                        <MatchResultForm
+                          slug={slug}
+                          matchId={match.id}
+                          hasResult={match.hasResult}
+                          winningGames={view.winningGames}
+                          player1={{
+                            name: match.player1.name,
+                            defaultValue: match.hasResult
+                              ? resultOption(match.player1, match.player2)
+                              : "0",
+                          }}
+                          player2={{
+                            name: match.player2.name,
+                            defaultValue: match.hasResult
+                              ? resultOption(match.player2, match.player1)
+                              : "0",
+                          }}
+                        />
+                        {!match.hasResult && match.active && swappable.length > 1 ? (
+                          <AdminRow.Actions>
+                            <details className="admin-row__override">
+                              <summary className="admin-row__meta">Swap opponent</summary>
+                              <form action={swapPlayersAction} className="payment-controls__confirm">
+                                <input type="hidden" name="slug" value={slug} />
+                                <select name="playerAId" aria-label="Player to move" required defaultValue="">
+                                  <option value="" disabled>
+                                    Move...
+                                  </option>
+                                  <option value={match.player1.registrationId}>{match.player1.name}</option>
+                                  <option value={match.player2.registrationId}>{match.player2.name}</option>
+                                </select>
+                                <select name="playerBId" aria-label="Swap with" required defaultValue="">
+                                  <option value="" disabled>
+                                    Swap with...
+                                  </option>
+                                  {swappable
+                                    .filter((m) => m.id !== match.id)
+                                    .flatMap((m) => [
+                                      { id: m.player1!.registrationId, name: m.player1!.name, opponent: m.player2!.name },
+                                      { id: m.player2!.registrationId, name: m.player2!.name, opponent: m.player1!.name },
+                                    ])
+                                    .map((p) => (
+                                      <option key={p.id} value={p.id}>
+                                        {p.name} (vs {p.opponent})
+                                      </option>
+                                    ))}
+                                </select>
+                                <Button variant="danger" type="submit">
+                                  Swap
+                                </Button>
+                              </form>
+                            </details>
+                          </AdminRow.Actions>
+                        ) : null}
+                      </>
                     ) : null}
                   </AdminRow>
                 );

@@ -196,6 +196,41 @@ export default function TournamentForm({
     }
   }, [state, toast]);
 
+  const durationField = (
+    <FormField label="Duration" htmlFor="durationMode" hint={DURATION_MODES[durationMode].hint}>
+      <Select
+        id="durationMode"
+        name="durationMode"
+        value={durationMode}
+        onChange={(e) => setDurationMode(e.target.value as DurationMode)}
+      >
+        {(Object.keys(DURATION_MODES) as DurationMode[]).map((value) => (
+          <option key={value} value={value}>
+            {DURATION_MODES[value].label}
+          </option>
+        ))}
+      </Select>
+    </FormField>
+  );
+
+  const entryField = (
+    <FormField label="Entry" htmlFor="entryType">
+      {isEditing && tournament ? (
+        <Input id="entryType" name="entryType" readOnly defaultValue={tournament.entry.type} required />
+      ) : (
+        <Select
+          id="entryType"
+          name="entryType"
+          value={entryType}
+          onChange={(e) => setEntryType(e.target.value as "free" | "paid")}
+        >
+          <option value="free">Free</option>
+          <option value="paid">Paid</option>
+        </Select>
+      )}
+    </FormField>
+  );
+
   return (
     <form action={dispatch} className="form form--grid">
       {isEditing && tournament ? (
@@ -254,7 +289,7 @@ export default function TournamentForm({
         </Select>
       </FormField>
 
-      <FormGroup>
+      <FormGroup columns={3}>
         <FormField label="Starts at" htmlFor="startsAtTime">
           <Input
             id="startsAtTime"
@@ -282,24 +317,21 @@ export default function TournamentForm({
             ))}
           </Select>
         </FormField>
-      </FormGroup>
 
-      <div className="form__field">
-        <label htmlFor="structure">Structure</label>
-        <Select
-          id="structure"
-          name="structure"
-          value={structure}
-          onChange={(e) => setStructure(e.target.value as Structure)}
-        >
-          {(Object.keys(STRUCTURES) as Structure[]).map((value) => (
-            <option key={value} value={value}>
-              {STRUCTURES[value].label}
-            </option>
-          ))}
-        </Select>
-        {showTopCut ? (
-          <div className="form__field">
+        <FormField label="Structure" htmlFor="structure">
+          <Select
+            id="structure"
+            name="structure"
+            value={structure}
+            onChange={(e) => setStructure(e.target.value as Structure)}
+          >
+            {(Object.keys(STRUCTURES) as Structure[]).map((value) => (
+              <option key={value} value={value}>
+                {STRUCTURES[value].label}
+              </option>
+            ))}
+          </Select>
+          {showTopCut ? (
             <Label className="topcut__toggle">
               <input
                 type="checkbox"
@@ -318,9 +350,9 @@ export default function TournamentForm({
                 </p>
               ) : null}
             </Label>
-          </div>
-        ) : null}
-      </div>
+          ) : null}
+        </FormField>
+      </FormGroup>
 
       <FormField label="Seats" htmlFor="seats">
         <Select id="seats" name="seats" value={seats} onChange={(e) => setSeats(e.target.value)}>
@@ -376,23 +408,10 @@ export default function TournamentForm({
         </Select>
       </FormField>
 
-      <FormField label="Duration" htmlFor="durationMode" hint={DURATION_MODES[durationMode].hint}>
-        <Select
-          id="durationMode"
-          name="durationMode"
-          value={durationMode}
-          onChange={(e) => setDurationMode(e.target.value as DurationMode)}
-        >
-          {(Object.keys(DURATION_MODES) as DurationMode[]).map((value) => (
-            <option key={value} value={value}>
-              {DURATION_MODES[value].label}
-            </option>
-          ))}
-        </Select>
-      </FormField>
-
       {durationMode === "same_day" ? (
-        <FormGroup>
+        <FormGroup columns={3}>
+          {durationField}
+
           <FormField
             label="Round length (minutes)"
             htmlFor="roundMinutes"
@@ -424,42 +443,31 @@ export default function TournamentForm({
           </FormField>
         </FormGroup>
       ) : (
-        <FormField
-          label="Round deadline (days)"
-          htmlFor="roundLimitDays"
-          hint="How long a round stays open before it locks and waits for a moderator."
-        >
-          <Input
-            id="roundLimitDays"
-            name="roundLimitDays"
-            type="number"
-            min={1}
-            defaultValue={tournament?.roundLimitDays ?? 2}
-            required
-          />
-        </FormField>
+        <FormGroup>
+          {durationField}
+
+          <FormField
+            label="Round deadline (days)"
+            htmlFor="roundLimitDays"
+            hint="How long a round stays open before it locks and waits for a moderator."
+          >
+            <Input
+              id="roundLimitDays"
+              name="roundLimitDays"
+              type="number"
+              min={1}
+              defaultValue={tournament?.roundLimitDays ?? 2}
+              required
+            />
+          </FormField>
+        </FormGroup>
       )}
 
-      <FormField label="Entry" htmlFor="entryType">
-        {isEditing && tournament ? (
-          <Input id="entryType" name="entryType" readOnly defaultValue={tournament.entry.type} required />
-        ) : (
-          <Select
-            id="entryType"
-            name="entryType"
-            value={entryType}
-            onChange={(e) => setEntryType(e.target.value as "free" | "paid")}
-          >
-            <option value="free">Free</option>
-            <option value="paid">Paid</option>
-          </Select>
-        )}
-      </FormField>
-
       {entryType === "paid" ? (
-        <FormGroup>
-          <div className="form__field">
-            <label htmlFor="entryAmount">Amount</label>
+        <FormGroup columns={3}>
+          {entryField}
+
+          <FormField label="Amount" htmlFor="entryAmount">
             <div className="input-affix">
               <span className="input-affix__symbol">{currencySymbol(currency)}</span>
               <Input
@@ -475,7 +483,7 @@ export default function TournamentForm({
               />
             </div>
             <input type="hidden" name="entryAmount" value={amountValue} />
-          </div>
+          </FormField>
 
           {!isEditing ? (
             <FormField label="Currency" htmlFor="entryCurrency">
@@ -496,7 +504,9 @@ export default function TournamentForm({
             <input type="hidden" name="entryCurrency" value={currency} />
           )}
         </FormGroup>
-      ) : null}
+      ) : (
+        entryField
+      )}
 
       <FormField
         label="Prizing"

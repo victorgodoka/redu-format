@@ -1,39 +1,33 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import AdminPageHead from "@/components/admin/AdminPageHead";
-import ParticipantList from "@/components/admin/ParticipantList";
-import Button from "@/components/ui/Button";
 import EmptyState from "@/components/ui/EmptyState";
-import FormField from "@/components/ui/FormField";
-import Input from "@/components/ui/Input";
 import { listPlayerNames } from "@/lib/backend/services/player.service";
 import { hasBracket } from "@/lib/backend/services/results.service";
-import { getTournament, listParticipants } from "@/lib/tournaments";
-import {
-  addParticipantAction,
-  confirmPaymentAction,
-  contestPaymentAction,
-  disqualifyParticipantAction,
-  editParticipantDeckAction,
-  overrideParticipantDeckAction,
-  reinstateParticipantAction,
-  removeParticipantAction,
-} from "./actions";
+import { formatEntry } from "@/lib/events";
+import { getTournament, listParticipants, Participant } from "@/lib/tournaments";
+import ParticipantCards from "@/components/admin/ParticipantCards";
+import ParticipantAddForm from "@/components/admin/ParticipantAddForm";
+
+type StatusFilter = "all" | "active" | "dropped" | "disqualified";
 
 export const metadata: Metadata = {
   title: "Tournament participants | REDU Format",
   robots: { index: false, follow: false },
 };
 
+function statusOf(p: Participant): Exclude<StatusFilter, "all"> {
+  if (p.disqualifiedAt) return "disqualified";
+  if (p.droppedAt) return "dropped";
+  return "active";
+}
+
 export default async function ParticipantsPage({
   params,
-  searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ error?: string }>;
 }) {
   const { slug } = await params;
-  const { error } = await searchParams;
   const tournament = await getTournament(slug);
   if (!tournament) notFound();
 
@@ -42,60 +36,46 @@ export default async function ParticipantsPage({
     hasBracket(slug),
     listPlayerNames(),
   ]);
+
   const isPaid = tournament.entry.type === "paid";
+  const eyebrow = `${formatEntry(tournament.entry)} · ${participants.length} ${participants.length === 1 ? "participant" : "participants"}`;
+  const counts: Record<StatusFilter, number> = {
+    all: participants.length,
+    active: participants.filter((p) => statusOf(p) === "active").length,
+    dropped: participants.filter((p) => statusOf(p) === "dropped").length,
+    disqualified: participants.filter((p) => statusOf(p) === "disqualified").length,
+  };
+
+  const statusLabel: Record<StatusFilter, string> = {
+    all: "All",
+    active: "Active",
+    dropped: "Dropped",
+    disqualified: "Disqualified",
+  };
 
   return (
     <>
       <AdminPageHead
-        title={`${tournament.name} · Participants`}
+        title={
+          <span className="admin-page-title">
+            <span className="admin-page-title__eyebrow">{eyebrow}</span>
+            {tournament.name}
+          </span>
+        }
         back={{ href: `/admin/tournaments/${slug}`, label: "← Back to tournament" }}
       />
 
-      {error ? (
-        <p role="alert" className="form__error">
-          {error}
-        </p>
-      ) : null}
-
-      <form action={addParticipantAction} className="form form--flex">
-        <input type="hidden" name="slug" value={slug} />
-        <FormField
-          label="Duelist name"
-          htmlFor="name"
-          hint="Pick a registered duelist to register them exactly as their own signup would - identity, inbox, prizing and deck lock all included. A name nobody here owns still goes in, as a plain entry."
-        >
-          {/* Plain datalist: the browser does the matching, so the page stays
-              a server component and there is no dropdown to build. */}
-          <Input id="name" name="name" type="text" list="registered-players" autoComplete="off" required />
-          <datalist id="registered-players">
-            {playerNames.map((playerName) => (
-              <option key={playerName} value={playerName} />
-            ))}
-          </datalist>
-        </FormField>
-        <FormField label="Deck UUID" htmlFor="deckName">
-          <Input id="deckName" name="deckName" type="text" placeholder="Dueling Nexus deck UUID" required />
-        </FormField>
-        <Button variant="solid" type="submit">
-          Add participant
-        </Button>
-      </form>
+      <ParticipantAddForm slug={slug} playerNames={playerNames} />
 
       {participants.length === 0 ? (
         <EmptyState message="No participants registered yet." />
       ) : (
-        <ParticipantList
+        <ParticipantCards
           slug={slug}
-          participants={participants}
           isPaid={isPaid}
           started={started}
-          confirmPaymentAction={confirmPaymentAction}
-          contestPaymentAction={contestPaymentAction}
-          editParticipantDeckAction={editParticipantDeckAction}
-          overrideParticipantDeckAction={overrideParticipantDeckAction}
-          removeParticipantAction={removeParticipantAction}
-          disqualifyParticipantAction={disqualifyParticipantAction}
-          reinstateParticipantAction={reinstateParticipantAction}
+          participants={participants}
+          tournamentName={tournament.name}
         />
       )}
     </>

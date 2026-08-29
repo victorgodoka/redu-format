@@ -32,13 +32,13 @@ const ParticipantCards = ({ participants, started, slug, isPaid, tournamentName 
       const acting = activeAction?.id === p.id ? activeAction.kind : null;
 
       return (
-        <li key={p.id}>
-          <div className="card">
-            <div className="row">
-              <div className="main">
-                <span className="name">{p.name}</span>
+        <li className={styles.wrapper} key={p.id}>
+          <div className={styles.card}>
+            <div className={styles.row}>
+              <div className={styles.main}>
+                <span className={styles.name}>{p.name}</span>
                 <a
-                  className="deck"
+                  className={styles.deck}
                   href={`${NEXUS_EDITOR_URL}${p.deckUUID}`}
                   target="_blank"
                   rel="noopener noreferrer"
@@ -46,12 +46,12 @@ const ParticipantCards = ({ participants, started, slug, isPaid, tournamentName 
                   {p.deckName ?? "Player's Deck"}
                   {started ? <Icon icon="material-symbols:lock " /> : null}
                 </a>
-                <span className="source">
+                <span className={styles.source}>
                   {p.source === "public_signup" ? "Public signup" : "Admin signup"}
                 </span>
 
                 {p.disqualifiedAt || p.droppedAt || canLink || isPaid ? (
-                  <div className="pills">
+                  <div className={styles.pills}>
                     {p.disqualifiedAt ? (
                       <Badge tone="negative">
                         Disqualified · {p.dqReason ?? "Deck violation"} · {formatDate(p.disqualifiedAt)}{" "}

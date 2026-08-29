@@ -1,0 +1,11 @@
+.wrapper {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px 24px;
+  border-top: 1px solid var(--c-line);
+  background: color-mix(in srgb, var(--c-panel) 65%, transparent);
+  border-radius: 0 0 12px 12px;
+}
+

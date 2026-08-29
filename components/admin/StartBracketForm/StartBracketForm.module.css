@@ -1,0 +1,44 @@
+.seedList {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 18px;
+  padding: 0;
+  list-style: none;
+  max-width: 420px;
+}
+
+.seedRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border: 1px solid var(--c-line);
+  border-radius: 4px;
+  background: var(--c-panel);
+  cursor: grab;
+}
+
+.seedRow:active {
+  cursor: grabbing;
+}
+
+.seedNumber {
+  flex: 0 0 auto;
+  font-family: var(--f-mono);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  color: var(--c-muted);
+}
+
+.seedName {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.seedHandle {
+  flex: 0 0 auto;
+  color: var(--c-muted);
+}

@@ -1,0 +1,57 @@
+.action-banner {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  width: 100%;
+  padding: 12px 16px;
+  border-radius: 0 0 12px 12px;
+}
+
+.action-banner__text {
+  flex: 1;
+  min-width: 220px;
+  font-size: 13px;
+  color: var(--c-text-soft);
+}
+
+.action-banner__form {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.action-banner__form input {
+  flex: 1;
+  min-width: 180px;
+  padding: 8px 12px;
+  border: 1px solid var(--c-line);
+  border-radius: 12px;
+  background: var(--c-raise);
+  color: var(--c-text);
+  font-size: 13px;
+}
+
+/* Tinted-panel treatment (matches .notice--done/.notice--warn): a soft wash
+   of the accent colour over the card's own panel background, not a solid
+   fill - keeps the banner legible and on-palette instead of a loud block. */
+.action-banner--red {
+  background: color-mix(in srgb, var(--c-danger) 18%, var(--c-panel));
+  border: 1px solid color-mix(in srgb, var(--c-danger) 55%, transparent);
+}
+
+.action-banner--amber {
+  background: color-mix(in srgb, var(--c-accent) 18%, var(--c-panel));
+  border: 1px solid color-mix(in srgb, var(--c-accent) 55%, transparent);
+}
+
+.action-banner--green {
+  background: color-mix(in srgb, var(--c-success) 18%, var(--c-panel));
+  border: 1px solid color-mix(in srgb, var(--c-success) 55%, transparent);
+}
+
+.action-banner--blue {
+  background: color-mix(in srgb, var(--c-primary) 18%, var(--c-panel));
+  border: 1px solid color-mix(in srgb, var(--c-primary) 55%, transparent);
+}

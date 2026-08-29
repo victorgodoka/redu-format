@@ -1,4 +1,3 @@
-import AdminList, { AdminRow } from "@/components/admin/AdminList";
 import Badge from "@/components/ui/Badge";
 import EmptyState from "@/components/ui/EmptyState";
 import { formatDate, formatTime } from "@/lib/events";
@@ -26,8 +25,8 @@ export default function PrizingPanel({
   const unsent = prizes.filter((p) => !p.sentAt).length;
 
   return (
-    <div className="section__content" style={{ marginTop: "24px" }}>
-      <h2 className="section__subtitle">Prizing</h2>
+    <div className="prizing">
+      <h2 className="prizing__title">Prizing</h2>
 
       {open ? <PrizeCodeFields slug={slug} /> : null}
 
@@ -41,30 +40,28 @@ export default function PrizingPanel({
       {prizes.length === 0 ? (
         <EmptyState message="No prize codes yet." />
       ) : (
-        <AdminList>
+        <ul className="prize-list">
           {prizes.map((prize) => (
-            <AdminRow key={prize.id}>
-              <AdminRow.Main>
-                <span className="admin-row__title">
-                  <code>{prize.code}</code>
-                </span>
-                <span className="admin-row__meta">
+            <li key={prize.id} className="prize-card">
+              <div>
+                <code className="prize-card__code">{prize.code}</code>
+                <div className="prize-card__meta">
                   <Badge tone={prize.sentAt ? "positive" : "neutral"}>
                     {PRIZE_TIERS[prize.tier].label}
-                  </Badge>{" "}
-                  {prize.sentAt
-                    ? `Sent to ${prize.sentTo ?? "a player"} on ${formatDate(prize.sentAt)} ${formatTime(prize.sentAt)}`
-                    : "Not sent yet"}
-                </span>
-              </AdminRow.Main>
+                  </Badge>
+                  <span className="prize-card__status">
+                    {prize.sentAt
+                      ? `Sent to ${prize.sentTo ?? "a player"} on ${formatDate(prize.sentAt)} ${formatTime(prize.sentAt)}`
+                      : "Not sent yet"}
+                  </span>
+                </div>
+              </div>
               {open && !prize.sentAt ? (
-                <AdminRow.Actions>
-                  <RemovePrizeButton slug={slug} prizeId={prize.id} prizeCode={prize.code} />
-                </AdminRow.Actions>
+                <RemovePrizeButton slug={slug} prizeId={prize.id} prizeCode={prize.code} />
               ) : null}
-            </AdminRow>
+            </li>
           ))}
-        </AdminList>
+        </ul>
       )}
 
       {status === "finished" ? (
