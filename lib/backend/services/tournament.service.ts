@@ -9,7 +9,8 @@ export type PaymentStatus = "pending" | "confirmed" | "contested" | "not_require
 export type Participant = {
   id: string;
   name: string;
-  deckName: string;
+  deckName?: string;
+  deckUUID: string | null;
   /** "not_required" for a free tournament's entry; otherwise the usual pending/confirmed/contested. */
   paymentStatus: PaymentStatus;
   proofUrl: string | null;
@@ -23,14 +24,16 @@ export type Participant = {
   /** ISO instant they were disqualified, or null. A DQ also drops them, so both are set. */
   disqualifiedAt: string | null;
   dqReason: string | null;
+  /** The account this registration is tied to, or null for a plain entry with nobody to notify. */
+  playerId: string | null;
 };
 
 /**
  * What a participant looks like in the public participant list: registered
- * before the start, active/eliminated once it is running, and disqualified if
- * they broke the deck lock.
+ * before the start, active/eliminated once it is running, dropped if they
+ * left of their own accord, and disqualified if they broke the deck lock.
  */
-export type ParticipantStatus = "registered" | "active" | "eliminated" | "disqualified";
+export type ParticipantStatus = "registered" | "active" | "eliminated" | "dropped" | "disqualified";
 
 export type PublicParticipant = {
   id: string;
@@ -155,9 +158,11 @@ export async function listPublicParticipants(
       ? "disqualified"
       : !started
         ? "registered"
-        : p.droppedAt || eliminatedIds.has(p.id)
-          ? "eliminated"
-          : "active",
+        : p.droppedAt
+          ? "dropped"
+          : eliminatedIds.has(p.id)
+            ? "eliminated"
+            : "active",
   }));
 }
 
@@ -172,8 +177,8 @@ export async function addParticipant(
   slug: string,
   input: {
     name: string;
-    deckName: string;
-    player?: { id: string; identityKey: string; deckId: string };
+    deckName?: string;
+    player?: { id: string; identityKey: string; deckId: string; deckName?: string };
   },
 ): Promise<Participant> {
   const id = crypto.randomUUID();
@@ -182,7 +187,8 @@ export async function addParticipant(
   return {
     id,
     name: input.name,
-    deckName: input.deckName,
+    deckName: input.player?.deckName ?? input.deckName,
+    deckUUID: input.player?.deckId ?? null,
     paymentStatus: "pending",
     proofUrl: null,
     paymentBy: null,
@@ -191,7 +197,22 @@ export async function addParticipant(
     droppedAt: null,
     disqualifiedAt: null,
     dqReason: null,
+    playerId: input.player?.id ?? null,
   };
+}
+
+/**
+ * Links an already-added, unlinked registration to a real account after the
+ * fact - for when the name typed in at add-time didn't match (a typo, a name
+ * that has since changed) and the participant is now stuck with no account
+ * behind their registration. Once linked, the lobby/prizing/ranking code
+ * paths that already key off `player_id` pick them up with no further changes.
+ */
+export async function linkParticipant(
+  id: string,
+  player: { id: string; identityKey: string; deckId: string, deckName?: string },
+): Promise<boolean> {
+  return repos().registrations.linkPlayer(id, player);
 }
 
 export async function removeParticipant(slug: string, id: string): Promise<boolean> {

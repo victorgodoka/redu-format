@@ -15,6 +15,7 @@ type RegistrationRow = RowDataPacket & {
   dropped_at: string | null;
   disqualified_at: string | null;
   dq_reason: string | null;
+  player_id: string | null;
 };
 
 function rowToParticipant(row: RegistrationRow): Participant {
@@ -22,6 +23,7 @@ function rowToParticipant(row: RegistrationRow): Participant {
     id: row.id,
     name: row.display_name,
     deckName: row.deck_name,
+    deckUUID: row.deck_id,
     paymentStatus: row.payment_status,
     proofUrl: row.proof_url,
     paymentBy: row.payment_by,
@@ -30,6 +32,7 @@ function rowToParticipant(row: RegistrationRow): Participant {
     droppedAt: fromMysqlDatetime(row.dropped_at),
     disqualifiedAt: fromMysqlDatetime(row.disqualified_at),
     dqReason: row.dq_reason,
+    playerId: row.player_id,
   };
 }
 
@@ -132,8 +135,8 @@ export class RegistrationsRepository {
     slug: string,
     input: {
       name: string;
-      deckName: string;
-      player?: { id: string; identityKey: string; deckId: string };
+      deckName?: string;
+      player?: { id: string; identityKey: string; deckId: string; deckName?: string };
     },
   ): Promise<boolean> {
     const [result] = await this.pool.query<ResultSetHeader>(
@@ -145,9 +148,28 @@ export class RegistrationsRepository {
         input.player?.identityKey ?? null,
         input.player?.deckId ?? null,
         input.name,
-        input.deckName,
+        input.player?.deckName ?? input.deckName ?? null,
         slug,
       ],
+    );
+    return result.affectedRows > 0;
+  }
+
+  /**
+   * Links an already-existing, unlinked registration to a real account -
+   * exactly what should have happened at add-time if the admin's typed name
+   * had matched. Guarded to never touch a registration that's already linked,
+   * same spirit as markDisqualified never overwriting an earlier DQ.
+   */
+  async linkPlayer(
+    registrationId: string,
+    player: { id: string; identityKey: string; deckId: string },
+  ): Promise<boolean> {
+    const [result] = await this.pool.query<ResultSetHeader>(
+      `UPDATE registrations
+       SET player_id = ?, nexus_identity_key_snapshot = ?, deck_id = ?
+       WHERE id = ? AND player_id IS NULL`,
+      [player.id, player.identityKey, player.deckId, registrationId],
     );
     return result.affectedRows > 0;
   }

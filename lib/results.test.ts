@@ -574,7 +574,7 @@ test("leaderboard aggregates points across tournaments, only for real players", 
   }
 
   const leaderboard = await getLeaderboard();
-  const entry = leaderboard.find((row) => row.playerId === playerId);
+  const entry = leaderboard.rows.find((row) => row.playerId === playerId);
   assert.ok(entry, "leaderboard should include the linked player");
   assert.equal(entry!.eventsPlayed, 2);
   assert.ok(entry!.totalPoints > 0);
